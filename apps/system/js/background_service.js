@@ -37,6 +37,18 @@ var BackgroundServiceManager = (function bsm() {
     var newapp = evt.application;
     installedApps[newapp.origin] = newapp;
 
+    // Caching the icon
+    var appCache = window.applicationCache;
+    if (appCache) {
+      var icons = newapp.manifest.icons;
+      if (icons) {
+        Object.keys(icons).forEach(function iconIterator(key) {
+          var url = newapp.origin + icons[key];
+          appCache.mozAdd(url);
+        });
+      }
+    }
+
     open(newapp.origin);
 
     if (OriginalOninstall)
@@ -63,7 +75,7 @@ var BackgroundServiceManager = (function bsm() {
     var frame = document.createElement('iframe');
     frame.className = 'backgroundWindow';
     frame.setAttribute('mozbrowser', 'true');
-    frame.setAttribute('mozapp', 'true');
+    frame.setAttribute('mozapp', app.manifestURL);
     frame.src = origin + app.manifest.background_page;
     frames[origin] = frame;
 
