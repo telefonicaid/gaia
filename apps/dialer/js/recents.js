@@ -31,7 +31,8 @@ var Recents = {
       db.createObjectStore(self.STORENAME, { keyPath: 'date' });
     };
 
-    this.startUpdatingDates();
+    if (this.view)
+      this.startUpdatingDates();
   },
 
   cleanup: function re_cleanup() {
@@ -105,6 +106,9 @@ var Recents = {
   },
 
   render: function re_render() {
+    if (!this.view)
+      return;
+
     this.view.innerHTML = '';
 
     this.history((function(history) {

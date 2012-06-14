@@ -15,13 +15,16 @@ var Contacts = {
   },
 
   setup: function contactsSetup() {
-    document.getElementById('contacts').addEventListener('change',
+    var tab = document.getElementById('contacts');
+    if (tab) {
+      tab.addEventListener('change',
       (function contactTabChanged(evt) {
         // loading contacts the first time the view appears
         this.load();
 
         ContactDetails.hide();
-     }).bind(this));
+      }).bind(this));
+    }
   },
 
   load: function contactsLoad() {

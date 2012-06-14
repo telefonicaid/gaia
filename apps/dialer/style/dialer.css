@@ -86,7 +86,6 @@ html * {
     text-align: right;
     cursor:none;
     -moz-user-select: none;
-    user-select: none;
   }
   #kb-delete{
     text-align:center;
@@ -113,9 +112,8 @@ html * {
 
   #kb-keypad{
     background: #2d3642; 
-    background: -moz-linear-gradient(top, #2d3642 0%, #0f1214 100%); 
-    background: linear-gradient(top, #2d3642 0%,#0f1214 100%); 
-    height:-moz-calc(100% - 6.5rem);
+    background: -moz-linear-gradient(top, #2d3642 0%, #0f1214 100%);
+    height: -moz-calc(100% - 6.5rem);
     width:100%;
     display:table;
     table-layout:fixed;
@@ -165,11 +163,7 @@ html * {
         .kb-keypad-key-label{
           display:table-cell;
           padding-left:1.5rem;
-          box-sizing:border-box;
           vertical-align:middle;
-          /*-moz-user-select: none;
-          
-          user-select: none;*/
         }
 
         .kb-keypad-key-label-centered{
@@ -194,42 +188,25 @@ html * {
   }
 
     #kb-callbar-add-contact{
-      
       display:table-cell;
       width:7rem;
-      background: -moz-linear-gradient(top, #242b36 0%, #19191a 100%); 
-      background: linear-gradient(top, #242b36 0%,#19191a 100%); 
+      background: -moz-linear-gradient(top, #242b36 0%, #19191a 100%);
       border:.1rem solid #242B36;
       border-radius:.2rem;
       opacity:0.5;
     }
     #kb-callbar-add-contact:active{
-      /*opacity:0.7;*/
-    }
-
-    
-
-    #kb-callbar-call-action{
-      display:table-cell;
-      background: #84c82c; 
-      border:0;
-      border-radius:.2rem;
-      background: -moz-linear-gradient(top, #84c82c 0%, #5f9b0a 100%); 
-      background: linear-gradient(top, #84c82c 0%,#5f9b0a 100%);
-    }
-    #kb-callbar-call-action:active{
       opacity:0.7;
     }
 
-    #kb-callbar-back-action{
+    #kb-callbar-call-action{
       display:table-cell;
-      background: #84c82c; 
+      background: #84c82c;
       border:0;
       border-radius:.2rem;
-       background: -moz-linear-gradient(top, #242b36 0%, #19191a 100%); 
-      background: linear-gradient(top, #242b36 0%,#19191a 100%); 
+      background: -moz-linear-gradient(top, #84c82c 0%, #5f9b0a 100%);
     }
-    #kb-callbar-back-action:active{
+    #kb-callbar-call-action:active{
       opacity:0.7;
     }
 
@@ -281,9 +258,8 @@ html * {
   -moz-transform: translateY(-100%);
   
   z-index: 100;
-  display:table;
-  table-layout:fixed;
-  transition:all .3s ease-in;
+  display: table;
+  table-layout: fixed;
   -moz-transition: all .3s ease-in;
 }
 
@@ -304,7 +280,6 @@ html * {
 
     .cs-h-info{
       padding:0 3rem;
-      box-sizing:border-box;
       overflow: hidden;
       text-overflow:ellipsis;
       white-space:nowrap;
@@ -313,7 +288,6 @@ html * {
         color:white;
         font-size: -moz-calc(25*0.226rem);
         padding:0 3rem;
-        box-sizing:border-box;
       }
 
       
@@ -430,15 +404,13 @@ html * {
           .co-basic-botton-start{
             
             background: -moz-linear-gradient(top, #84C82C 1%, #5F9B0A 100%); 
-            background: linear-gradient(top, #84C82C 1%,#5F9B0A 100%);
             border:0;
             border-radius:.3rem;
           }
-            
+
 
           .co-basic-botton-hangup{
             background: -moz-linear-gradient(top, #ff0000 1%, #ce0000 100%); 
-            background: linear-gradient(top, #ff0000 1%,#ce0000 100%);
             border:0;
             border-radius:.3rem;
           }
@@ -448,7 +420,7 @@ html * {
               background-size: 2.6rem 2.4rem;
               width:2.6rem;
               height:2.4rem;
-              
+
             }
 
             .i-hangup{
