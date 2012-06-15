@@ -257,6 +257,9 @@ var Contacts = {
 
 var ShortcutsHandler = {
   setup: function sh_setup() {
+    if (!this.shortcutsBar)
+      return;
+
     ['touchstart', 'touchmove', 'touchend'].forEach((function(evt) {
       this.shortcutsBar.addEventListener(evt, this, true);
     }).bind(this));
@@ -316,6 +319,9 @@ var ContactDetails = {
   _keyboardDisplayed: false,
 
   setup: function cd_setup() {
+    if (!this.container)
+      return;
+
     window.addEventListener('keyup', this, true);
     window.addEventListener('resize', this, true);
 
