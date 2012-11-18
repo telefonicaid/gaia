@@ -24,6 +24,10 @@ body, html {
   -moz-box-sizing: border-box;
 }
 
+#statusbar.ftuStarting {
+  opacity: 0;
+}
+
 #statusbar > * {
   pointer-events: none;
   float: right;
