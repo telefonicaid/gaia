@@ -47,7 +47,6 @@
 // properly documented.
 // See https://bugzilla.mozilla.org/show_bug.cgi?id=796629
 //
-
 var WindowManager = (function() {
   // Holds the origin of the home screen, which should be the first
   // app we launch through web activity during boot
@@ -94,6 +93,19 @@ var WindowManager = (function() {
 
   // The origin of the currently displayed app, or null if there isn't one
   var displayedApp = null;
+
+  // Function to hide init starting logo
+  function handleInitlogo(callback) {
+    var initlogo = document.getElementById('initlogo');
+    initlogo.classList.add('hide');
+    initlogo.addEventListener('transitionend', function delInitlogo() {
+      initlogo.removeEventListener('transitionend', delInitlogo);
+      initlogo.parentNode.removeChild(initlogo);
+      if (callback) {
+        callback();
+      }
+    });
+  };
 
   // Public function. Return the origin of the currently displayed app
   // or null if there is none.
@@ -393,6 +405,8 @@ var WindowManager = (function() {
     // If the FTU is closing, make sure we save this state
     if (frame.src == ftuURL) {
       window.asyncStorage.setItem('ftu.enabled', false);
+      document.getElementById('lockscreen').classList.remove('ftu');
+      document.getElementById('statusbar').classList.remove('ftu');
     }
 
     frame.classList.remove('active');
@@ -759,11 +773,14 @@ var WindowManager = (function() {
       if (launchFTU === false) {
         // Eventually ask for SIM code, but only when we do not show FTU,
         // which already asks for it!
+        handleInitlogo();
         SimLock.showIfLocked();
         setDisplayedApp(homescreen);
         return;
       }
-
+      WindowManager.isFTU = true;
+      document.getElementById('statusbar').classList.add('ftuStarting');
+      document.getElementById('lockscreen').classList.add('ftuStarting');
       var lock = navigator.mozSettings.createLock();
       var req = lock.get('ftu.manifestURL');
       req.onsuccess = function() {
@@ -859,6 +876,14 @@ var WindowManager = (function() {
     // Case 2: null --> app
     else if (!currentApp && newApp != homescreen) {
       openWindow(newApp, function windowOpened() {
+        handleInitlogo(function() {
+          var lockscreen = document.getElementById('lockscreen');
+          var statusBar = document.getElementById('statusbar');
+          lockscreen.classList.add('ftu');
+          statusBar.classList.add('ftu');
+          lockscreen.classList.remove('ftuStarting');
+          statusBar.classList.remove('ftuStarting');
+        });
         // TODO Implement FTU stuff if necessary
       });
     }

@@ -17,6 +17,10 @@
     visibility 0.5s ease;
 }
 
+#lockscreen.ftuStarting {
+  display: none;
+}
+
 #screen.active-statusbar > #lockscreen {
   top: 40px;
   height: -moz-calc(100% - 40px);
