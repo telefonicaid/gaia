@@ -233,9 +233,11 @@ var UIManager = {
 
   unlockSIM: function ui_us() {
     var pin = this.pinInput.value;
-    if (pin === '')
-      return;
     this.pinInput.value = '';
+    if (pin === '' || pin.length < 4 || pin.length > 8) {
+      UIManager.pinError.innerHTML = _('pinValidation');
+      return;
+    }
 
     // Unlock SIM
     var options = {lockType: 'pin', pin: pin };
