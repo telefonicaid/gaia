@@ -1,3 +1,5 @@
+'use strict';
+
 requireApp('system/js/updatable.js');
 
 requireApp('system/test/unit/mock_app.js');
@@ -84,9 +86,9 @@ suite('system/Updatable', function() {
   teardown(function() {
     MockUpdateManager.mTeardown();
     MockAppsMgmt.mTeardown();
-    MockCustomDialog.mTearDown();
-    MockWindowManager.mTearDown();
-    MockUtilityTray.mTearDown();
+    MockCustomDialog.mTeardown();
+    MockWindowManager.mTeardown();
+    MockUtilityTray.mTeardown();
 
     subject._dispatchEvent = realDispatchEvent;
     lastDispatchedEvent = null;
@@ -111,11 +113,6 @@ suite('system/Updatable', function() {
     });
 
     suite('size', function() {
-      test('should give system update size', function() {
-        subject = new SystemUpdatable(433567);
-        assert.equal(433567, subject.size);
-      });
-
       test('should give packaged app update size', function() {
         assert.equal(42, subject.size);
       });
@@ -177,15 +174,30 @@ suite('system/Updatable', function() {
         assert.equal(subject, MockUpdateManager.mLastDownloadsAdd);
       });
 
-      test('should start system updates with progress 0 too', function() {
-        subject = new SystemUpdatable(42);
-        subject.progress = 42;
-        subject.download();
-        assert.equal(0, subject.progress);
+      suite('when starting a system update', function() {
+        setup(function() {
+          subject = new SystemUpdatable(42);
+          subject._dispatchEvent = fakeDispatchEvent;
+          subject.progress = 42;
+          subject.download();
+        });
+
+        test('should start system updates with progress 0 too', function() {
+          assert.equal(subject.progress, 0);
+        });
+
+        test('should do nothing if already downloading', function() {
+          lastDispatchedEvent = null;
+          subject.progress = 42;
+          subject.download();
+
+          assert.equal(subject.progress, 42);
+          assert.isNull(lastDispatchedEvent);
+        });
       });
     });
 
-    suite('cancel download', function() {
+    suite('cancel app update download', function() {
       setup(function() {
         subject.cancelDownload();
       });
@@ -198,6 +210,28 @@ suite('system/Updatable', function() {
 
       test('should call cancelDownload on the app', function() {
         assert.isTrue(mockApp.mCancelCalled);
+      });
+    });
+
+    suite('cancel system update download', function() {
+      setup(function() {
+        subject = new SystemUpdatable(42);
+        subject.download();
+        subject._dispatchEvent = fakeDispatchEvent;
+        subject.cancelDownload();
+      });
+
+      test('should remove self from active downloads', function() {
+        assert.isNotNull(MockUpdateManager.mLastDownloadsRemoval);
+        assert.equal(subject, MockUpdateManager.mLastDownloadsRemoval);
+      });
+
+      test('should send cancel message', function() {
+        assert.equal('update-download-cancel', lastDispatchedEvent.type);
+      });
+
+      test('should remove the downloading flag', function() {
+        assert.isFalse(subject.downloading);
       });
     });
   });
@@ -340,6 +374,7 @@ suite('system/Updatable', function() {
       setup(function() {
         subject = new SystemUpdatable(42);
         subject._dispatchEvent = fakeDispatchEvent;
+        subject.download();
       });
 
       suite('update-downloaded', function() {
@@ -348,6 +383,10 @@ suite('system/Updatable', function() {
             type: 'update-downloaded'
           });
           subject.handleEvent(event);
+        });
+
+        test('should reset the downloading flag', function() {
+          assert.isFalse(subject.downloading);
         });
 
         testSystemApplyPrompt();
@@ -382,6 +421,10 @@ suite('system/Updatable', function() {
           assert.isNotNull(MockUpdateManager.mLastDownloadsRemoval);
           assert.equal(subject, MockUpdateManager.mLastDownloadsRemoval);
         });
+
+        test('should remove the downloading flag', function() {
+          assert.isFalse(subject.downloading);
+        });
       });
 
       suite('update-progress', function() {
@@ -406,6 +449,21 @@ suite('system/Updatable', function() {
           event.detail.progress = 2234;
           subject.handleEvent(event);
           assert.equal(1000, MockUpdateManager.mProgressCalledWith);
+        });
+
+        suite('when the download is complete', function() {
+          setup(function() {
+            event = new MockChromeEvent({
+              type: 'update-progress',
+              progress: 98734,
+              total: 98734
+            });
+            subject.handleEvent(event);
+          });
+
+          test('should signal the UpdateManager', function() {
+            assert.isTrue(MockUpdateManager.mStartedUncompressingCalled);
+          });
         });
       });
     });
@@ -435,6 +493,13 @@ suite('system/Updatable', function() {
 
       assert.equal('update-prompt-apply-result', lastDispatchedEvent.type);
       assert.equal('wait', lastDispatchedEvent.value);
+    });
+
+    test('canceling should remove from downloads queue', function() {
+      subject.declineInstall();
+
+      assert.isNotNull(MockUpdateManager.mLastDownloadsRemoval);
+      assert.equal(subject, MockUpdateManager.mLastDownloadsRemoval);
     });
 
     test('apply prompt confirm callback', function() {

@@ -17,18 +17,6 @@ if (!fb.utils) {
       fb.oauthflow.params['redirectLogout'] : '';
     var STORAGE_KEY = Utils.TOKEN_DATA_KEY = 'tokenData';
 
-    function getMozContactByUid(uid, success, error) {
-      var filter = {
-        filterBy: ['category'],
-        filterValue: uid,
-        filterOp: 'contains'
-      };
-
-      var req = navigator.mozContacts.find(filter);
-      req.onsuccess = success;
-      req.onerror = error;
-    }
-
       // For controlling data synchronization
     Utils.setLastUpdate = function(value, cb) {
       window.asyncStorage.setItem(LAST_UPDATED_KEY, {
@@ -79,7 +67,7 @@ if (!fb.utils) {
       var outReq = new Utils.Request();
 
       window.setTimeout(function get_mozContact_ByUid() {
-        getMozContactByUid(uid,
+        Utils.getMozContactByUid(uid,
           function onsuccess(e) {
             if (e.target.result && e.target.result.length > 0) {
               outReq.done(e.target.result[0]);
@@ -101,7 +89,7 @@ if (!fb.utils) {
       var outReq = new Utils.Request();
 
       window.setTimeout(function get_mozContact_ByUid() {
-        getMozContactByUid(uid,
+        Utils.getMozContactByUid(uid,
           function onsuccess(e) {
             if (e.target.result && e.target.result.length > 0) {
               outReq.done(e.target.result.length);
@@ -142,17 +130,16 @@ if (!fb.utils) {
       return outReq;
     };
 
-
     // On the device
     Utils.getNumFbContacts = function() {
       var outReq = new Utils.Request();
 
       window.setTimeout(function get_num_fb_contacts() {
-        var req = Utils.getAllFbContacts();
+        var req = fb.contacts.getAll();
 
         req.onsuccess = function() {
           var result = req.result || [];
-          outReq.done(result.length);
+          outReq.done(Object.keys(result).length);
         }
 
         req.onerror = function() {
@@ -186,7 +173,7 @@ if (!fb.utils) {
     // Obtains the number locally
     Utils.getCachedNumFbFriends = function(callback) {
       window.asyncStorage.getItem(CACHE_FRIENDS_KEY, function(data) {
-        if (typeof callback === 'function') {
+        if (typeof callback === 'function' && typeof data === 'number') {
           callback(data);
         }
       });
@@ -200,10 +187,22 @@ if (!fb.utils) {
     Utils.getImportChecked = function(callback) {
       // If we have an access token Import should be checked
       Utils.getCachedAccessToken(function(access_token) {
-        var out = false;
+        var out = 'logged-out';
 
         if (access_token) {
-          out = true;
+          out = 'logged-in';
+        }
+        else {
+          // In this case is needed to know whether the access_token has
+          // been invalidated
+          Utils.getCachedNumFbFriends(function(value) {
+            if (value) {
+              out = 'renew-pwd';
+              if (typeof callback === 'function') {
+                callback(out);
+              }
+            }
+          });
         }
 
         if (typeof callback === 'function') {
@@ -228,17 +227,18 @@ if (!fb.utils) {
         }
       }
 
-      var remoteCallbacks = {
-        success: auxCallback,
-        error: null,
-        timeout: null
-      };
-
-      Utils.getCachedAccessToken(function(access_token) {
-        if (access_token) {
-          Utils.getNumFbFriends(remoteCallbacks, access_token);
-        }
-      });
+      if (typeof remoteCb === 'function' && navigator.onLine === true) {
+        var remoteCallbacks = {
+          success: auxCallback,
+          error: null,
+          timeout: null
+        };
+        Utils.getCachedAccessToken(function(access_token) {
+          if (access_token) {
+            Utils.getNumFbFriends(remoteCallbacks, access_token);
+          }
+        });
+      }
     };
 
     // Clears all Fb data (use with caution!!)
@@ -250,19 +250,29 @@ if (!fb.utils) {
       var outReq = new Utils.Request();
 
       window.setTimeout(function do_clearFbData() {
-        var req = Utils.getAllFbContacts();
+        // First a clear request is issued
+        var ireq = fb.contacts.clear();
 
-        req.onsuccess = function() {
-          var cleaner = new FbContactsCleaner(req.result);
-          // And now success notification is sent
-          outReq.done(cleaner);
-          // The cleaning activity should be starting immediately
-          window.setTimeout(cleaner.start, 0);
+        ireq.onsuccess = function() {
+          var req = Utils.getAllFbContacts();
+
+          req.onsuccess = function() {
+            var cleaner = new Utils.FbContactsCleaner(req.result, 'clear');
+            // And now success notification is sent
+            outReq.done(cleaner);
+            // The cleaning activity should be starting immediately
+            window.setTimeout(cleaner.start, 0);
+          }
+
+          req.onerror = function() {
+            window.console.error('FB Clean. Error retrieving FB Contacts');
+            outReq.failed(req.error);
+          }
         }
 
-        req.onerror = function() {
-          window.console.error('FB Clean. Error retrieving FB Contacts');
-          outReq.failed(req.error);
+        ireq.onerror = function(e) {
+          window.console.error('Error while clearing the FB Cache');
+          outReq.failed(ireq.error);
         }
 
       },0);
@@ -297,7 +307,7 @@ if (!fb.utils) {
             window.addEventListener('message', m_listen);
 
             var xhr = new XMLHttpRequest({
-              mozSystem:true
+              mozSystem: true
             });
 
             xhr.open('GET', logoutUrl, true);
@@ -307,7 +317,7 @@ if (!fb.utils) {
 
             xhr.onload = function(e) {
               if (xhr.status === 200 || xhr.status === 0) {
-                if(xhr.response.success) {
+                if (xhr.response.success) {
                   window.asyncStorage.removeItem(STORAGE_KEY);
                   outReq.done();
                 }
@@ -346,91 +356,93 @@ if (!fb.utils) {
 
     } // logout
 
-    /**
-     *   Request auxiliary object to support asynchronous calls
-     *
-     */
-    Utils.Request = function() {
-      this.done = function(result) {
-        this.result = result;
-        if (typeof this.onsuccess === 'function') {
-          var ev = {};
-          ev.target = this;
-          window.setTimeout(function() {
-            this.onsuccess(ev);
-          }.bind(this), 0);
-        }
-      }
-
-      this.failed = function(error) {
-        this.error = error;
-        if (typeof this.onerror === 'function') {
-          var ev = {};
-          ev.target = this;
-          window.setTimeout(function() {
-            this.onerror(ev);
-          }.bind(this), 0);
-        }
-      }
-    }
 
     // FbContactsCleaner Object
-    function FbContactsCleaner(contacts) {
+    // Mode can be 'update' or 'cleanAll'
+    Utils.FbContactsCleaner = function(contacts, pmode) {
       this.lcontacts = contacts;
+      var total = contacts.length;
       var next = 0;
       var self = this;
+      var CHUNK_SIZE = 5;
+      var numResponses = 0;
+      var mode = pmode || 'update';
+      var mustUpdate = (pmode === 'update');
+      var notifyClean = false;
 
       this.start = function() {
-        if (self.lcontacts.length > 0) {
-          cleanContact(self.lcontacts[0]);
+        if (total > 0) {
+          cleanContacts(0);
         }
         else if (typeof self.onsuccess === 'function') {
                 window.setTimeout(self.onsuccess, 0);
         }
       }
 
-      function successHandler() {
-        if (typeof self.oncleaned === 'function') {
+      function successHandler(e) {
+        if (notifyClean || typeof self.oncleaned === 'function') {
+          notifyClean = true;
           // Avoiding race condition so the cleaned element is cached
-          var cleaned = next + 1;
+          var cleaned = e.target.number;
           window.setTimeout(function() {
             self.oncleaned(cleaned);
           },0);
         }
-        continuee();
+        continueCb();
       }
 
-      function errorHandler() {
+      function errorHandler(contactid, error) {
         if (typeof self.onerror === 'function') {
-          self.onerror(self.lcontacts[next], e.target.error);
+          self.onerror(contactid, error);
+        }
+
+        continueCb();
+      }
+
+      function cleanContacts(from) {
+        for (var idx = from; idx < (from + CHUNK_SIZE) && idx < total; idx++) {
+          var contact = contacts[idx];
+          var number = idx;
+          var req;
+          if (fb.isFbLinked(contact)) {
+            if (mustUpdate) {
+              var fbContact = new fb.Contact(contact);
+              req = fbContact.unlink('hard');
+            }
+            else {
+              fb.markAsUnlinked(contact);
+              req = navigator.mozContacts.save(contact);
+            }
+          }
+          else {
+            if (mustUpdate) {
+              var fbContact = new fb.Contact(contact);
+              req = fbContact.remove();
+            }
+            else {
+              var req = navigator.mozContacts.remove(contact);
+            }
+          }
+          req.number = number;
+          req.onsuccess = successHandler;
+          req.onerror = function(e) {
+            errorHandler(contact.id, e.target.error);
+          }
         }
       }
 
-      function cleanContact(contact) {
-        var fbContact = new fb.Contact(contact);
-
-        if (fb.isFbLinked(contact)) {
-          var req = fbContact.unlink('hard');
-          req.onsuccess = successHandler;
-          req.onerror = errorHandler;
-        }
-        else {
-          var req = fbContact.remove();
-          req.onsuccess = successHandler;
-          req.onerror = errorHandler;
-        }
-      }
-
-      function continuee() {
+      function continueCb() {
         next++;
-        if (next < self.lcontacts.length) {
-          cleanContact(self.lcontacts[next]);
+        numResponses++;
+        if (next < total && numResponses === CHUNK_SIZE) {
+          numResponses = 0;
+          cleanContacts(next);
         }
-        else {
-              // End has been reached
-              if (typeof self.onsuccess === 'function') {
-                window.setTimeout(self.onsuccess, 0);
-              }
+        else if (next >= total) {
+          // End has been reached
+          if (typeof self.onsuccess === 'function') {
+            window.setTimeout(self.onsuccess, 0);
+          }
         }
       } // function
     } // FbContactsCleaner

@@ -1,88 +1,49 @@
 'use strict';
 
 var UIManager = {
-  get splashScreen() {
-    delete this.splashScreen;
-    return this.splashScreen = document.getElementById('splash');
-  },
-  get progressBar() {
-    delete this.progressBar;
-    return this.progressBar = document.getElementById('activation_progress');
-  },
-  get activationScreen() {
-    delete this.activationScreen;
-    return this.activationScreen = document.getElementById('activation');
-  },
-  get finishScreen() {
-    delete this.finishScreen;
-    return this.finishScreen = document.getElementById('finish');
-  },
-  get navBar() {
-    delete this.navBar;
-    return this.navBar = document.getElementById('nav-bar');
-  },
-  get mainTitle() {
-    delete this.mainTitle;
-    return this.mainTitle = document.getElementById('main_title');
-  },
-  get pincodeScreen() {
-    delete this.pincodeScreen;
-    return this.pincodeScreen = document.getElementById('pincode');
-  },
-  get pinInput() {
-    delete this.pinInput;
-    return this.pinInput = document.getElementById('pincode');
-  },
-  get refreshButton() {
-    delete this.refreshButton;
-    return this.refreshButton = document.getElementById('wifi-refresh');
-  },
-  get simImportButton() {
-    delete this.simImportButton;
-    return this.simImportButton = document.getElementById('sim_import');
-  },
-  get doneButton() {
-    delete this.doneButton;
-    return this.doneButton = document.getElementById('done');
-  },
-  get networks() {
-    delete this.networks;
-    return this.networks = document.getElementById('networks');
-  },
-  get joinButton() {
-    delete this.joinButton;
-    return this.joinButton = document.getElementById('join');
-  },
-  get timezoneConfiguration() {
-    delete this.timezoneConfiguration;
-    return this.timezoneConfiguration =
-      document.getElementById('timezone-configuration');
-  },
-  get dateConfiguration() {
-    delete this.dateConfiguration;
-    return this.dateConfiguration = document.getElementById(
-      'date-configuration');
-  },
-  get timeConfiguration() {
-    delete this.timeConfiguration;
-    return this.timeConfiguration = document.getElementById(
-      'time-configuration');
-  },
-  get dateConfigurationLabel() {
-    delete this.dateConfigurationLabel;
-    return this.dateConfigurationLabel = document.getElementById(
-      'date-configuration-label');
-  },
-  get timeConfigurationLabel() {
-    delete this.timeConfigurationLabel;
-    return this.timeConfigurationLabel = document.getElementById(
-      'time-configuration-label');
-  },
-  get buttonLetsGo() {
-    delete this.buttonLetsGo;
-    return this.buttonLetsGo = document.getElementById('end');
-  },
+
+  // As in other Gaia apps, we store all the dom selectors in one
+  // place and then camelCase them and attach to the main object,
+  // eg. instead of calling document.getElementById('splash-screen')
+  // we can access this.splashScreen in our code.
+  domSelectors: [
+    'splash-screen',
+    'progress-bar',
+    'tutorial-progress',
+    'activation-screen',
+    'finish-screen',
+    'tutorial-screen',
+    'nav-bar',
+    'main-title',
+    'pincode-screen',
+    'pin-input',
+    'sim-import-button',
+    'done-button',
+    'networks',
+    'wifi-join-button',
+    'date-configuration',
+    'time-configuration',
+    'date-configuration-label',
+    'time-configuration-label',
+    'data-connection-switch',
+    'fake-sim-pin',
+    'pin-error',
+    'button-lets-go',
+    'button-skip',
+    'time-form',
+    'sim-import-feedback',
+    'wifi-refresh-button',
+    'share-performance',
+    'offline-error-dialog'
+  ],
+
   init: function ui_init() {
+
+    // Initialization of the DOM selectors
+    this.domSelectors.forEach(function createElementRef(name) {
+      this[toCamelCase(name)] = document.getElementById(name);
+    }.bind(this));
+
     var currentDate = new Date();
     var f = new navigator.mozL10n.DateTimeFormat();
     var format = _('shortTimeFormat');
@@ -90,30 +51,52 @@ var UIManager = {
     this.dateConfigurationLabel.innerHTML = currentDate.
       toLocaleFormat('%Y-%m-%d');
     // Add events to DOM
-    this.refreshButton.addEventListener('click', this);
+    this.wifiRefreshButton.addEventListener('click', this);
     this.simImportButton.addEventListener('click', this);
     this.doneButton.addEventListener('click', this);
-    this.joinButton.addEventListener('click', this);
+    this.wifiJoinButton.addEventListener('click', this);
     this.networks.addEventListener('click', this);
-    this.timezoneConfiguration.addEventListener('change', this);
     this.timeConfiguration.addEventListener('input', this);
     this.dateConfiguration.addEventListener('input', this);
-    this.buttonLetsGo.addEventListener('click', function() {
+    this.buttonSkip.addEventListener('click', function() {
       window.close();
     });
+    this.dataConnectionSwitch.addEventListener('click', this);
+    this.buttonLetsGo.addEventListener('click', function() {
+      UIManager.activationScreen.classList.remove('show');
+      UIManager.finishScreen.classList.remove('show');
+      UIManager.tutorialScreen.classList.add('show');
+    });
+    this.fakeSimPin.addEventListener('input', this);
+    // Prevent form submit in case something tries to send it
+    this.timeForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+    });
+
+    // Enable sharing performance data (saving to settings)
+    this.sharePerformance.addEventListener('click', this);
+
+    // Initialize the timezone selector, see /shared/js/tz_select.js
+    var tzCont = document.getElementById('tz-continent');
+    var tzCity = document.getElementById('tz-city');
+    tzSelect(tzCont, tzCity, this.setTimeZone);
+
+    var button = this.offlineErrorDialog.querySelector('button');
+    button.addEventListener('click', this.onOfflineDialogButtonClick.bind(this));
   },
+
   handleEvent: function ui_handleEvent(event) {
     switch (event.target.id) {
-      case 'wifi-refresh':
+      case 'wifi-refresh-button':
         WifiManager.scan(UIManager.renderNetworks);
         break;
-      case 'sim_import':
+      case 'sim-import-button':
         this.importFromSim();
         break;
-      case 'done':
+      case 'done-button':
         this.unlockSIM();
         break;
-      case 'join':
+      case 'wifi-join-button':
         this.joinNetwork();
         break;
       case 'time-configuration':
@@ -122,8 +105,15 @@ var UIManager = {
       case 'date-configuration':
         this.setDate();
         break;
-      case 'timezone-configuration':
-        this.setTimeZone();
+      case 'data-connection-switch':
+        var status = event.target.checked;
+        DataMobile.toggle(status);
+        break;
+      case 'fake-sim-pin':
+        this.pinInput.value = this.fakeSimPin.value;
+        break;
+      case 'share-performance':
+        this.updateSetting(event.target.name, event.target.value);
         break;
       default:
         if (event.target.parentNode.id == 'networks') {
@@ -132,18 +122,38 @@ var UIManager = {
         break;
     }
   },
+
+  updateSetting: function ui_updateSetting(name, value) {
+    var settings = window.navigator.mozSettings;
+    if (!name || !settings)
+      return;
+    var cset = {}; cset[name] = value;
+    settings.createLock().set(cset);
+  },
+
+  displayOfflineDialog: function ui_displayOfflineDialog(href, title) {
+    var dialog = this.offlineErrorDialog,
+        text = _('offline-dialog-text', { url: href });
+    dialog.querySelector('small').textContent = text;
+    dialog.classList.add('visible');
+  },
+
+  onOfflineDialogButtonClick: function ui_onOfflineDialogButtonClick(e) {
+    this.offlineErrorDialog.classList.remove('visible');
+  },
+
   importFromSim: function ui_ifs() {
-    var feedbackMessage = document.getElementById('sim_import_feedback');
-    feedbackMessage.innerHTML = _('simContacts-importing');
+    this.simImportFeedback.innerHTML = _('simContacts-importing');
     importSIMContacts(
       function() {
-        feedbackMessage.innerHTML = _('simContacts-reading');
-      }, function(n) {
-        feedbackMessage.innerHTML = _('simContacts-imported', {n: n});
-      }, function() {
-        feedbackMessage.innerHTML = _('simContacts-error');
-    });
+        this.simImportFeedback.innerHTML = _('simContacts-reading');
+      }.bind(this), function(n) {
+        this.simImportFeedback.innerHTML = _('simContacts-imported2', {n: n});
+      }.bind(this), function() {
+        this.simImportFeedback.innerHTML = _('simContacts-error');
+    }.bind(this));
   },
+
   joinNetwork: function ui_jn() {
     var password = document.getElementById('wifi_password').value;
     if (password == '') {
@@ -164,21 +174,23 @@ var UIManager = {
       window.history.back();
     }
   },
+
   setDate: function ui_sd() {
     if (!!this.lock) {
       return;
     }
 
-    var dateLabel = document.getElementById('date-configuration-label');
+    var dateLabel = document.getElementById('this.dateConfigurationLabel');
      // Current time
     var now = new Date();
     // Format: 2012-09-01
-    var currentDate = document.getElementById('date-configuration').value;
+    var currentDate = this.dateConfiguration.value;
     var currentTime = now.toLocaleFormat('%H:%M');
     var timeToSet = new Date(currentDate + 'T' + currentTime);
     TimeManager.set(timeToSet);
-    dateLabel.innerHTML = timeToSet.toLocaleFormat('%Y-%m-%d');
+    this.dateConfigurationLabel.innerHTML = timeToSet.toLocaleFormat('%Y-%m-%d');
   },
+
   setTime: function ui_st() {
     if (!!this.lock) {
       return;
@@ -200,49 +212,54 @@ var UIManager = {
     var format = _('shortTimeFormat');
     timeLabel.innerHTML = f.localeFormat(timeToSet, format);
   },
-  setTimeZone: function ui_stz() {
-    var tzConfiguration = document.getElementById('timezone-configuration');
-    var tzOverlay = document.getElementById('time_zone_overlay');
-    var tzInput = document.getElementById('timezone-configuration');
-    var tzTitle = document.getElementById('time-zone-title');
-    var tzLabel = document.getElementById('timezone-configuration-label');
 
-    var gmt = tzInput.options[tzInput.selectedIndex].value;
-
-    var classes = tzOverlay.classList;
-    for (var i = 0; i < classes.length; i++) {
-      tzOverlay.classList.remove(classes[i]);
-    }
-    tzOverlay.classList.add('gmt' + gmt);
-
-    // TODO Include automatic set of time
-    // https://bugzilla.mozilla.org/show_bug.cgi?id=796265
-    tzLabel.innerHTML = TimeManager.getTimeZone(gmt);
-    tzTitle.innerHTML = TimeManager.getTimeZone(gmt);
+  setTimeZone: function ui_stz(timezone) {
+    var utc = 'UTC' + timezone.utcOffset;
+    document.getElementById('time_zone_overlay').className =
+      utc.replace(/[+:]/g, '');
+    document.getElementById('time-zone-title').textContent =
+      utc + ' ' + timezone.id;
+    document.getElementById('tz-continent-label').textContent =
+      timezone.id.replace(/\/.*$/, '');
+    document.getElementById('tz-city-label').textContent = timezone.city;
+    // it can take a few milliseconds before the TZ change is reflected on time
+    setTimeout(function updateTime() {
+      var f = new navigator.mozL10n.DateTimeFormat();
+      var now = new Date();
+      var timeLabel = document.getElementById('time-configuration-label');
+      timeLabel.innerHTML = f.localeFormat(now, _('shortTimeFormat'));
+    });
   },
+
   unlockSIM: function ui_us() {
-    var pinInput = document.getElementById('sim-pin');
-    var pin = pinInput.value;
-    if (pin === '')
+    var pin = this.pinInput.value;
+    this.pinInput.value = '';
+    if (pin === '' || pin.length < 4 || pin.length > 8) {
+      UIManager.pinError.innerHTML = _('pinValidation');
       return;
-    pinInput.value = '';
+    }
 
     // Unlock SIM
     var options = {lockType: 'pin', pin: pin };
     var conn = window.navigator.mozMobileConnection;
+
+    conn.addEventListener('icccardlockerror', function(data) {
+      this.pinInput.value = '';
+      this.fakeSimPin.value = '';
+      this.pinInput.classList.add('onerror');
+      this.pinError.innerHTML = _('pinErrorMsg') + ' ' +
+        _('pinAttemptMsg', {n: data.retryCount});
+    }.bind(this));
+
     var req = conn.unlockCardLock(options);
+
     req.onsuccess = function sp_unlockSuccess() {
       UIManager.pincodeScreen.classList.remove('show');
       UIManager.activationScreen.classList.add('show');
       window.location.hash = '#languages';
-
-    };
-    req.onerror = function sp_unlockError() {
-      var retry = (req.result && req.result.retryCount) ?
-        parseInt(req.result.retryCount, 10) : -1;
-      document.getElementById('pin_error').innerHTML = 'Error ' + retry;
     };
   },
+
   chooseNetwork: function ui_cn(event) {
     // Retrieve SSID from dataset
     var ssid = event.target.dataset.ssid;
@@ -282,6 +299,7 @@ var UIManager = {
       window.location.hash = '#configure_network';
     });
   },
+
   renderNetworks: function ui_rn(networks) {
     var networksDOM = document.getElementById('networks');
     networksDOM.innerHTML = '';
@@ -333,13 +351,25 @@ var UIManager = {
       }
     }
   },
+
   renderNetworkConfiguration: function uim_rnc(ssid, callback) {
     if (callback) {
       callback();
     }
   },
+
   updateNetworkStatus: function uim_uns(ssid, status) {
     document.getElementById(ssid).
       querySelector('p:last-child').innerHTML = status;
+  },
+
+  updateDataConnectionStatus: function uim_udcs(status) {
+    this.dataConnectionSwitch.checked = status;
   }
 };
+
+function toCamelCase(str) {
+  return str.replace(/\-(.)/g, function replacer(str, p1) {
+    return p1.toUpperCase();
+  });
+}

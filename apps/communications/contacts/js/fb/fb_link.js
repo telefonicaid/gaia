@@ -24,6 +24,8 @@ if (!fb.link) {
     // The uid of the friend to be linked
     var friendUidToLink;
 
+    var linkProposalElement = document.querySelector('#linkProposal');
+
     // Base query to search for contacts
     var SEARCH_QUERY = ['SELECT uid, name, email from user ',
     ' WHERE uid IN (SELECT uid1 FROM friend WHERE uid2=me() ORDER BY rank) ',
@@ -57,6 +59,7 @@ if (!fb.link) {
     // State can be proposal or view All
     var state;
     var _ = navigator.mozL10n.get;
+    var imgLoader;
 
     // Builds the first query for finding a contact to be linked to
     function buildQuery(contact) {
@@ -251,6 +254,7 @@ if (!fb.link) {
         var data = response.data;
         currentRecommendation = data;
 
+        var numFriendsProposed = response.data.length;
         data.forEach(function(item) {
           if (!item.email) {
             item.email = '';
@@ -259,13 +263,18 @@ if (!fb.link) {
 
         if (numQueries === 3) {
           mainSection.classList.add('no-proposal');
+          numFriendsProposed = 0;
         } else {
           viewButton.textContent = _('viewAll');
           viewButton.onclick = UI.viewAllFriends;
         }
 
+        linkProposalElement.textContent = _('linkProposal', {
+          numFriends: numFriendsProposed
+        });
+
         utils.templates.append('#friends-list', data);
-        ImageLoader.reload();
+        imgLoader.reload();
 
         Curtain.hide(sendReadyEvent);
       }
@@ -354,9 +363,12 @@ if (!fb.link) {
         });
 
         clearList();
+        
+        var fragment = document.createDocumentFragment();
+        utils.templates.append(friendsList, response.data, fragment);
+        friendsList.appendChild(fragment);
 
-        utils.templates.append(friendsList, response.data);
-        ImageLoader.reload();
+        imgLoader.reload();
 
         Curtain.hide();
       }
@@ -388,7 +400,8 @@ if (!fb.link) {
 
       setCurtainHandlers();
       clearList();
-      ImageLoader.init('#mainContent', "li:not([data-uuid='#uid#'])");
+      imgLoader = new ImageLoader('#mainContent',
+                                  "li:not([data-uuid='#uid#'])");
 
       if (!acc_tk) {
         fb.oauth.getAccessToken(function proposal_new_token(new_acc_tk) {
@@ -416,6 +429,10 @@ if (!fb.link) {
       var cb = function() {
         allFriends = null;
         link.start(contactid);
+        parent.postMessage({
+          type: 'token_error',
+          data: ''
+        }, fb.CONTACTS_APP_ORIGIN);
       }
       window.asyncStorage.removeItem(fb.utils.TOKEN_DATA_KEY, cb);
     }
@@ -423,7 +440,7 @@ if (!fb.link) {
     UI.selected = function(event) {
       Curtain.show('message', 'linking');
 
-      var element = event.target;
+      var element = event.target.parentNode;
       friendUidToLink = element.dataset.uuid;
 
       // First it is needed to check whether is an already imported friend
@@ -517,7 +534,7 @@ if (!fb.link) {
 
       clearList();
       utils.templates.append(friendsList, currentRecommendation);
-      ImageLoader.reload();
+      imgLoader.reload();
 
       return false;
     }

@@ -237,6 +237,11 @@ function SetupManualConfig(domNode, mode, args) {
     'sup-manual-activesync-hostname')[0];
   this.activeSyncHostnameNode.setAttribute('placeholder',
      mozL10n.get('setup-manual-hostname-placeholder'));
+
+  this.activeSyncUsernameNode = domNode.getElementsByClassName(
+    'sup-manual-activesync-username')[0];
+  this.activeSyncUsernameNode.setAttribute('placeholder',
+     mozL10n.get('setup-manual-username-placeholder'));
 }
 SetupManualConfig.prototype = {
   onBack: function(event) {
@@ -262,7 +267,8 @@ SetupManualConfig.prototype = {
     }
     else { // config.type === 'activesync'
       config.incoming = {
-        server: 'https://' + this.activeSyncHostnameNode.value
+        server: 'https://' + this.activeSyncHostnameNode.value,
+        username: this.activeSyncUsernameNode.value
       };
     }
 
@@ -468,6 +474,44 @@ Cards.defineCardWithDefaultMode(
     'setup-fix-password',
     { tray: false },
     SetupFixPassword
+);
+// The app password card is just the bad password card with different text
+Cards.defineCardWithDefaultMode(
+    'setup-fix-gmail-twofactor', 
+    { tray: false },
+    SetupFixPassword
+);
+
+/**
+ * Tells the user how to enable IMAP for Gmail
+ */
+function SetupFixGmailImap(domNode, mode, args) {
+  this.domNode = domNode;
+  this.account = args.account;
+  this.restoreCard = args.restoreCard;
+
+  var accountNode =
+    domNode.getElementsByClassName('sup-gmail-imap-account')[0];
+  accountNode.textContent = this.account.name;
+
+  var useButton = domNode.getElementsByClassName('sup-dismiss-btn')[0];
+  useButton.addEventListener('click', this.onDismiss.bind(this), false);
+}
+SetupFixGmailImap.prototype = {
+  die: function() {
+    // no special cleanup required
+  }, 
+
+  onDismiss: function() {
+    this.account.clearProblems();
+    Cards.removeCardAndSuccessors(this.domNode, 'animate', 1,
+                                  this.restoreCard);
+  }
+};
+Cards.defineCardWithDefaultMode(
+    'setup-fix-gmail-imap',
+    { tray: false },
+    SetupFixGmailImap
 );
 
 /**

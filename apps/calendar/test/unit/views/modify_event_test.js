@@ -1,5 +1,5 @@
 requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('input_parser.js');
+  requireLib('utils/input_parser.js');
   requireLib('views/modify_event.js');
   requireLib('models/account.js');
   requireLib('models/calendar.js');
@@ -17,6 +17,7 @@ suite('views/modify_event', function() {
   var account;
   var calendar;
   var busytime;
+  var provider;
 
   var remote;
   var eventStore;
@@ -41,21 +42,57 @@ suite('views/modify_event', function() {
     return field.value;
   }
 
+  function escapeHTML(html) {
+    var template = new Calendar.Template(function() {
+      return this.h('value');
+    });
+
+    return template.render({ value: html });
+  }
+
+  function setProviderCaps(override) {
+    var values = {};
+    var primaryValues =
+      Calendar.Provider.Abstract.prototype.calendarCapabilities.call(provider);
+
+    [primaryValues, override].forEach(function(caps) {
+      for (var key in caps) {
+        values[key] = caps[key];
+      }
+    });
+
+    provider.caps = values;
+  }
+
   var triggerEvent;
+  var TestProvider;
 
   suiteSetup(function() {
     triggerEvent = testSupport.calendar.triggerEvent;
+
+    TestProvider = function() {
+      Calendar.Provider.Abstract.apply(this, arguments);
+    }
+
+    TestProvider.prototype = {
+      __proto__: Calendar.Provider.Abstract.prototype,
+
+      calendarCapabilities: function() {
+        return this.caps;
+      }
+    };
   });
 
   var InputParser;
 
   suiteSetup(function() {
-    InputParser = Calendar.InputParser;
+    InputParser = Calendar.Utils.InputParser;
   });
 
   teardown(function() {
     var el = document.getElementById('test');
     el.parentNode.removeChild(el);
+    delete app._providers.Test
   });
 
   setup(function() {
@@ -86,15 +123,19 @@ suite('views/modify_event', function() {
 
     document.body.appendChild(div);
     app = testSupport.calendar.app();
+    app._providers.Test = new TestProvider({ app: app });
 
     eventStore = app.store('Event');
     accountStore = app.store('Account');
     calendarStore = app.store('Calendar');
+    provider = app.provider('Test');
+
+    setProviderCaps();
 
     fmt = navigator.mozL10n.DateTimeFormat();
 
     // setup model fixtures
-    account = Factory('account', { _id: 'foo' });
+    account = Factory('account', { _id: 'foo', providerType: 'Test' });
     calendar = Factory('calendar', { _id: 'foo', accountId: 'foo' });
 
     event = Factory('event', {
@@ -260,9 +301,7 @@ suite('views/modify_event', function() {
       var curCal = getField('currentCalendar');
       assert.isTrue(curCal.readOnly, 'current calendar readonly');
 
-      var expected = Calendar.Template.handlers.h(
-        event.remote.description
-      );
+      var expected = escapeHTML(event.remote.description);
 
       assert.equal(
         getField('description').innerHTML,
@@ -271,18 +310,20 @@ suite('views/modify_event', function() {
     }
 
     test('provider can edit', function() {
-      account.providerType = 'Local';
       updatesValues();
 
       assert.isFalse(list.contains(subject.READONLY));
-
-      assert.equal(subject.provider, app.provider('Local'));
       assert.ok(!getField('title').readOnly, 'does not mark as readOnly');
     });
 
     test('provider cannot edit', function() {
       remote.startDate = new Date(2012, 0, 1, 10);
-      account.providerType = 'Abstract';
+
+      setProviderCaps({
+        canUpdateEvent: false,
+        canCreateEvent: false
+      });
+
       updatesValues();
 
       assert.isTrue(list.contains(subject.READONLY), 'is readonly');
@@ -291,9 +332,7 @@ suite('views/modify_event', function() {
       var allday = subject.getField('allday');
       assert.isFalse(allday.checked, 'is allday');
 
-      assert.equal(subject.provider, app.provider('Abstract'));
       assert.ok(getField('title').readOnly, 'marks readonly');
-
     });
 
     test('use busytime instance when isRecurring', function() {
@@ -645,7 +684,7 @@ suite('views/modify_event', function() {
 
         setFieldValue('calendarId', calendar._id);
         setFieldValue('startDate', '2012-1-2');
-        setFieldValue('endDate', '2012-1-2');
+        setFieldValue('endDate', '2012-1-3');
         setFieldValue('title', 'myfoo');
 
         subject.save();
@@ -683,7 +722,7 @@ suite('views/modify_event', function() {
       calendars = app.store('Calendar');
 
       accounts.cached.one = {
-        providerType: 'Local'
+        providerType: 'Test'
       };
 
       list = calendars._cached = {};
@@ -708,12 +747,24 @@ suite('views/modify_event', function() {
       }
     });
 
-    test('rename calendar', function() {
+    test('rename calendar (#_updateCalendarId)', function() {
       list.one.remote.name = 'fooobar';
       calendars.emit('update', list.one._id, list.one);
 
       var option = element.querySelector('[value="' + list.one._id + '"]');
       assert.equal(option.textContent, 'fooobar');
+    });
+
+    test('change calendar permissions', function() {
+      calendars.emit('add', calendar._id, calendar);
+      assert.length(element.children, 3, 'added one');
+
+      setProviderCaps({
+        canCreateEvent: false
+      });
+
+      calendars.emit('update', calendar._id, calendar);
+      assert.length(element.children, 2, 'added one');
     });
 
     test('add calendar (#_addCalendarId)', function() {
@@ -849,7 +900,6 @@ suite('views/modify_event', function() {
 
     test('submit form', function() {
       var calledWith;
-      var provider = app.provider('Local');
 
       subject.onfirstseen();
       subject.dispatch({ params: {} });
@@ -876,7 +926,6 @@ suite('views/modify_event', function() {
 
     test('save button click', function() {
       var calledWith;
-      var provider = app.provider('Local');
 
       subject.onfirstseen();
       subject.dispatch({ params: {} });

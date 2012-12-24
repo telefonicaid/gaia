@@ -144,6 +144,8 @@ if (!fb.sync) {
 
     // Updates the FB data from a friend
     function updateFbFriend(contactId, cfdata) {
+      fb.friend2mozContact(cfdata);
+
       cfdata.fbInfo = cfdata.fbInfo || {};
 
       cfdata.fbInfo.org = [fb.getWorksAt(cfdata)];
@@ -222,7 +224,9 @@ if (!fb.sync) {
 
         // Once sync has finished the last update date is set
         // Thus we ensure next will happen in the next <period> hours
-        fb.utils.setLastUpdate(nextTimestamp, completionCallback);
+        fb.utils.setLastUpdate(nextTimestamp, function sync_end() {
+          completionCallback(totalToChange);
+        });
 
         if (theWorker) {
           theWorker.terminate();
@@ -375,6 +379,7 @@ if (!fb.sync) {
       var toBeUpdated = {};
 
       fb.utils.getLastUpdate(function import_updates(lastUpdate) {
+        var toBeChanged = 0;
         var lastUpdateTime = Math.round(lastUpdate / 1000);
 
         debug('Last update time: ', lastUpdateTime);
@@ -405,6 +410,7 @@ if (!fb.sync) {
               }
               else {
                 debug('Updating friend: ', friendData.uid);
+                toBeChanged++;
                 updateFbFriend(aContact.id, friendData);
               }
             }
@@ -414,6 +420,7 @@ if (!fb.sync) {
           }
           else {
             debug('Removing friend: ', aContact.id);
+            toBeChanged++;
             removeFbFriend(aContact.id);
           }
         });
@@ -424,7 +431,7 @@ if (!fb.sync) {
         // worker
         var toBeUpdatedList = Object.keys(toBeUpdated);
         if (toBeUpdatedList.length > 0) {
-          totalToChange = changed + toBeUpdatedList.length;
+          totalToChange = toBeChanged + toBeUpdatedList.length;
 
           debug('Starting worker for updating img data');
           startWorker();
@@ -442,7 +449,7 @@ if (!fb.sync) {
           });
         }
         else {
-          totalToChange = changed;
+          totalToChange = toBeChanged;
           checkTotals();
         }
       });

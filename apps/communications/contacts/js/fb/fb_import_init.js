@@ -35,20 +35,19 @@
       '#import-close': fb.importer.ui.end,
       '#import-action': fb.importer.ui.importAll,
       '#done-search': contacts.Search.exitSearchMode,
-      '#search-contact': [
+      '#groups-list': fb.importer.ui.selection,
+      '#search-start': [
         {
-          event: 'focus',
+          event: 'click',
           handler: contacts.Search.enterSearchMode
-        },
-        {
-          event: 'keyup',
-          handler: contacts.Search.search
         }
       ]
     });
 
     // This is done through onclick as it is going to be changed it dynamically
     document.querySelector('#select-all').onclick = fb.importer.ui.selectAll;
+    document.querySelector('#deselect-all').onclick =
+        fb.importer.ui.unSelectAll;
 
     fb.contacts.init(function fb_init() {
       fb.importer.ui.init();
@@ -72,5 +71,4 @@
     type: 'messaging_ready',
     data: ''
   }, allowedOrigin);
-
 })(document);

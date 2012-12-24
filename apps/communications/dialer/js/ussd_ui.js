@@ -43,20 +43,26 @@ var UssdUI = {
   },
 
   init: function uui_init() {
-    this._ = window.navigator.mozL10n.get;
-    this.updateHeader(window.name);
-    this.closeNode.addEventListener('click', this.closeWindow.bind(this));
-    this.sendNode.addEventListener('click', this.reply.bind(this));
-    this.responseTextResetNode.addEventListener('click',
-      this.resetResponse.bind(this));
-    this.responseTextNode.addEventListener('input',
-      this.responseUpdated.bind(this));
-    this._origin = document.location.protocol + '//' +
-      document.location.host;
-    window.addEventListener('message', this);
+    if (window.location.hash != '#send') {
+      this.hideLoading();
+    }
+    LazyL10n.get((function localized(_) {
+      window.addEventListener('message', this);
+      window.dispatchEvent(new CustomEvent('ready'));
+      this._ = _;
+      this.updateHeader(window.name);
+      this.closeNode.addEventListener('click', this.closeWindow.bind(this));
+      this.sendNode.addEventListener('click', this.reply.bind(this));
+      this.responseTextResetNode.addEventListener('click',
+        this.resetResponse.bind(this));
+      this.responseTextNode.addEventListener('input',
+        this.responseUpdated.bind(this));
+      this._origin = document.location.protocol + '//' +
+        document.location.host;
+    }).bind(this));
   },
 
-  closeWindow: function uui_close() {
+  closeWindow: function uui_closeWindow() {
     window.opener.postMessage({
       type: 'close'
     }, this._origin);
@@ -65,7 +71,7 @@ var UssdUI = {
   },
 
   showMessage: function uui_showMessage(message) {
-    document.body.classList.remove('loading');
+    this.hideLoading();
     this.responseTextNode.removeAttribute('disabled');
     this.messageNode.textContent = message;
   },
@@ -74,6 +80,10 @@ var UssdUI = {
     document.body.classList.add('loading');
     this.responseTextNode.setAttribute('disabled', 'disabled');
     this.sendNode.setAttribute('disabled', 'disabled');
+  },
+
+  hideLoading: function uui_hideLoading() {
+    document.body.classList.remove('loading');
   },
 
   showResponseForm: function uui_showForm() {
@@ -139,11 +149,15 @@ var UssdUI = {
       case 'voicechange':
         this.updateHeader(evt.data.operator);
         break;
+      case 'close':
+        this.closeWindow();
+        break;
     }
   }
 };
 
-window.addEventListener('localized', function usui_startup(evt) {
+window.addEventListener('load', function usui_startup(evt) {
+  window.removeEventListener('load', usui_startup);
   UssdUI.init();
 });
 

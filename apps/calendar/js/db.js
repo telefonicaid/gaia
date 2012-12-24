@@ -1,6 +1,7 @@
 (function(window) {
   var idb = window.indexedDB;
-  const VERSION = 10;
+  const VERSION = 12;
+  var debug = Calendar.debug('database');
 
   var store = {
     events: 'events',
@@ -62,10 +63,14 @@
 
       function complete() {
         if (self.hasUpgraded && self.oldVersion < 8) {
-          self._setupDefaults(callback);
+          self._setupDefaults(function(err) {
+            callback(err);
+            self.emit('loaded');
+          });
         } else {
           if (callback) {
             callback();
+            self.emit('loaded');
           }
         }
       }
@@ -160,7 +165,7 @@
       req.onblocked = function(error) {
         callback(error, null);
         self.emit('error', error);
-      }
+      };
 
       req.onupgradeneeded = function(event) {
         self._handleVersionChange(req.result, event);
@@ -285,6 +290,14 @@
           if (this.oldVersion !== 0) {
             this._upgradeOperations.push(this._upgradeMoveICALComponents);
           }
+        } else if (curVersion === 10) {
+          if (this.oldVersion !== 0) {
+            this._upgradeOperations.push(this._resetCaldavAccounts);
+          }
+        } else if (curVersion === 11) {
+          if (this.oldVersion !== 0) {
+            this._upgradeOperations.push(this._upgradeAccountUrls);
+          }
         }
       }
     },
@@ -364,18 +377,150 @@
       req.onblocked = function(e) {
         // improve interface
         callback(new Error('blocked'));
-      }
+      };
 
       req.onsuccess = function(event) {
         callback(null, event);
-      }
+      };
 
       req.onerror = function(event) {
         callback(event, null);
-      }
+      };
     },
 
     /** private db upgrade methods **/
+
+    /**
+     * Reset all caldav accounts removing all events,
+     * calendars, alarms and components.
+     * Then triggering resync.
+     *
+     * @param {Function} callback fired on completion.
+     */
+    _resetCaldavAccounts: function(callback) {
+      debug('enter reset caldav');
+
+      var trans = this.transaction(
+        [
+          store.accounts, store.calendars,
+          store.events, store.busytimes,
+          store.alarms, store.icalComponents
+        ],
+        'readwrite'
+      );
+
+      this.once('loaded', function() {
+        if ('syncController' in Calendar.App && navigator.onLine) {
+          Calendar.App.syncController.all(function() {
+            debug('begin resync after reset');
+          });
+        } else {
+          debug('skipping resync');
+        }
+      });
+
+      var accountObjectStore = trans.objectStore(store.accounts);
+      var calendarObjectStore = trans.objectStore(store.calendars);
+      var calendarStore = this.getStore('Calendar');
+
+      trans.onerror = function(event) {
+        debug('ERROR', event.target.error.name);
+        callback(event.target.error);
+      };
+
+      trans.oncomplete = function() {
+        callback();
+      };
+
+      var caldavAccounts = Object.create(null);
+
+      function fetchCalendars() {
+        calendarObjectStore.mozGetAll().onsuccess = function(event) {
+          var result = event.target.result;
+          var i = 0;
+          var len = result.length;
+
+          for (; i < len; i++) {
+            var calendar = result[i];
+
+            if (calendar.accountId in caldavAccounts) {
+              debug('reset calendar:', calendar);
+              calendarStore.remove(calendar._id, trans);
+            }
+          }
+        };
+      }
+
+      accountObjectStore.mozGetAll().onsuccess = function(event) {
+        var result = event.target.result;
+        var i = 0;
+        var len = result.length;
+        var hasCaldav = false;
+
+        for (; i < len; i++) {
+          var account = result[i];
+
+          if (account.providerType === 'Caldav') {
+            hasCaldav = true;
+            debug('reset account', account);
+            caldavAccounts[account._id] = true;
+          }
+
+          if (hasCaldav) {
+            fetchCalendars();
+          }
+        }
+      };
+    },
+
+    _upgradeAccountUrls: function(callback) {
+      var trans = this.transaction(store.accounts, 'readwrite');
+
+      trans.oncomplete = function() {
+        callback();
+      }
+
+      trans.onerror = function(event) {
+        console.error('Error updating account urls');
+        callback(event.error.name);
+      }
+
+      var accountStore = trans.objectStore(store.accounts);
+      var req = accountStore.openCursor();
+
+      req.onsuccess = function upgradeUrls(e) {
+        var cursor = e.target.result;
+        if (cursor) {
+          var value = cursor.value;
+          var preset = value.preset;
+
+          value.calendarHome = value.url;
+
+          // url is removed we have two urls now so
+          // it would be unnecessarily confusing.
+          delete value.url;
+
+          // when possible we calculate the correct
+          // entrypoint (from our presets) if the preset
+          // is missing then we fallback to the original url.
+          if (preset in Calendar.Presets) {
+            var presetData = Calendar.Presets[preset].options;
+
+            // not using "in" intentionally.
+            if (presetData && presetData.entrypoint) {
+              value.entrypoint = presetData.entrypoint;
+            }
+          }
+
+          if (!value.entrypoint) {
+            value.entrypoint = value.calendarHome;
+          }
+          cursor.update(value);
+          cursor.continue();
+        }
+      };
+    },
+
     _upgradeMoveICALComponents: function(callback) {
       var trans = this.transaction(
         [store.events, store.icalComponents],
@@ -385,11 +530,11 @@
       trans.onerror = function() {
         console.error('Error while upgrading ical components');
         callback();
-      }
+      };
 
       trans.oncomplete = function() {
         callback();
-      }
+      };
 
       var eventStore = trans.objectStore(store.events);
       var componentStore = trans.objectStore(store.icalComponents);
@@ -411,7 +556,7 @@
 
           cursor.continue();
         }
-      }
+      };
     }
   };
 

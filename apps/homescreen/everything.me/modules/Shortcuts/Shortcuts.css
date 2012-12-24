@@ -31,7 +31,7 @@
     #evmeContainer #shortcuts-loading.visible {
         display: block;
     }
-    
+
     #evmeContainer #shortcuts #shortcuts-list {
         position: absolute;
         top: 0;
@@ -56,6 +56,7 @@
         vertical-align: top;
         z-index: 10;
         padding: 5px 0 8px 0;
+        width: 25%;
         height: 80px;
         text-align: center;
         cursor: pointer;
@@ -69,7 +70,7 @@
             z-index: 100;
             display: none;
             cursor: pointer;
-            background: transparent url('/everything.me/images/shared/close.png') 50% 0 no-repeat;
+            background: transparent url('/resources/images/delete.png') 50% 0 no-repeat;
         }
     #evmeContainer .shortcut.disabled {
         opacity: 0;
@@ -142,11 +143,11 @@
             -moz-transform: scale(.7) !important;
             transform: scale(.7) !important;
         }
-        
+
     #evmeContainer #category-page-name {
         text-transform: capitalize;
     }
-    
+
 #evmeContainer #category-page-screen {
     position: absolute;
     top: -80px;
@@ -179,7 +180,7 @@
         -moz-transform: translate(0, 0) !important;
         transform: translate(0, 0) !important;
     }
-    
+
 #evmeContainer #page-category {
     font-size: 15px;
     opacity: 0;
@@ -196,7 +197,7 @@
     #evmeContainer #page-category .category-scroll {
         padding: 0 20px;
     }
-    
+
 #evmeContainer .pages > #page-category.active {
     opacity: 1;
     pointer-events: inherit;
@@ -252,7 +253,7 @@
     #evmeContainer #page-category.one-option .category-item .arrow-next {
         bottom: 31px;
     }
-    
+
     #evmeContainer #page-category .category-item label {
         display: block;
         margin-bottom: 4px;
@@ -280,7 +281,7 @@
         -moz-box-sizing: border-box;
         margin: 0;
     }
-    
+
 #evmeContainer #close-category {
     background-position: 0 -220px;
     position: absolute;

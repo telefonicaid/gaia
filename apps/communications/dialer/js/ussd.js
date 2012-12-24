@@ -8,6 +8,7 @@ var UssdManager = {
   _origin: null,
   _operator: null,
   _pendingNotification: null,
+  _lastMessage: null,
   // In same cases, the RIL doesn't provide the expected order of events
   // while sending an MMI that triggers an interactive USSD request (specially
   // while roaming), which should be DOMRequest.onsuccess (or .onerror) +
@@ -17,7 +18,6 @@ var UssdManager = {
   _pendingRequest: null,
 
   init: function um_init() {
-    this._ = window.navigator.mozL10n.get;
     if (this._conn.voice) {
       this._conn.addEventListener('voicechange', this);
       // Even without SIM card, the mozMobileConnection.voice.network object
@@ -27,6 +27,9 @@ var UssdManager = {
     this._origin = document.location.protocol + '//' +
       document.location.host;
     if (this._conn) {
+      // We cancel any active session if one exists to avoid sending any new
+      // USSD message within an invalid session.
+      this._conn.cancelMMI();
       this._conn.addEventListener('ussdreceived', this);
       window.addEventListener('message', this);
     }
@@ -38,15 +41,7 @@ var UssdManager = {
       request.onsuccess = this.notifySuccess.bind(this);
       request.onerror = this.notifyError.bind(this);
       if (!this._popup) {
-        var urlBase = this._origin + '/dialer/ussd.html';
-        this._popup = window.open(urlBase,
-          this._operator ? this._operator : this._('USSD'),
-          'attention');
-        // To control cases where the success or error is received
-        // even before the new USSD window has been opened and/or
-        // initialized.
-        this._popup.addEventListener('localized',
-          this.uiReady.bind(this));
+        this.openUI();
       }
     }
   },
@@ -64,35 +59,43 @@ var UssdManager = {
         if (!result[i].active) {
           continue;
         }
-        switch (result[i].serviceClass) {
-          case this._conn.ICC_SERVICE_CLASS_VOICE:
-            voice = result[i].number;
-            break;
-          case this._conn.ICC_SERVICE_CLASS_DATA:
-            data = result[i].number;
-            break;
-          case this._conn.ICC_SERVICE_CLASS_FAX:
-            fax = result[i].number;
-            break;
-          case this._conn.ICC_SERVICE_CLASS_SMS:
-            sms = result[i].number;
-            break;
-          case this._conn.ICC_SERVICE_CLASS_DATA_SYNC:
-            sync = result[i].number;
-            break;
-          case this._conn.ICC_SERVICE_CLASS_DATA_ASYNC:
-            async = result[i].number;
-            break;
-          case this._conn.ICC_SERVICE_CLASS_PACKET:
-            packet = result[i].number;
-            break;
-          case this._conn.ICC_SERVICE_CLASS_PAD:
-            pad = result[i].number;
-            break;
-          default:
-            return this._('cf-error');
+
+        for (var serviceClassMask = 1;
+             serviceClassMask <= this._conn.ICC_SERVICE_CLASS_MAX;
+             serviceClassMask <<= 1) {
+          if ((serviceClassMask & result[i].serviceClass) != 0) {
+            switch (serviceClassMask) {
+              case this._conn.ICC_SERVICE_CLASS_VOICE:
+                voice = result[i].number;
+                break;
+              case this._conn.ICC_SERVICE_CLASS_DATA:
+                data = result[i].number;
+                break;
+              case this._conn.ICC_SERVICE_CLASS_FAX:
+                fax = result[i].number;
+                break;
+              case this._conn.ICC_SERVICE_CLASS_SMS:
+                sms = result[i].number;
+                break;
+              case this._conn.ICC_SERVICE_CLASS_DATA_SYNC:
+                sync = result[i].number;
+                break;
+              case this._conn.ICC_SERVICE_CLASS_DATA_ASYNC:
+                async = result[i].number;
+                break;
+              case this._conn.ICC_SERVICE_CLASS_PACKET:
+                packet = result[i].number;
+                break;
+              case this._conn.ICC_SERVICE_CLASS_PAD:
+                pad = result[i].number;
+                break;
+              default:
+                return this._('cf-error');
+            }
+          }
         }
       }
+
       msg += this._('cf-voice', {voice: voice || this._('cf-inactive')}) +
              this._('cf-data', {data: data || this._('cf-inactive')}) +
              this._('cf-fax', {fax: fax || this._('cf-inactive')}) +
@@ -121,11 +124,7 @@ var UssdManager = {
       result: msg
     };
 
-    if (this._popup && this._popup.ready) {
-      this._popup.postMessage(message, this._origin);
-    } else {
-      this._pendingNotification = message;
-    }
+    this.postMessage(message);
   },
 
   notifyError: function um_notifyError(evt) {
@@ -133,21 +132,92 @@ var UssdManager = {
       type: 'error',
       error: evt.target.error.name
     };
-    if (this._popup && this._popup.ready) {
-      this._popup.postMessage(message, this._origin);
-    } else {
-      this._pendingNotification = message;
+    this.postMessage(message);
+  },
+
+  openUI: function um_openUI(ussd) {
+    if (this._popup) {
+      return;
     }
+
+    LazyL10n.get((function localized(_) {
+      this._ = _;
+
+      // The MMI UI might be opened for one of these reasons:
+      // 1. The dialer requested the send of a new MMI/USSD message.
+      //    In this case, 'openUI' is called with no parameters.
+      // 2. The platform sent a system message indicating that a new incoming
+      //    USSD has being received.
+      var urlBase = '/dialer/ussd.html';
+      if (!ussd) {
+        // The #send hash makes the 'sending' screen appear.
+        urlBase += '#send';
+      }
+
+      this._popup = window.open(urlBase,
+        this._operator ? this._operator : this._('USSD'), 'attention');
+
+      // To control cases where the success or error is received
+      // even before the new USSD window has been opened and/or
+      // initialized.
+      this._popup.addEventListener('ready', this.uiReady.bind(this));
+
+      if (!ussd) {
+        return;
+      }
+      // The message containing the received USSD won't be delivered until
+      // the UI notifies about its successfull load.
+      var message = {
+        type: 'ussdreceived',
+        message: ussd.message,
+        sessionEnded: ussd.sessionEnded
+      };
+      this.postMessage(message);
+    }).bind(this));
   },
 
   uiReady: function um_uiReady() {
+    this._popup.removeEventListener('ready', this.uiReady);
     this._popup.ready = true;
+    if (this._closedOnVisibilityChange) {
+      this.notifyLast();
+    }
     this.notifyPending();
   },
 
   notifyPending: function um_notifyPending() {
     if (this._pendingNotification)
-        this._popup.postMessage(this._pendingNotification, this._origin);
+      this.postMessage(this._pendingNotification);
+  },
+
+  notifyLast: function um_notifyPending() {
+    if (this._lastMessage)
+      this.postMessage(this._lastMessage);
+  },
+
+  isUSSD: function um_isUSSD(number) {
+    // A valid USSD/MMI code is any 'number' ending in '#'.
+    return (number.charAt(number.length - 1) === '#');
+  },
+
+  postMessage: function um_postMessage(message) {
+    if (this._popup && this._popup.ready) {
+      this._popup.postMessage(this._lastMessage = message, this._origin);
+    } else {
+      this._pendingNotification = message;
+    }
+  },
+
+  closeUI: function um_closeUI(keepSessionAlive) {
+    if (!keepSessionAlive)
+      this._conn.cancelMMI();
+    this._popup.close();
+    this._popup = null;
+    this._closedOnVisibilityChange = false;
+  },
+
+  handleIncomingUssd: function um_handleIncomingUssd(ussd) {
+    this.openUI(ussd);
   },
 
   handleEvent: function um_handleEvent(evt) {
@@ -182,19 +252,29 @@ var UssdManager = {
             this.send(evt.data.message);
             break;
           case 'close':
-            this._conn.cancelMMI();
-            this._popup = null;
+            this.closeUI();
             break;
         }
         return;
     }
 
-    if (message && this._popup && this._popup.ready) {
-      this._popup.postMessage(message, this._origin);
+    if (message) {
+      this.postMessage(message);
     }
   }
 };
 
-window.addEventListener('localized', function us_startup(evt) {
-  UssdManager.init();
-});
+window.addEventListener('mozvisibilitychange',
+  function us_handleVisibility(ev) {
+    if (document.mozHidden) {
+      if (UssdManager._popup) {
+        UssdManager.closeUI(true);
+        UssdManager._closedOnVisibilityChange = true;
+      }
+    } else if (UssdManager._closedOnVisibilityChange) {
+      UssdManager.openUI();
+    }
+  }
+);
+
+UssdManager.init();

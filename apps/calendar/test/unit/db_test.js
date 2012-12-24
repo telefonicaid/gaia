@@ -247,7 +247,106 @@ suite('db', function() {
       });
 
     });
+  });
 
+  suite('#_upgradeAccountUrls', function() {
+    var original;
+
+    function stageData(done) {
+      var trans = subject.transaction('accounts', 'readwrite');
+      var accountStore = trans.objectStore('accounts');
+
+      // not using factory for a reason we may never change
+      // this test but the factory will change at some point
+      // we are trying to emulate old data so it should not
+      // be updated along with the factory.
+      original = {
+        custom: {
+          _id: 'custom',
+          preset: 'caldav',
+          url: '/caldavfoo'
+        },
+        yahoo: {
+          _id: 'yahoo',
+          preset: 'yahoo',
+          url: '/foo'
+        }
+      };
+
+      accountStore.put(original.yahoo);
+      accountStore.put(original.custom);
+
+      trans.onerror = function(event) {
+        done(event.target.error.name);
+      };
+
+      trans.oncomplete = function() {
+        done();
+      };
+    }
+
+    // first setup is to ensure no database exists
+    // and set its version to # 9
+    setup(function(done) {
+      this.timeout(12000);
+      subject.deleteDatabase(function(err) {
+        if (err) {
+          done(err);
+          return;
+        }
+        subject.open(11, function() {
+          stageData(function() {
+            subject.close();
+            subject.open(12, done);
+          });
+        });
+      });
+    });
+
+    teardown(function() {
+      subject.close();
+    });
+
+    test('convert url to entrypoint/calendarHome', function(done) {
+      var accounts;
+
+      var trans = subject.transaction('accounts', 'readwrite');
+      var store = trans.objectStore('accounts');
+
+      store.mozGetAll().onsuccess = function(e) {
+        var all = e.target.result;
+        var accounts = {};
+
+        all.forEach(function(item) {
+          var id = item._id;
+          accounts[item._id] = item;
+
+          assert.ok(!item.url, 'should remove url for ' + id);
+          assert.ok(item.entrypoint, 'should have entrypoint for ' + id);
+          assert.ok(item.calendarHome, 'should have calendar home for ' + id);
+
+          assert.equal(
+            item.calendarHome,
+            original[id].url,
+            'should set calendar home for: ' + id
+          );
+        });
+
+        assert.equal(
+          accounts.yahoo.entrypoint,
+          Calendar.Presets.yahoo.options.entrypoint,
+          'should set entrypoint for known providers'
+        );
+
+        assert.equal(
+          accounts.custom.entrypoint,
+          original.custom.url,
+          'should keep url as entrypoint when ungrade is unavailable'
+        );
+
+        done();
+      };
+    });
   });
 
   suite('#_upgradeMoveICALComponents', function() {
@@ -285,8 +384,6 @@ suite('db', function() {
       }
     }
 
-    var hit = 0;
-
     // first setup is to ensure no database exists
     // and set its version to # 9
     setup(function(done) {
@@ -307,6 +404,10 @@ suite('db', function() {
           });
         });
       });
+    });
+
+    teardown(function() {
+      subject.close();
     });
 
     test('verify icalComponent was moved to new store', function(done) {
@@ -358,4 +459,108 @@ suite('db', function() {
 
     });
   });
+
+  suite('#_resetCaldavEventData', function() {
+    var localAccount;
+    var caldavAccount;
+    var caldavCalendar;
+    var localCalendar;
+
+    var syncCalled = false;
+
+    function stageData(done) {
+      var trans = subject.transaction(
+        [
+          'accounts', 'calendars', 'events',
+          'alarms', 'icalComponents'
+        ],
+        'readwrite'
+      );
+
+      trans.oncomplete = function() {
+        done();
+      };
+
+      localAccount = Factory('account', {
+        _id: 1,
+        providerType: 'Local'
+      });
+
+      caldavAccount = Factory('account', {
+        _id: 2,
+        providerType: 'Caldav'
+      });
+
+      var accountStore = trans.objectStore('accounts');
+
+      accountStore.add(localAccount);
+      accountStore.add(caldavAccount);
+
+      var calendarStore = trans.objectStore('calendars');
+
+      caldavCalendar = Factory('calendar', {
+        remote: { name: 'remove me' },
+        accountId: caldavAccount._id
+      });
+
+      localCalendar = Factory('calendar', {
+        accountId: localAccount._id
+      });
+
+      calendarStore.add(caldavCalendar);
+      calendarStore.add(localCalendar);
+    }
+
+    // first setup is to ensure no database exists
+    // and set its version to # 9
+    setup(function(done) {
+      this.timeout(12000);
+
+      Calendar.App.syncController = {
+        all: function() {
+          syncCalled = true;
+        }
+      };
+
+      subject.deleteDatabase(function(err) {
+        if (err) {
+          done(err);
+          return;
+        }
+        subject.open(10, function() {
+          stageData(function() {
+            subject.close();
+            subject.open(11, function() {
+              subject.emit('loaded');
+              done();
+            });
+          });
+        });
+      });
+    });
+
+    teardown(function() {
+      subject.close();
+    });
+
+    test('verify icalComponent was moved to new store', function(done) {
+      var trans = subject.transaction('calendars');
+      var store = trans.objectStore('calendars');
+
+      assert.ok(syncCalled, 'calls resync');
+
+      store.mozGetAll().onsuccess = function(event) {
+        var result = event.target.result;
+        assert.length(result, 1);
+
+        assert.deepEqual(
+          result[0],
+          localCalendar
+        );
+
+        done();
+      }
+    });
+  });
+
 });

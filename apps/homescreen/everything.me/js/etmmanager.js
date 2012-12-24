@@ -1,7 +1,7 @@
 
 "use strict";
 
-var EvmeManager = (function() {
+var EvmeManager = (function EvmeManager() {
     var currentWindow = null;
     var currentURL = null;
 
@@ -12,19 +12,16 @@ var EvmeManager = (function() {
             icon: params.icon
         });
 
-        if (currentWindow && currentURL !== params.url) {
-            currentWindow.close();
-        }
-        currentWindow = evmeApp.launch(params.url, params.urlTitle);
+        evmeApp.launch(params.url, params.urlTitle);
         currentURL = params.url;
     }
 
     function addBookmark(params) {
-        GridManager.install({
+        GridManager.install(new Bookmark({
           bookmarkURL: params.originUrl,
           name: params.title,
           icon: params.icon
-        });
+        }));
     }
 
     function openUrl(url) {
@@ -78,13 +75,18 @@ var EvmeManager = (function() {
         return manifest.name;
     }
 
+    function getIconSize() {
+        return Icon.prototype.MAX_ICON_SIZE;
+    }
+
     return {
         openApp: openApp,
 
         addBookmark: addBookmark,
 
         isAppInstalled: function isAppInstalled(url) {
-            return !!GridManager.getAppByOrigin(url);
+            return GridManager.getIconForBookmark(url) ||
+                   GridManager.getAppByOrigin(url);
         },
         getApps: getApps,
         getAppIcon: getAppIcon,
@@ -94,7 +96,9 @@ var EvmeManager = (function() {
 
         menuShow: menuShow,
         menuHide: menuHide,
-        getMenuHeight: getMenuHeight
+        getMenuHeight: getMenuHeight,
+
+        getIconSize: getIconSize
     };
 }());
 
@@ -107,7 +111,8 @@ extend(EvmeApp, Bookmark);
 EvmeApp.prototype.launch = function evmeapp_launch(url, name) {
     var features = {
       name: this.manifest.name.replace(/\s/g, '&nbsp;'),
-      icon: this.manifest.icons['60']
+      icon: this.manifest.icons['60'],
+      remote: true
     };
 
     if (!GridManager.getIconForBookmark(this.origin)) {
@@ -132,5 +137,7 @@ EvmeApp.prototype.launch = function evmeapp_launch(url, name) {
 
     // The third parameter is received in window_manager without whitespaces
     // so we decice replace them for &nbsp;
-    return window.open(url || this.origin, '_blank', JSON.stringify(features));
+    // We use `e.me` name in order to always reuse the same window
+    // so that we can only open one e.me app at a time
+    return window.open(url || this.origin, 'e.me', JSON.stringify(features));
 };

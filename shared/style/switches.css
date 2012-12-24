@@ -8,6 +8,7 @@ label:not([for])  {
   width: 5rem;
   height: 5rem;
   position: relative;
+  background: none;
 }
 
 label:not([for]) input {
@@ -92,6 +93,21 @@ label input[data-type="switch"] + span:after {
   left: 100%;
   background: #e6e6e6;
   transform: translateX(-5.4rem);
+}
+
+/* switch: disabled state */
+label input[data-type="switch"]:disabled + span:before,
+label input[data-type="switch"]:disabled + span:after {
+  opacity: 0.2;
+}
+
+label input[data-type="switch"]:disabled + span {
+  opacity: 0.3;
+}
+
+label input[data-type="switch"]:checked:disabled + span {
+  opacity: 1;
+  border: solid 1px #A7DBE6;
 }
 
 /* 'ON' state */

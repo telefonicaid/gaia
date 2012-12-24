@@ -1,42 +1,46 @@
 html, body {
-	width: 100%;
-	height: 100%;
-	margin: 0;
-	padding: 0;
-	overflow: hidden !important;
-	font-size: 10px;
-	font-family: "MozTT","Moz",sans-serif;
-	font-weight: 400;
-	user-select: none;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important;
+  font-size: 10px;
+  font-family: "MozTT","Moz",sans-serif;
+  font-weight: 400;
+  user-select: none;
 }
 
 /*
-	Areas in our app
+  Areas in our app
 */
 
 
 /* Basics */
 
 [role=region] {
-  width: 100%;
-  height: 100%;
   visibility: hidden;
   position: absolute;
-	top: 0;
-	left: 0;
-	overflow-x: auto;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-x: auto;
   background: url(images/bgtop.png) top left no-repeat,
               url(images/bgbottom.png) bottom left no-repeat,
               url(images/bg_1px.png) repeat-y;
+  background-size: 100% auto;
 }
 
 [role=region].show {
-	visibility: visible;
+  visibility: visible;
 }
 
 [role=main] {
-	height: calc(100% - 11.5rem);
-	position: relative;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 5rem;
+  bottom: 6.5rem;
 }
 
 [role=main] > [role=region] {
@@ -44,7 +48,7 @@ html, body {
 }
 
 [role=region]:target {
-	visibility: visible;
+  visibility: visible;
 }
 
 [role=navigation] {
@@ -65,59 +69,59 @@ html, body {
 
 [role=navigation] button {
   width: calc((100% - 1rem) / 2);
-	float: left;
-	margin-right: 1rem;
+  float: left;
+  margin-right: 1rem;
   position: relative;
   text-align: right;
   text-transform: capitalize;
 }
 
 [role=navigation] .recommend {
-	margin-right: 0;
+  margin-right: 0;
   text-align: left;
 }
 
 [role=navigation] button span {
-	width: 3rem;
-	height: 100%;
-	left: 0;
-	position: absolute;
-	pointer-events: none;
-	background: url(images/prev.png) no-repeat center center;
+  width: 3rem;
+  height: 100%;
+  left: 0;
+  position: absolute;
+  pointer-events: none;
+  background: url(images/prev.png) no-repeat center center;
 }
 
 [role=navigation] button.recommend span {
   left: calc(100% - 3rem);
-	background: url(images/next.png) no-repeat center center;
+  background: url(images/next.png) no-repeat center center;
 }
 
-[role=navigation] #join {
-	display:none;
+[role=navigation] #wifi-join-button {
+  display:none;
 }
 
-[role=navigation].forward-only #back {
-	display:none;
+[role=navigation].forward-only .back {
+  display:none;
 }
 
 [role=navigation].forward-only .recommend {
-	width: 100%;
+  width: 100%;
 }
 
-[role=navigation].secondary-menu #forward {
-	display: none;
+[role=navigation].secondary-menu .forward {
+  display: none;
 }
 
-[role=navigation].secondary-menu #join {
-	display: block;
+[role=navigation].secondary-menu #wifi-join-button {
+  display: block;
 }
 
-[role=navigation].back-only #back {
-	width: 100%;
-	margin: 0;
+[role=navigation].back-only .back {
+  width: 100%;
+  margin: 0;
 }
 
 [role=navigation].back-only .recommend {
-	display:none;
+  display:none;
 }
 
 /* Steps state */
@@ -135,7 +139,7 @@ html, body {
 
  .step-state:before {
   content: "";
-  width: calc(100% / 5);
+  width: calc(100% / 6);
   height: 0.6rem;
   position: absolute;
   top: 50%;
@@ -166,57 +170,91 @@ html, body {
   transform: translateX(400%);
 }
 
+.step-6.step-state:before {
+  transform: translateX(500%);
+}
+
 /*
-	Header conditional button
+  Header conditional button
 */
 
 .no-options header menu {
-	display: none;
+  display: none;
 }
 
 /*
- 	Splash screen
+  Splash screen
 */
 
-#splash {
-	opacity: 0;
-	z-index: 3000;
-	transition: all 1s ease;
-	background-image: url(images/powered.png);
+#splash-screen {
+  opacity: 0;
+  z-index: 3000;
+  transition: all 1s ease;
+  background-image: url(/shared/resources/branding/powered.png);
+  background-size: 100% auto;
 }
 
-#splash.show {
-	opacity: 1;
+#splash-screen.show {
+  opacity: 1;
 }
 /*
-	Pin code screen
+  Pin code screen
 */
 
-#pincode .pin_container {
-	height: calc(100% - 10rem);
+#pincode-screen .pin_container {
+  height: calc(100% - 10rem);
 }
 
-#pincode section header {
-	padding: 1.5rem 3rem 0.5rem 3rem;
-	color: black;
-	font-size: 1.5rem;
+#pincode-screen section header {
+  padding: 1.5rem 3rem 0.5rem 3rem;
+  color: black;
+  font-size: 1.5rem;
 }
 
-#pincode .input-wrapper {
-	padding: 0 1.5rem;
+#pincode-screen .input-wrapper {
+  padding: 0 1.5rem;
+  position: relative;
 }
 
-#pincode .input-wrapper input {
-	font-size: 2rem;
+#pincode-screen #pin-error {
+  padding: 1rem 2rem;
+  font-size: 1.5rem;
+  color: red;
+}
+
+#pincode-screen #pin-input.onerror {
+  border-color: red;
+}
+
+#pincode-screen .input-wrapper input {
+  font-size: 2rem;
   padding-left: 1.5rem;
+  pointer-events: none;
+}
+
+#pincode-screen #fake-sim-pin {
+  margin-top: -4rem;
+  opacity: 0;
+  pointer-events: auto;
+}
+
+#pincode-screen input[type="number"] {
+    -moz-box-sizing: border-box;
+    display: block;
+    overflow: hidden;
+    width: 100%;
+    height: 4rem;
+    resize: none;
+    padding: 0px 0.8rem;
 }
 
 /*
-	Languages Styles
+  Languages Styles
 */
 
-#languages [data-type="list"] {	
-	background: url(images/bgbubbles.png) 0 -4.5rem no-repeat;
+#languages [data-type="list"] {
+  background: url(images/bgbubbles.png) 0 -4.5rem no-repeat;
+  background-size: 100% auto;
   padding-top: 14rem;
 }
 
@@ -228,11 +266,11 @@ html, body {
 }
 
 /*
-	Wifi configuration
+  Wifi configuration
 */
 
 #configure_network_params form {
-	padding: 1rem 1.5rem;
+  padding: 1rem 1.5rem;
 }
 
 #configure_network_params form label {
@@ -247,187 +285,167 @@ html, body {
 }
 
 .hidden {
-	display: none !important;
+  display: none !important;
 }
 
 
 /*
-	Finish process
+  Finish process
 */
 
-#finish {
-	opacity: 0;
-	z-index: 3010;
-	transition: all 1s ease;
-	background: #3b4547;
+#finish-screen, #tutorialFinish {
+  opacity: 0;
+  z-index: 3010;
+  transition: all 1s ease;
+  background: #3b4547;
 }
 
-#finish.show {
-	opacity: 1;
+#finish-screen.show, #tutorialFinish.show {
+  opacity: 1;
 }
 
-#finish h1 {
-	margin: 0;
-	color: white;
-	font-size: 4.1rem;
-	padding: 4rem 0 0 0;
-	font-weight: 200;
-	line-height: 4rem;
+#finish-screen h1, #tutorialFinish h1 {
+  margin: 0;
+  color: white;
+  font-size: 4.1rem;
+  padding: 4rem 0 0 0;
+  font-weight: 200;
+  line-height: 4rem;
 }
 
-#finish h2 {
-	margin: 0;
-	color: white;
-	font-size: 1.8rem;
-	padding: .5rem 0 2rem 0;
-	font-weight: 200;
-	line-height: 2rem;
+#finish-screen h2, #tutorialFinish h2 {
+  margin: 0;
+  color: white;
+  font-size: 1.8rem;
+  padding: .5rem 0 2rem 0;
+  font-weight: 200;
+  line-height: 2rem;
 }
 
-#finish p {
-	margin: 0;
-	color: white;
-	font-size: 1.4rem;
+#finish-screen p, #tutorialFinish p {
+  margin: 0;
+  color: white;
+  font-size: 1.4rem;
   font-weight: normal;
 }
 
-#finish .content {
-	background: url(images/thumb-up.png) no-repeat center 90%;
-	height: calc(100% - 6rem);
+#finish-screen .content {
+  background: url(images/icon_tour.png) no-repeat center 95%;
+}
+
+#tutorialFinish .content {
+  background: url(images/thumb-up.png) no-repeat center 70%;
+}
+
+#finish-screen .content, #tutorialFinish .content {
+  height: calc(100% - 6rem);
   padding: 0 3rem;
   width: calc(100% - 6rem);
 }
 
-#finish [role=navigation] {
+#finish-screen [role=navigation],#tutorialFinish [role=navigation] {
   border-top: .1rem solid #697476;
 }
 
-#finish [role=navigation] button {
-	text-align: center;
+#finish-screen [role=navigation] button,#tutorialFinish [role=navigation] button {
+  text-align: center;
 }
 
 /*
-	Date and time
+  Date and time
 */
 
 .change {
-	float: right; 
-	width: 8rem;
+  float: right;
+  width: 8rem;
 }
 
 #time_zone_overlay {
-	background-position: bottom;
-	background-repeat: no-repeat;
-	position: relative;
-	position: absolute;
-	z-index: 10;
-	width: 100%;
-	height: 4rem;
-	height: 21.5rem;
+  background-position: bottom;
+  background-repeat: no-repeat;
+  position: relative;
+  position: absolute;
+  z-index: 10;
+  width: 100%;
+  height: 21.5rem;
   margin-top: 0.5rem;
 }
 
-#time_zone_overlay.gmt0 {
-	background-image: url('images/timezone/+0.png') ;
-}
-#time_zone_overlay.gmt1 {
-	background-image: url('images/timezone/+1.png') ;
-}
-#time_zone_overlay.gmt2 {
-	background-image: url('images/timezone/+2.png') ;
-}
-#time_zone_overlay.gmt3 {
-	background-image: url('images/timezone/+3.png') ;
-}
-#time_zone_overlay.gmt4 {
-	background-image: url('images/timezone/+4.png') ;
-}
-#time_zone_overlay.gmt5 {
-	background-image: url('images/timezone/+5.png') ;
-}
-#time_zone_overlay.gmt6 {
-	background-image: url('images/timezone/+6.png') ;
-}
-#time_zone_overlay.gmt7 {
-	background-image: url('images/timezone/+7.png') ;
-}
-#time_zone_overlay.gmt8 {
-	background-image: url('images/timezone/+8.png') ;
-}
-#time_zone_overlay.gmt9 {
-	background-image: url('images/timezone/+9.png') ;
-}
-#time_zone_overlay.gmt10 {
-	background-image: url('images/timezone/+10.png') ;
-}
-#time_zone_overlay.gmt11 {
-	background-image: url('images/timezone/+11.png') ;
-}
-#time_zone_overlay.gmt12 {
-	background-image: url('images/timezone/+12.png') ;
-}
-#time_zone_overlay.gmt3 {
-	background-image: url('images/timezone/+3.png') ;
-}
-#time_zone_overlay.gmt4 {
-	background-image: url('images/timezone/+4.png') ;
-}
+#time_zone_overlay.UTC0000 { background-image: url('images/timezone/+0.png'); }
+#time_zone_overlay.UTC0100 { background-image: url('images/timezone/+1.png'); }
+#time_zone_overlay.UTC0200 { background-image: url('images/timezone/+2.png'); }
+#time_zone_overlay.UTC0300 { background-image: url('images/timezone/+3.png'); }
+#time_zone_overlay.UTC0330 { }
+#time_zone_overlay.UTC0400 { background-image: url('images/timezone/+4.png'); }
+#time_zone_overlay.UTC0430 { }
+#time_zone_overlay.UTC0500 { background-image: url('images/timezone/+5.png'); }
+#time_zone_overlay.UTC0530 { }
+#time_zone_overlay.UTC0545 { }
+#time_zone_overlay.UTC0600 { background-image: url('images/timezone/+6.png'); }
+#time_zone_overlay.UTC0630 { }
+#time_zone_overlay.UTC0700 { background-image: url('images/timezone/+7.png'); }
+#time_zone_overlay.UTC0800 { background-image: url('images/timezone/+8.png'); }
+#time_zone_overlay.UTC0845 { }
+#time_zone_overlay.UTC0900 { background-image: url('images/timezone/+9.png'); }
+#time_zone_overlay.UTC0930 { }
+#time_zone_overlay.UTC1000 { background-image: url('images/timezone/+10.png'); }
+#time_zone_overlay.UTC1030 { }
+#time_zone_overlay.UTC1100 { background-image: url('images/timezone/+11.png'); }
+#time_zone_overlay.UTC1130 { }
+#time_zone_overlay.UTC1200 { background-image: url('images/timezone/+12.png'); }
+#time_zone_overlay.UTC1245 { }
+#time_zone_overlay.UTC1300 { }
+#time_zone_overlay.UTC1400 { }
 
-#time_zone_overlay.gmt-1 {
-	background-image: url('images/timezone/-1.png') ;
-}
-#time_zone_overlay.gmt-2 {
-	background-image: url('images/timezone/-2.png') ;
-}
-#time_zone_overlay.gmt-3 {
-	background-image: url('images/timezone/-3.png') ;
-}
-#time_zone_overlay.gmt-4 {
-	background-image: url('images/timezone/-4.png') ;
-}
-#time_zone_overlay.gmt-5 {
-	background-image: url('images/timezone/-5.png') ;
-}
-#time_zone_overlay.gmt-6 {
-	background-image: url('images/timezone/-6.png') ;
-}
-#time_zone_overlay.gmt-7 {
-	background-image: url('images/timezone/-7.png') ;
-}
-#time_zone_overlay.gmt-8 {
-	background-image: url('images/timezone/-8.png') ;
-}
+#time_zone_overlay.UTC-0100 { background-image: url('images/timezone/-1.png'); }
+#time_zone_overlay.UTC-0200 { background-image: url('images/timezone/-2.png'); }
+#time_zone_overlay.UTC-0300 { background-image: url('images/timezone/-3.png'); }
+#time_zone_overlay.UTC-0330 { }
+#time_zone_overlay.UTC-0400 { background-image: url('images/timezone/-4.png'); }
+#time_zone_overlay.UTC-0430 { }
+#time_zone_overlay.UTC-0500 { background-image: url('images/timezone/-5.png'); }
+#time_zone_overlay.UTC-0600 { background-image: url('images/timezone/-6.png'); }
+#time_zone_overlay.UTC-0700 { background-image: url('images/timezone/-7.png'); }
+#time_zone_overlay.UTC-0800 { background-image: url('images/timezone/-8.png'); }
+#time_zone_overlay.UTC-0900 { }
+#time_zone_overlay.UTC-0930 { }
+#time_zone_overlay.UTC-1000 { }
+#time_zone_overlay.UTC-1100 { }
 
 #time_zone_map {
-	background-image: url('images/map.png') ;
-	background-position: bottom;
-	background-repeat: no-repeat;
-	position: relative;
-	height: 21.5rem;
-	width: 100%;
-	margin-top: 0.5rem;
-	z-index: 1;
+  background-image: url('images/map.png') ;
+  background-position: bottom;
+  background-repeat: no-repeat;
+  position: relative;
+  height: 21.5rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  z-index: 1;
+}
+
+#time-form {
+  z-index: 11;
 }
 
 #date_and_time h1 {
-	font-size: 1.6rem;
+  font-size: 1.6rem;
   line-height: 1.8rem;
-	padding: 2rem 1.5rem 0 1.5rem;
-	font-weight: 500;
+  padding: 2rem 1.5rem 0 1.5rem;
+  font-weight: 500;
 }
 
 #date_and_time h2 {
-	font-size: 1.4rem;
+  font-size: 1.4rem;
   line-height: 1.6rem;
-	padding: 0 1.5rem;
-	font-weight: normal;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+  padding: 0 1.5rem;
+  font-weight: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #date_and_time h1,h2 {
-	margin: 0;
+  margin: 0;
 }
 
 #date_and_time [data-type="list"] {
@@ -457,10 +475,12 @@ html, body {
 
 
 /*
-	Import
+  Import
 */
 
-#import_contacts li,
+#import_contacts li {
+  padding: 0 3.5rem;
+}
 #wifi li {
   padding: 0 1.5rem;
 }
@@ -471,7 +491,6 @@ html, body {
   transition: opacity 0.2s ease;
   background: #b1f1ff;
   opacity: 0;
-  pointer-events: auto;
   position: absolute;
   left: 0;
   top: 0;
@@ -489,6 +508,10 @@ html, body {
   pointer-events: none;
 }
 
+#import_contacts li.disabled p{
+    pointer-events: none;
+}
+
 #import_contacts li.disabled:after {
   content: "";
   background-color: #e6e6e6;
@@ -496,89 +519,113 @@ html, body {
 }
 
 #import_contacts ul:first-child li:last-child {
-	margin-bottom: 0;
+  margin-bottom: 0;
+}
+
+#sim-import-button {
+  background: url('images/import_sim.png') center left no-repeat;
+}
+
+#fb_import {
+  background: url('images/import_fb.png') center left no-repeat;
 }
 
 /*
-	About your rights
+  About your rights
 */
-#welcome_firefox {
+#welcome_browser {
   padding: 1.5rem 3rem 0 3rem;
   width: calc(100% - 6rem);
 }
 
-#welcome_firefox p {
-	margin: 0;
-	color: #000;
-	padding: 0 0 2rem 0;
-	font-size: 1.35rem;
+#welcome_browser p {
+  margin: 0;
+  color: #000;
+  padding: 0 0 2rem 0;
+  font-size: 1.35rem;
   line-height: 1.8rem;
 }
-#welcome_firefox #firefox_logo_horizontal {
-	margin: 1rem 0;
+#welcome_browser #browser_logo_horizontal {
+  margin: 1rem 0;
 }
 
-#welcome_firefox label {
-	position: absolute;
-	margin: -1.5rem 0 0 -1.5rem;
+#welcome_browser label {
+  position: absolute;
+  margin: -1.5rem 0 0 -1.5rem;
 }
 
-#welcome_firefox section a {
-	font-size: 1.35rem;
+#welcome_browser section a {
+  font-size: 1.35rem;
   line-height: 1.8rem;
   color: #000;
   text-decoration: underline;
   font-weight: 500;
 }
+#welcome_browser section p a {
+  margin-left: 0.3rem;
+}
 
-#welcome_firefox #firefox_os_privacy_links {
-	margin-bottom: 3rem;
+#welcome_browser #browser_os_privacy_links {
+  margin-bottom: 3rem;
   display: block;
   overflow: hidden;
 }
 
-#welcome_firefox #firefox_os_privacy_links a {
-	width: 50%;
+#welcome_browser #browser_os_privacy_links a {
+  width: 50%;
   float: left;
 }
 
-#welcome_firefox #firefox_os_privacy_links a:last-child {
+#welcome_browser #browser_os_privacy_links a:last-child {
   float: right;
+  text-align: right;
 }
 
-#welcome_firefox #form_share_statistics {
-	clear: both;
+#welcome_browser #form_share_statistics {
+  clear: both;
 }
 
-#welcome_firefox #form_share_statistics p {
-	width: calc(100% - 3.5rem);
+#welcome_browser #form_share_statistics label {
+  width: auto;
+  height: auto;
+  margin: 0 3rem 0 0;
+}
+
+#welcome_browser #form_share_statistics span {
+  top: 1rem;
+  left: 1rem;
+}
+
+#welcome_browser #form_share_statistics p {
+  width: calc(100% - 3.5rem);
   float: right;
 }
 
 /*
-	Privacy policies
+  Privacy policies
 */
 
-#firefox_privacy {
+#browser_privacy {
   padding: 1.5rem 3rem 0 3rem;
   width: calc(100% - 6rem);
+  height: calc(100% - 3.5rem);
 }
 
-#firefox_privacy img {
+#browser_privacy img {
   vertical-align: middle;
 }
 
-#firefox_privacy .logo_container {
-	margin: 1rem 0 2.5rem 0;
+#browser_privacy .logo_container {
+  margin: 1rem 0 2.5rem 0;
 }
 
-#firefox_privacy .logo_title {
-	font-size: 1.8rem;
-	margin-left: 1rem;
+#browser_privacy .logo_title {
+  font-size: 1.8rem;
+  margin-left: 1rem;
   font-weight: 500;
 }
 
-#firefox_privacy p {
+#browser_privacy p {
   margin: 0;
   color: #000;
   padding: 0 0 2rem 0;
@@ -586,35 +633,115 @@ html, body {
   line-height: 1.8rem;
 }
 
-#firefox_privacy input {
+#browser_privacy p a {
+  margin-left: 0.3rem;
+  font-size: 1.35rem;
+  line-height: 1.8rem;
+  color: #000;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+#browser_privacy input {
   margin-bottom: 2rem;
 }
 
 .invisible {
-	position: absolute;
-	top: 0;
-	opacity: 0;
-	height: 4rem;
-	width: 100%;
+  position: absolute;
+  top: 0;
+  opacity: 0;
+  height: 4rem;
+  width: 100%;
 }
 
 /*
-	#about-your-rights
+  #about-your-rights
 */
 
-#about-your-rights p ,#about-your-privacy p {
-	margin: 0;
+#about-your-rights p ,#about-your-privacy p, #sharing-performance-data p {
+  margin: 0;
   color: #000;
   padding: 0 3rem 1rem 3rem;
   font-size: 1.35rem;
   line-height: 1.8rem;
 }
 
-#about-your-rights p:first-child, #about-your-privacy p:first-child {
-	margin-top: 2rem;
+#about-your-rights p:first-child, #about-your-privacy p:first-child, #sharing-performance-data p:first-child {
+  margin-top: 2rem;
 }
 
-/******************************************************************************
+#about-your-rights p a ,#about-your-privacy p a, #sharing-performance-data p a {
+  margin-left: 0.3rem;
+  font-size: 1.35rem;
+  line-height: 1.8rem;
+  color: #000;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+/* external url loader */
+iframe.external {
+  width: 100%;
+  height: 100%;
+  /* using position absolute makes the container not overflowing */
+  position: absolute;
+  border: none;
+}
+
+/* your privacy */
+/* see Bug 819886 */
+i.hack-first-child {
+  display: none;
+}
+
+#about-your-privacy ul li > a {
+  display: block;
+  text-decoration: none;
+  outline: 0;
+  color: #000;
+  -moz-box-sizing: border-box;
+  height: 6rem;
+  font-size: 1.9rem;
+  line-height: 6rem;
+  padding: 0 3rem;
+}
+
+#about-your-privacy article {
+  padding: 0;
+}
+
+/*
+ * Privacy icons
+ */
+
+#about-your-privacy .privacy-menuitem {
+  padding-left: 5.5rem;
+  background-repeat: no-repeat;
+  background-position: 1.4rem center;
+}
+
+.privacy-browserOS {
+  background-image: -moz-image-rect(url(/shared/resources/branding/privacy_sprite.png), 0, 32, 32, 0);
+}
+
+.privacy-everythingME {
+  background-image: -moz-image-rect(url(/shared/resources/branding/privacy_sprite.png), 0, 64, 32, 32);
+}
+
+.privacy-marketPlace {
+  background-image: -moz-image-rect(url(/shared/resources/branding/privacy_sprite.png), 0, 96, 32, 64);
+}
+
+/* no connection error dialog */
+#offline-error-dialog {
+  display: none;
+}
+
+#offline-error-dialog.visible {
+  display: block;
+}
+
+/*
  * Lists
  */
 
@@ -663,21 +790,21 @@ html, body {
 
 [data-type="list"].pack-value-selector li label:not([for]) {
   background: none;
-	height: 100%;
-	position: absolute;
-	left: 1.5rem;
-	right: 1.5rem;
+  height: 100%;
+  position: absolute;
+  left: 1.5rem;
+  right: 1.5rem;
   pointer-events: auto;
 }
 
 [data-type="list"].pack-value-selector li label:not([for]) input {
-	height: 100%
+  height: 100%
 }
 
 [data-type="list"].pack-value-selector li label:not([for]) input + span {
-	background: none;
-	left: 100%;
-	margin-left: -2.2rem;
+  background: none;
+  left: 100%;
+  margin-left: -2.2rem;
 }
 
 [data-type="list"].pack-value-selector li label:not([for]) input:checked + span {
@@ -692,6 +819,7 @@ html, body {
   font-weight: 500;
 }
 
+
 #date_and_time [data-type="list"] select,
 #date_and_time [data-type="list"] input {
   width: 8rem;
@@ -702,11 +830,11 @@ html, body {
 }
 
 /*
-
+  States of Wifi
 */
 
 .wifi-signal0 {
-	background-image: -moz-image-rect(url(images/wifi_sprite.png), 0, 32, 32, 0) !important;
+  background-image: -moz-image-rect(url(images/wifi_sprite.png), 0, 32, 32, 0) !important;
 }
 
 .wifi-signal1 {
@@ -726,7 +854,70 @@ html, body {
 }
 
 .icon {
-	background-color: transparent !important;
-	background-repeat: no-repeat !important; 
-	background-position: center center !important; 
+  background-color: transparent !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+}
+
+/*
+  3G
+*/
+
+#data_3g [data-type="list"] li {
+  padding: 0 1.5rem;
+}
+
+#data_3g label:not([for]) {
+  width: 6rem;
+}
+
+#data_3g .content {
+  padding: 0 3rem 1rem 3rem;
+}
+
+#data_3g .content p {
+  font-size: 1.4rem;
+}
+
+[data-type="list"] aside {
+  margin: 0px 0.5rem 0px 0px !important;
+}
+
+
+/*
+  Tutorial
+*/
+
+#tutorial-screen [role=main] > [role=region] {
+  background-color: #474747;
+  color: white;
+}
+
+#tutorial-screen [role=main] {
+  top: 0;
+  bottom: 0;
+}
+
+#tutorial-screen header {
+  height: 5rem;
+  font-size: 1.4rem;
+  padding: 3rem 1.5rem 1rem 1.5rem;
+  text-align: left;
+}
+
+#tutorial-screen section {
+  text-align: center;
+}
+
+/* Tutorial Steps state */
+#tutorial-screen .step-state {
+  border-bottom: none;
+  top: 1.5rem;
+}
+
+#tutorial-screen .step-state:before {
+  width: calc(100% / 5);
+  height: 0.3rem;
+  margin-top: -0.2rem;
+  background: #FFFFFF;
 }

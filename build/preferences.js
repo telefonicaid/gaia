@@ -1,6 +1,10 @@
 
 'use strict';
 
+function debug(msg) {
+  //dump('-*- preferences.js ' + msg + '\n');
+}
+
 const prefs = [];
 
 let homescreen = HOMESCREEN + (GAIA_PORT ? GAIA_PORT : '');
@@ -22,6 +26,9 @@ Gaia.webapps.forEach(function (webapp) {
 prefs.push(["dom.send_after_paint_to_content", true]);
 
 prefs.push(["network.http.max-connections-per-server", 15]);
+
+// for https://bugzilla.mozilla.org/show_bug.cgi?id=811605 to let user know what prefs is for ril debugging
+prefs.push(["ril.debugging.enabled", false]);
 
 if (LOCAL_DOMAINS) {
   prefs.push(["network.dns.localDomains", domains.join(",")]);
@@ -70,7 +77,7 @@ function writePrefs() {
     return 'user_pref("' + entry[0] + '", ' + JSON.stringify(entry[1]) + ');';
   }).join('\n');
   writeContent(userJs, content + "\n");
-  dump("\n" + content + "\n");
+  debug("\n" + content);
 }
 
 function setPrefs() {

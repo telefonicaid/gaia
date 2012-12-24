@@ -16,7 +16,7 @@ window.addEventListener('localized', function showPanel() {
     activity = activityRequest;
     if (settings && bluetooth &&
         (activity.source.name == 'share') &&
-        (activity.source.data.filenames != null)) {
+        (activity.source.data.filepaths != null)) {
       isBluetoothEnabled();
     } else {
       var msg = 'Cannot transfer without blobs data!';
@@ -32,6 +32,12 @@ window.addEventListener('localized', function showPanel() {
     document.getElementById('enable-bluetooth-button-turn-on');
   var dialogAlertView = document.getElementById('alert-view');
   var alertOkButton = document.getElementById('alert-button-ok');
+  var dialogConfirmPairing =
+    document.getElementById('enable-bluetooth-settings-view');
+  var pairingCancelButton =
+    document.getElementById('enable-bluetooth-settings-button-cancel');
+  var pairingOkButton =
+    document.getElementById('enable-bluetooth-settings-button-ok');
   var deviceSelect = null;
   var dialogDeviceSelector = document.getElementById('value-selector');
   var deviceSelectorContainers =
@@ -41,6 +47,10 @@ window.addEventListener('localized', function showPanel() {
   var deviceCancelButton =
     document.getElementById('device-select-button-cancel');
   var deviceOkButton = document.getElementById('device-select-button-ok');
+  // Don't let this form accidentally get submitted
+  document.getElementById('select-option-popup').onsubmit =
+    function handleSubmit(e) { e.preventDefault(); };
+
   var _debug = false;
 
   function debug(msg) {
@@ -72,7 +82,10 @@ window.addEventListener('localized', function showPanel() {
     bluetoothTurnOnButton.addEventListener('click', turnOnBluetooth);
   }
 
-  function turnOnBluetooth() {
+  function turnOnBluetooth(evt) {
+    if (evt)
+      evt.preventDefault();
+
     dialogConfirmBluetooth.hidden = true;
     bluetooth.onadapteradded = function bt_adapterAdded() {
       initialDefaultAdapter(getPairedDevice);
@@ -107,7 +120,10 @@ window.addEventListener('localized', function showPanel() {
     };
   }
 
-  function cancelTransfer() {
+  function cancelTransfer(evt) {
+    if (evt)
+      evt.preventDefault();
+
     dialogConfirmBluetooth.hidden = true;
     dialogDeviceSelector.hidden = true;
     activity.postError('cancelled');
@@ -127,6 +143,33 @@ window.addEventListener('localized', function showPanel() {
     endTransfer();
   }
 
+  function showPairingConfirmation(msg) {
+    debug(msg);
+    dialogConfirmPairing.hidden = false;
+    pairingCancelButton.addEventListener('click',
+      confirmPairingDevice.bind(this, false));
+    pairingOkButton.addEventListener('click',
+      confirmPairingDevice.bind(this, true));
+  }
+
+  function confirmPairingDevice(enabled) {
+    dialogConfirmPairing.hidden = true;
+    pairingCancelButton.removeEventListener('click', confirmPairingDevice);
+    pairingOkButton.removeEventListener('click', confirmPairingDevice);
+    if (enabled) {
+      // Launch Settings App to Bluetooth settings.
+      var activityRequest = new MozActivity({
+        name: 'configure',
+        data: {
+          target: 'device',
+          section: 'bluetooth'
+        }
+      });
+    }
+    activity.postError('cancelled');
+    endTransfer();
+  }
+
   function endTransfer() {
     bluetoothCancelButton.removeEventListener('click', cancelTransfer);
     bluetoothTurnOnButton.removeEventListener('click', turnOnBluetooth);
@@ -141,7 +184,7 @@ window.addEventListener('localized', function showPanel() {
       if (length == 0) {
         var msg = 'There is no paired device!' +
                   ' Please pair your bluetooth device first.';
-        cannotTransfer(msg);
+        showPairingConfirmation(msg);
         return;
       }
       // Put the list to value selector
@@ -216,7 +259,7 @@ window.addEventListener('localized', function showPanel() {
     evt.target.setAttribute('aria-checked', 'true');
   }
 
-  function transferToDevice() {
+  function transferToDevice(evt) {
     var selectee =
       deviceSelectorContainers.querySelectorAll('[aria-checked="true"]');
     deviceSelect.selectedIndex = selectee[0].dataset.optionIndex;
@@ -229,9 +272,9 @@ window.addEventListener('localized', function showPanel() {
       // XXX: Bug 811615 - Miss file name when passing file by Web Activity.
       // If above issue is fixed,
       // we could refine following code to pass blob to API directly.
-      var filenames = activity.source.data.filenames;
+      var filepaths = activity.source.data.filepaths;
       var storage = navigator.getDeviceStorage('sdcard');
-      var getRequest = storage.get(filenames[0]);
+      var getRequest = storage.get(filepaths[0]);
 
       getRequest.onsuccess = function() {
         defaultAdapter.sendFile(targetDevice.address, getRequest.result);

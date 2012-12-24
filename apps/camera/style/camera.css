@@ -32,7 +32,11 @@ html, body {
   width: 33%;
 }
 
-#switch-button span, #capture-button span, #gallery-button span {
+#switch-button span,
+#capture-button span,
+#gallery-button span,
+#cancel-pick span
+{
   -moz-transition: 0.2s ease-in-out;
   pointer-events: none;
   background-position: center center;
@@ -67,12 +71,31 @@ html, body {
   width: 100%;
   height: 100%;
 }
+
+#gallery-button.hidden {
+  display:none;
+}
+
 #gallery-button span {
   background-image: url(images/grid.png);
 }
 
 #gallery-button[disabled=disabled] {
   display: none;
+}
+
+#cancel-pick {
+  display:block;
+  width: 100%;
+  height: 100%;
+}
+
+#cancel-pick.hidden {
+  display:none
+}
+
+#cancel-pick span {
+  background-image: url(images/actionicon_cancel.png);
 }
 
 #capture-button[disabled=disabled] {
@@ -130,51 +153,6 @@ html, body {
 
 .video #capture-button span {
   background-image: url(images/video.png);
-}
-
-#film-strip {
-  -moz-transition: 0.2s ease-in-out;
-  position: absolute;
-  z-index: 100;
-  -moz-transform: translateY(0px);
-  left: 0;
-  right: 0;
-/*  padding: 10px; */
-  min-height: 30px;
-  background: rgba(0, 0, 0, 0.8);
-}
-
-#film-strip.hidden {
-  -moz-transform: translateY(-50px);
-}
-
-.thumbnail {
-  position: relative;
-  width: 50px;
-  height: 50px;
-  border: 2px solid grey;
-/*  margin-right: 10px; */
-  float: left;
-}
-
-.thumbnail:last-child {
-  border-color: orange;
-}
-
-.thumbnail.video:after {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 40px;
-  width: 40px;
-  content:'';
-  background: url(images/play_overlay.png) no-repeat center center;
-}
-
-.thumbnail img {
-  -moz-user-select: none; /* so the image can't be selected */
-  height: 100%;
-  width: 100%;
 }
 
 #focus-ring {

@@ -21,17 +21,13 @@ if (typeof Contacts.extFb === 'undefined') {
       } else {
         unlink(contactId);
       }
-    }
+    };
 
     extFb.importFB = function(evt) {
       closeRequested = false;
       canClose = false;
       load('fb_import.html', 'friends');
-    }
-
-    function open() {
-      extensionFrame.className = 'opening';
-    }
+    };
 
     function load(uri, from) {
       window.addEventListener('message', messageHandler);
@@ -81,22 +77,22 @@ if (typeof Contacts.extFb === 'undefined') {
         var profileUrl = 'https://m.facebook.com/' + uid;
 
         openURL(profileUrl);
-      }
+      };
 
       req.onerror = function() {
         window.console.error('Contacts FB Profile: Contact not found');
-      }
-    }
+      };
+    };
 
     extFb.wallPost = function(cid) {
       contactId = cid;
       fb.msg.ui.wallPost(contactId);
-    }
+    };
 
     extFb.sendPrivateMsg = function(cid) {
       contactId = cid;
       fb.msg.ui.sendPrivateMsg(contactId);
-    }
+    };
 
     extFb.initEventHandlers = function(socialNode, contact, linked) {
       var elements = {
@@ -131,7 +127,7 @@ if (typeof Contacts.extFb === 'undefined') {
         });
         node.addEventListener('click', elements[nodeName].callback);
       }
-    }
+    };
 
     function onClickWithId(evt, callback) {
       var contactId = evt.target.dataset['id'];
@@ -190,25 +186,26 @@ if (typeof Contacts.extFb === 'undefined') {
             contacts.List.remove(originalFbContact.id);
           }
           Contacts.showContactDetail(contactId);
-        }
+        };
 
         req.onerror = function() {
            window.console.error('FB: Error while linking contacts', req.error);
-        }
-      }
+        };
+      };
 
       mozContReq.onerror = function() {
          window.console.error('FB: Error while linking contacts',
                               mozContReq.error);
-      }
+      };
     }
 
     function unlink(cid) {
       var msg = _('social-unlink-confirm-title');
       var yesObject = {
         title: _('social-unlink-confirm-accept'),
+        isDanger: true,
         callback: function onAccept() {
-          CustomDialog.hide();
+          ConfirmDialog.hide();
           doUnlink(cid);
         }
       };
@@ -216,11 +213,11 @@ if (typeof Contacts.extFb === 'undefined') {
       var noObject = {
         title: _('cancel'),
         callback: function onCancel() {
-          CustomDialog.hide();
+          ConfirmDialog.hide();
         }
       };
 
-      CustomDialog.show(null, msg, noObject, yesObject);
+      ConfirmDialog.show(null, msg, noObject, yesObject);
     }
 
     function doUnlink(cid) {
@@ -235,16 +232,18 @@ if (typeof Contacts.extFb === 'undefined') {
           Contacts.updateContactDetail(cid);
           contacts.List.refresh(freq.result);
         }
-      }
+      };
 
       freq.onerror = function() {
         window.console.error('FB: Error while unlinking', freq.error);
-      }
+      };
     }
 
-    function notifySettings() {
+    function notifySettings(evtype) {
        // Notify observers that a change from FB could have happened
-      var event = new CustomEvent('fb_imported', {
+      var eventType = evtype || 'fb_changed';
+
+      var event = new CustomEvent(eventType, {
         'detail' : true
       });
 
@@ -258,12 +257,27 @@ if (typeof Contacts.extFb === 'undefined') {
 
       switch (data.type) {
         case 'ready':
-          open();
+          extensionFrame.className = 'opening';
+          extensionFrame.addEventListener('transitionend', function topen() {
+            extensionFrame.removeEventListener('transitionend', topen);
+            extensionFrame.contentWindow.postMessage({
+              type: 'dom_transition_end',
+              data: ''
+            }, fb.CONTACTS_APP_ORIGIN);
+          });
         break;
 
         case 'authenticated':
           extensionFrame.src = currentURI;
           access_token = data.data;
+        break;
+
+        case 'token_stored':
+          notifySettings('fb_token_ready');
+        break;
+
+        case 'token_error':
+          notifySettings('fb_token_error');
         break;
 
         case 'abort':
@@ -272,19 +286,18 @@ if (typeof Contacts.extFb === 'undefined') {
 
         case 'window_close':
           close(data.message);
+          notifySettings();
         break;
 
-        case 'fb_imported':
+        case 'fb_updated':
           contacts.List.load();
-          notifySettings();
 
-          Contacts.navigation.home(function finished() {
+          Contacts.navigation.home(function fb_finished() {
             extensionFrame.contentWindow.postMessage({
               type: 'contacts_loaded',
               data: ''
             }, fb.CONTACTS_APP_ORIGIN);
           });
-
         break;
 
         case 'sync_finished':
@@ -293,15 +306,19 @@ if (typeof Contacts.extFb === 'undefined') {
           if (closeRequested) {
             unload();
           }
-          contacts.List.load();
-          notifySettings();
+          // Check whether there has been changes or not
+          if(data.data > 0) {
+            contacts.List.load();
+            notifySettings();
+          }
         break;
 
         case 'item_selected':
           var fData = data.data;
           doLink(fData);
 
-          notifySettings();
+          // Not needed to notifySettings as when settings will be open
+          // the info from FB will be refreshed anyway
         break;
 
         case 'messaging_ready':

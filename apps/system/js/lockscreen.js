@@ -69,6 +69,31 @@ var LockScreen = {
   */
   airplaneMode: false,
 
+  /*
+  * Timeout ID for backing from triggered state to normal state
+  */
+  triggeredTimeoutId: 0,
+
+  /*
+  * Interval ID for elastic of curve and arrow
+  */
+  elasticIntervalId: 0,
+
+  /*
+  * elastic animation interval
+  */
+  ELASTIC_INTERVAL: 5000,
+
+  /*
+  * timeout for triggered state after swipe up
+  */
+  TRIGGERED_TIMEOUT: 7000,
+
+  /*
+  * Max value for handle swiper up
+  */
+  HANDLE_MAX: 70,
+
   /* init */
   init: function ls_init() {
     this.getAllElements();
@@ -82,9 +107,9 @@ var LockScreen = {
 
     /* Gesture */
     this.area.addEventListener('mousedown', this);
-    this.areaHandle.addEventListener('mousedown', this);
-    this.areaCamera.addEventListener('mousedown', this);
-    this.areaUnlock.addEventListener('mousedown', this);
+    this.areaCamera.addEventListener('click', this);
+    this.areaUnlock.addEventListener('click', this);
+    this.iconContainer.addEventListener('mousedown', this);
 
     /* Unlock & camera panel clean up */
     this.overlay.addEventListener('transitionend', this);
@@ -103,6 +128,7 @@ var LockScreen = {
     if (conn && conn.voice) {
       conn.addEventListener('voicechange', this);
       conn.addEventListener('cardstatechange', this);
+      conn.addEventListener('iccinfochange', this);
       this.updateConnState();
       this.connstate.hidden = false;
     }
@@ -112,12 +138,19 @@ var LockScreen = {
       self.setEnabled(value);
     });
 
-    SettingsListener.observe('audio.volume.master', 5, function(volume) {
-      self.mute.hidden = !!volume;
+    SettingsListener.observe('ring.enabled', true, function(value) {
+      self.mute.hidden = value;
     });
 
-    SettingsListener.observe(
-      'ril.radio.disabled', false, function(value) {
+    SettingsListener.observe('vibration.enabled', true, function(value) {
+      if (value) {
+        self.mute.classList.add('vibration');
+      } else {
+        self.mute.classList.remove('vibration');
+      }
+    });
+
+    SettingsListener.observe('ril.radio.disabled', false, function(value) {
       self.airplaneMode = value;
       self.updateConnState();
     });
@@ -195,6 +228,11 @@ var LockScreen = {
           if (!this.locked) {
             this._screenOffTime = new Date().getTime();
           }
+
+          // Remove camera once screen turns off
+          if (this.camera.firstElementChild)
+            this.camera.removeChild(this.camera.firstElementChild);
+
         } else {
           var _screenOffInterval = new Date().getTime() - this._screenOffTime;
           if (_screenOffInterval > this.passCodeRequestTimeout * 1000) {
@@ -208,9 +246,15 @@ var LockScreen = {
         break;
       case 'voicechange':
       case 'cardstatechange':
+      case 'iccinfochange':
         this.updateConnState();
 
       case 'click':
+        if (evt.target === this.areaUnlock || evt.target === this.areaCamera) {
+          this.handleIconClick(evt.target);
+          break;
+        }
+
         if (!evt.target.dataset.key)
           break;
 
@@ -226,13 +270,21 @@ var LockScreen = {
         var overlay = this.overlay;
         var target = evt.target;
 
+        // Reset timer when touch while overlay triggered
+        if (overlay.classList.contains('triggered')) {
+          clearTimeout(this.triggeredTimeoutId);
+          this.triggeredTimeoutId = setTimeout(this.unloadPanel.bind(this),
+                                               this.TRIGGERED_TIMEOUT);
+          break;
+        }
+
+        overlay.classList.remove('elastic');
+        this.setElasticEnabled(false);
+
         this._touch = {
-          target: null,
           touched: false,
           leftTarget: leftTarget,
           rightTarget: rightTarget,
-          railLeftWidth: this.railLeft.offsetWidth,
-          railRightWidth: this.railRight.offsetWidth,
           overlayWidth: this.overlay.offsetWidth,
           handleWidth: this.areaHandle.offsetWidth,
           maxHandleOffset: rightTarget.offsetLeft - handle.offsetLeft -
@@ -241,39 +293,10 @@ var LockScreen = {
         window.addEventListener('mouseup', this);
         window.addEventListener('mousemove', this);
 
-        switch (target) {
-          case leftTarget:
-            overlay.classList.add('touched-left');
-            break;
-
-          case rightTarget:
-            overlay.classList.add('touched-right');
-            break;
-
-          case this.areaHandle:
-            this._touch.touched = true;
-            this._touch.initX = evt.pageX;
-            this._touch.initY = evt.pageY;
-
-            overlay.classList.add('touched');
-            break;
-
-          case this.accessibilityUnlock:
-            overlay.classList.add('touched');
-            this.areaUnlock.classList.add('triggered');
-            this.areaHandle.classList.add('triggered');
-            this._touch.target = this.areaUnlock;
-            this.handleGesture();
-            break;
-
-          case this.accessibilityCamera:
-            overlay.classList.add('touched');
-            this.areaUnlock.classList.add('triggered');
-            this.areaHandle.classList.add('triggered');
-            this._touch.target = this.areaCamera;
-            this.handleGesture();
-            break;
-        }
+        this._touch.touched = true;
+        this._touch.initX = evt.pageX;
+        this._touch.initY = evt.pageY;
+        overlay.classList.add('touched');
         break;
 
       case 'mousemove':
@@ -281,12 +304,8 @@ var LockScreen = {
         break;
 
       case 'mouseup':
-        var handle = this.areaHandle;
         window.removeEventListener('mousemove', this);
         window.removeEventListener('mouseup', this);
-
-        this.overlay.classList.remove('touched-left');
-        this.overlay.classList.remove('touched-right');
 
         this.handleMove(evt.pageX, evt.pageY);
         this.handleGesture();
@@ -325,14 +344,6 @@ var LockScreen = {
     }
   },
 
-  setRailWidth: function ls_setRailWidth(left, right) {
-    var touch = this._touch;
-    this.railLeft.style.transform =
-      'scaleX(' + (left / touch.railLeftWidth) + ')';
-    this.railRight.style.transform =
-      'scaleX(' + (right / touch.railRightWidth) + ')';
-  },
-
   handleMove: function ls_handleMove(pageX, pageY) {
     var touch = this._touch;
 
@@ -346,93 +357,58 @@ var LockScreen = {
       touch.initY = pageY;
 
       var overlay = this.overlay;
-      overlay.classList.remove('touched-left');
-      overlay.classList.remove('touched-right');
       overlay.classList.add('touched');
     }
 
-    var dx = pageX - touch.initX;
+    var dy = pageY - touch.initY;
+    var ty = Math.max(- this.HANDLE_MAX, dy);
+    var base = - ty / this.HANDLE_MAX;
+    // mapping position 20-100 to opacity 0.1-0.5
+    var opacity = base <= 0.2 ? 0.1 : base * 0.5;
+    touch.ty = ty;
 
-    var handleMax = touch.maxHandleOffset;
-    this.areaHandle.style.transform =
-      'translateX(' + Math.max(- handleMax, Math.min(handleMax, dx)) + 'px)';
-
-    var railMax = touch.railLeftWidth;
-    var railLeft = railMax + dx;
-    var railRight = railMax - dx;
-
-    this.setRailWidth(Math.max(0, Math.min(railMax * 2, railLeft)),
-                      Math.max(0, Math.min(railMax * 2, railRight)));
-
-    var base = touch.overlayWidth / 4;
-    var opacity = Math.max(0.1, (base - Math.abs(dx)) / base);
-
-    var leftTarget = touch.leftTarget;
-    var rightTarget = touch.rightTarget;
-
-    if (dx > 0) {
-      rightTarget.style.opacity =
-        this.railRight.style.opacity = '';
-      leftTarget.style.opacity =
-        this.railLeft.style.opacity = opacity;
-    } else {
-      rightTarget.style.opacity =
-        this.railRight.style.opacity = opacity;
-      leftTarget.style.opacity =
-        this.railLeft.style.opacity = '';
-    }
-
-    var handleWidth = touch.handleWidth;
-    var triggered = false;
-
-    if (railLeft < handleWidth / 2) {
-      if (!leftTarget.classList.contains('triggered')) {
-        leftTarget.classList.add('triggered');
-        triggered = true;
-      }
-      rightTarget.classList.remove('triggered');
-      touch.target = leftTarget;
-    } else if (railRight < handleWidth / 2) {
-      leftTarget.classList.remove('triggered');
-      if (!rightTarget.classList.contains('triggered')) {
-        rightTarget.classList.add('triggered');
-        triggered = true;
-      }
-      touch.target = rightTarget;
-    } else {
-      leftTarget.classList.remove('triggered');
-      rightTarget.classList.remove('triggered');
-      touch.target = null;
-    }
-
-    if (triggered && navigator.vibrate)
-      navigator.vibrate([200]);
+    this.iconContainer.style.transform = 'translateY(' + ty + 'px)';
+    this.areaCamera.style.opacity =
+      this.areaUnlock.style.opacity = opacity;
   },
 
   handleGesture: function ls_handleGesture() {
     var touch = this._touch;
-    var target = touch.target;
+    if (touch.ty < -50) {
+      this.areaHandle.style.transform =
+        this.areaHandle.style.opacity =
+        this.iconContainer.style.transform =
+        this.iconContainer.style.opacity =
+        this.areaCamera.style.transform =
+        this.areaCamera.style.opacity =
+        this.areaUnlock.style.transform =
+        this.areaUnlock.style.opacity = '';
+      this.overlay.classList.add('triggered');
 
-    if (!target) {
+      this.triggeredTimeoutId =
+        setTimeout(this.unloadPanel.bind(this), this.TRIGGERED_TIMEOUT);
+    } else if (touch.ty > -10) {
+      touch.touched = false;
       this.unloadPanel();
-      return;
+      this.playElastic();
+
+      var self = this;
+      var container = this.iconContainer;
+      container.addEventListener('animationend', function prompt() {
+        container.removeEventListener('animationend', prompt);
+        self.overlay.classList.remove('elastic');
+        self.setElasticEnabled(true);
+      });
+    } else {
+      this.unloadPanel();
+      this.setElasticEnabled(true);
     }
+  },
 
-    var distance = target.offsetLeft - this.areaHandle.offsetLeft -
-      (this.areaHandle.offsetWidth - target.offsetWidth) / 2;
-    this.overlay.classList.add('triggered');
-    this.areaHandle.classList.add('triggered');
-
-    var transformDistance = 'translateX(' + distance + 'px)';
-    var railLength = touch.rightTarget.offsetLeft -
-      touch.leftTarget.offsetLeft -
-      (this.areaHandle.offsetWidth + target.offsetWidth) / 2;
-
+  handleIconClick: function ls_handleIconClick(target) {
     var self = this;
     switch (target) {
       case this.areaCamera:
-        this.setRailWidth(0, railLength);
-
         var panelOrFullApp = function panelOrFullApp() {
           if (self.passCodeEnabled) {
             // Go to secure camera panel
@@ -450,25 +426,13 @@ var LockScreen = {
           });
           a.onerror = function ls_activityError() {
             console.log('MozActivity: camera launch error.');
-          }
+          };
         };
 
-
-        if (this.areaHandle.style.transform == transformDistance) {
-          panelOrFullApp();
-          break;
-        }
-        this.areaHandle.style.transform = transformDistance;
-
-        this.areaHandle.addEventListener('transitionend', function goCamera() {
-          self.areaHandle.removeEventListener('transitionend', goCamera);
-          panelOrFullApp();
-        });
+        panelOrFullApp();
         break;
 
       case this.areaUnlock:
-        this.setRailWidth(railLength, 0);
-
         var passcodeOrUnlock = function passcodeOrUnlock() {
           if (!self.passCodeEnabled || !self._passCodeTimeoutCheck) {
             self.unlock();
@@ -476,17 +440,7 @@ var LockScreen = {
             self.switchPanel('passcode');
           }
         };
-
-        if (this.areaHandle.style.transform == transformDistance) {
-          passcodeOrUnlock();
-          break;
-        }
-        this.areaHandle.style.transform = transformDistance;
-
-        this.areaHandle.addEventListener('transitionend', function goUnlock() {
-          self.areaHandle.removeEventListener('transitionend', goUnlock);
-          passcodeOrUnlock();
-        });
+        passcodeOrUnlock();
         break;
     }
   },
@@ -534,6 +488,7 @@ var LockScreen = {
   unlock: function ls_unlock(instant) {
     var wasAlreadyUnlocked = !this.locked;
     this.locked = false;
+    this.setElasticEnabled(false);
 
     this.mainScreen.focus();
     if (instant) {
@@ -570,6 +525,8 @@ var LockScreen = {
     this.updateTime();
 
     this.switchPanel();
+
+    this.setElasticEnabled(ScreenManager.screenEnabled);
 
     this.overlay.focus();
     if (instant)
@@ -631,7 +588,7 @@ var LockScreen = {
     }
   },
 
-  unloadPanel: function ls_loadPanel(panel, toPanel, callback) {
+  unloadPanel: function ls_unloadPanel(panel, toPanel, callback) {
     switch (panel) {
       case 'passcode':
         // Reset passcode panel only if the status is not error
@@ -660,16 +617,20 @@ var LockScreen = {
         var self = this;
         var unload = function unload() {
           self.areaHandle.style.transform =
+            self.areaUnlock.style.transform =
+            self.areaCamera.style.transform =
+            self.iconContainer.style.transform =
+            self.iconContainer.style.opacity =
+            self.areaHandle.style.opacity =
             self.areaUnlock.style.opacity =
-            self.railRight.style.opacity =
-            self.areaCamera.style.opacity =
-            self.railLeft.style.opacity =
-            self.railRight.style.transform =
-            self.railLeft.style.transform = '';
+            self.areaCamera.style.opacity = '';
           self.overlay.classList.remove('triggered');
           self.areaHandle.classList.remove('triggered');
           self.areaCamera.classList.remove('triggered');
           self.areaUnlock.classList.remove('triggered');
+
+          clearTimeout(self.triggeredTimeoutId);
+          self.setElasticEnabled(false);
         };
 
         if (toPanel !== 'camera') {
@@ -721,7 +682,9 @@ var LockScreen = {
 
     var timeFormat = _('shortTimeFormat') || '%H:%M';
     var dateFormat = _('longDateFormat') || '%A %e %B';
-    this.clock.textContent = f.localeFormat(d, timeFormat);
+    var time = f.localeFormat(d, timeFormat);
+    this.clockNumbers.textContent = time.match(/([012]?\d):[0-5]\d/g);
+    this.clockMeridiem.textContent = (time.match(/AM|PM/i) || []).join('');
     this.date.textContent = f.localeFormat(d, dateFormat);
 
     var self = this;
@@ -736,6 +699,7 @@ var LockScreen = {
       return;
 
     var voice = conn.voice;
+    var iccInfo = conn.iccInfo;
     var connstateLine1 = this.connstate.firstElementChild;
     var connstateLine2 = this.connstate.lastElementChild;
     var _ = navigator.mozL10n.get;
@@ -805,25 +769,16 @@ var LockScreen = {
 
       return;
     }
-
-    if (voice.network.mcc == 724 &&
-        voice.cell && voice.cell.gsmLocationAreaCode) {
-      // We are in Brazil, It is legally required to show local info
-      // about current registered GSM network in a legally specified way.
-      var lac = voice.cell.gsmLocationAreaCode % 100;
-      var carriers = MobileInfo.brazil.carriers;
-      var regions = MobileInfo.brazil.regions;
-
-      connstateLine2.textContent =
-        (carriers[voice.network.mnc] || ('724' + voice.network.mnc)) +
-        ' ' +
-        (regions[lac] ? regions[lac] + ' ' + lac : '');
+    var operatorInfos = MobileOperator.userFacingInfo(conn);
+    if (operatorInfos.carrier) {
+      connstateLine2.textContent = operatorInfos.carrier + ' ' +
+        operatorInfos.region;
     }
 
-    var carrierName = voice.network.shortName || voice.network.longName;
+    var operator = operatorInfos.operator;
 
     if (voice.roaming) {
-      var l10nArgs = { operator: carrierName };
+      var l10nArgs = { operator: operator };
       connstateLine1.dataset.l10nId = 'roaming';
       connstateLine1.dataset.l10nArgs = JSON.stringify(l10nArgs);
       connstateLine1.textContent = _('roaming', l10nArgs);
@@ -832,7 +787,7 @@ var LockScreen = {
     }
 
     delete connstateLine1.dataset.l10nId;
-    connstateLine1.textContent = carrierName;
+    connstateLine1.textContent = operator;
   },
 
   updatePassCodeUI: function lockscreen_updatePassCodeUI() {
@@ -885,9 +840,9 @@ var LockScreen = {
 
   getAllElements: function ls_getAllElements() {
     // ID of elements to create references
-    var elements = ['connstate', 'mute', 'clock', 'date',
-        'area', 'area-unlock', 'area-camera',
-        'area-handle', 'rail-left', 'rail-right', 'passcode-code',
+    var elements = ['connstate', 'mute', 'clock-numbers', 'clock-meridiem',
+        'date', 'area', 'area-unlock', 'area-camera', 'icon-container',
+        'area-handle', 'passcode-code',
         'passcode-pad', 'camera', 'accessibility-camera',
         'accessibility-unlock', 'panel-emergency-call'];
 
@@ -895,7 +850,7 @@ var LockScreen = {
       return str.replace(/\-(.)/g, function replacer(str, p1) {
         return p1.toUpperCase();
       });
-    }
+    };
 
     elements.forEach((function createElementRef(name) {
       this[toCamelCase(name)] = document.getElementById('lockscreen-' + name);
@@ -918,8 +873,30 @@ var LockScreen = {
     SettingsListener.getSettingsLock().set({
       'lockscreen.locked': value
     });
+  },
+
+  setElasticEnabled: function ls_setElasticEnabled(value) {
+    clearInterval(this.elasticIntervalId);
+    if (value) {
+      this.elasticIntervalId =
+        setInterval(this.playElastic.bind(this), this.ELASTIC_INTERVAL);
+    }
+  },
+
+  playElastic: function ls_playElastic() {
+    if (this._touch && this._touch.touched)
+      return;
+
+    var overlay = this.overlay;
+    var container = this.iconContainer;
+
+    overlay.classList.add('elastic');
+    container.addEventListener('animationend', function animationend(e) {
+      container.removeEventListener(e.type, animationend);
+      overlay.classList.remove('elastic');
+    });
   }
 };
 
-LockScreen.init();
+window.addEventListener('localized', LockScreen.init.bind(LockScreen));
 

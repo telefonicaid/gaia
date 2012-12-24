@@ -72,13 +72,14 @@
     "contacts":{ "access": "readwrite" },
     "mobileconnection":{},
     "attention":{},
-    "settings":{ "access": "readonly" },
+    "settings":{ "access": "readwrite" },
     "desktop-notification":{},
     "alarms": {},
     "systemXHR": {},
     "wifi-manage":{},
-    "wifi":{},
-    "time": {}
+    "time": {},
+    "audio-channel-telephony":{},
+    "audio-channel-ringer":{}
   },
   "orientation": "portrait-primary",
   "activities": {
@@ -94,7 +95,7 @@
       "filters": {
         "type": "webcontacts/contact"
       },
-      "disposition": "window",
+      "disposition": "inline",
       "href": "/contacts/index.html?new",
       "returnValue": true
     },
@@ -107,8 +108,11 @@
     }
   },
   "messages": [
-     { "telephony-new-call": "/dialer/index.html#keyboard-view" },
+     { "alarm": "/facebook/fb_sync.html" },
      { "bluetooth-dialer-command": "/dialer/index.html#keyboard-view" },
-     { "alarm": "/facebook/fb_sync.html" }
+     { "headset-button": "/dialer/index.html#keyboard-view" },
+     { "notification": "/dialer/index.html#keyboard-view" },
+     { "telephony-new-call": "/dialer/index.html#keyboard-view" },
+     { "ussd-received": "/dialer/index.html#keyboard-view" }
   ]
 }

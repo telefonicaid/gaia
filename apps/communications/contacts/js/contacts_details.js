@@ -4,6 +4,7 @@ var contacts = window.contacts || {};
 
 contacts.Details = (function() {
   var photoPos = 7;
+  var initMargin = 8;
   var contactData,
       contactDetails,
       listContainer,
@@ -65,22 +66,19 @@ contacts.Details = (function() {
 
   var initPullEffect = function cd_initPullEffect(cover) {
     cover.addEventListener('mousedown', function(event) {
-      if (contactDetails.classList.contains('no-photo'))
+      if (event.target != cover || contactDetails.classList.contains('no-photo'))
         return;
 
       var startPosition = event.clientY;
-      var currentPosition;
-      var initMargin = '16rem';
       contactDetails.classList.add('up');
       cover.classList.add('up');
 
       var onMouseMove = function onMouseMove(event) {
-        currentPosition = event.clientY;
-        var newMargin = currentPosition - startPosition;
+        var newMargin = event.clientY - startPosition;
         if (newMargin > 0 && newMargin < 150) {
           contactDetails.classList.remove('up');
           cover.classList.remove('up');
-          var calc = '-moz-calc(' + initMargin + ' + ' + newMargin + 'px)';
+          var calc = 'calc(' + initMargin + 'rem + ' + newMargin + 'px)';
           // Divide by 40 (4 times slower and in rems)
           contactDetails.style.transform = 'translateY(' + calc + ')';
           var newPos = (-photoPos + (newMargin / 40)) + 'rem';
@@ -91,14 +89,14 @@ contacts.Details = (function() {
       var onMouseUp = function onMouseUp(event) {
         contactDetails.classList.add('up');
         cover.classList.add('up');
-        contactDetails.style.transform = 'translateY(' + initMargin + ')';
-        cover.style.transform = 'translateY(-' + photoPos + 'rem)';
-        cover.removeEventListener('mousemove', onMouseMove);
-        cover.removeEventListener('mouseup', onMouseUp);
+        contactDetails.style.transform = null;
+        cover.style.transform = null;
+        removeEventListener('mousemove', onMouseMove);
+        removeEventListener('mouseup', onMouseUp);
       };
 
-      cover.addEventListener('mousemove', onMouseMove);
-      cover.addEventListener('mouseup', onMouseUp);
+      addEventListener('mousemove', onMouseMove);
+      addEventListener('mouseup', onMouseUp);
     });
   };
 
@@ -241,7 +239,13 @@ contacts.Details = (function() {
 
     var f = new navigator.mozL10n.DateTimeFormat();
     var birthdayFormat = _('birthdayDateFormat') || '%e %B';
-    var birthdayString = f.localeFormat(contact.bday, birthdayFormat);
+    var birthdayString = '';
+    try {
+      birthdayString = f.localeFormat(contact.bday, birthdayFormat);
+    } catch (err) {
+      console.error('Error parsing birthday');
+      return;
+    }
 
     var element = utils.templates.render(birthdayTemplate, {
       i: contact.id,
@@ -331,10 +335,11 @@ contacts.Details = (function() {
     var telLength = Contacts.getLength(contact.tel);
     for (var tel = 0; tel < telLength; tel++) {
       var currentTel = contact.tel[tel];
+      var escapedType = utils.text.escapeHTML(currentTel.type, true);
       var telField = {
-        value: currentTel.value || '',
-        type: currentTel.type || TAG_OPTIONS['phone-type'][0].value,
-        carrier: currentTel.carrier || '',
+        value: utils.text.escapeHTML(currentTel.value, true) || '',
+        type: escapedType || TAG_OPTIONS['phone-type'][0].value,
+        carrier: utils.text.escapeHTML(currentTel.carrier, true) || '',
         i: tel
       };
       var template = utils.templates.render(phonesTemplate, telField);
@@ -369,9 +374,10 @@ contacts.Details = (function() {
     var emailLength = Contacts.getLength(contact.email);
     for (var email = 0; email < emailLength; email++) {
       var currentEmail = contact.email[email];
+      var escapedType = utils.text.escapeHTML(currentEmail['type'], true);
       var emailField = {
-        value: currentEmail['value'] || '',
-        type: currentEmail['type'] || TAG_OPTIONS['email-type'][0].value,
+        value: utils.text.escapeHTML(currentEmail['value'], true) || '',
+        type: escapedType || TAG_OPTIONS['email-type'][0].value,
         i: email
       };
       var template = utils.templates.render(emailsTemplate, emailField);
@@ -403,12 +409,22 @@ contacts.Details = (function() {
         'locality', 'countryName'])) {
         continue;
       }
+      var address = currentAddress['streetAddress'] || '';
+      var escapedStreet = utils.text.escapeHTML(address, true);
+      var locality = currentAddress['locality'];
+      var escapedLocality = utils.text.escapeHTML(locality, true);
+      var escapedType = utils.text.escapeHTML(currentAddress['type'], true);
+      var country = currentAddress['countryName'] || '';
+      var escapedCountry = utils.text.escapeHTML(country, true);
+      var postalCode = currentAddress['postalCode'] || '';
+      var escapedPostalCode = utils.text.escapeHTML(postalCode, true);
+
       var addressField = {
-        streetAddress: currentAddress['streetAddress'] || '',
-        postalCode: currentAddress['postalCode'] || '',
-        locality: currentAddress['locality'] || '',
-        countryName: currentAddress['countryName'] || '',
-        type: currentAddress['type'] || TAG_OPTIONS['address-type'][0].value,
+        streetAddress: escapedStreet,
+        postalCode: escapedPostalCode,
+        locality: escapedLocality || '',
+        countryName: escapedCountry,
+        type: escapedType || TAG_OPTIONS['address-type'][0].value,
         i: i
       };
       var template = utils.templates.render(addressesTemplate, addressField);
@@ -427,7 +443,7 @@ contacts.Details = (function() {
     for (var i = 0; i < contact.note.length; i++) {
       var currentNote = contact.note[i];
       var noteField = {
-        note: currentNote || '',
+        note: utils.text.escapeHTML(currentNote, true) || '',
         i: i
       };
       var template = utils.templates.render(notesTemplate, noteField);
@@ -437,9 +453,10 @@ contacts.Details = (function() {
   };
 
   var renderPhoto = function cd_renderPhoto(contact) {
+    contactDetails.classList.remove('up');
     if (contact.photo && contact.photo.length > 0) {
       contactDetails.classList.add('up');
-      var clientHeight = contactDetails.clientHeight;
+      var clientHeight = contactDetails.clientHeight - (initMargin * 10);
       if (detailsInner.offsetHeight < clientHeight) {
         cover.style.overflow = 'hidden';
       } else {
@@ -454,11 +471,20 @@ contacts.Details = (function() {
     }
   };
 
+  var reMark = function(field, value) {
+    var selector = '[data-' + field + '="' + value + '"]';
+    var elements = listContainer.querySelectorAll(selector);
+    for (var i = 0; i < elements.length; i++) {
+      elements[i].classList.add('remark');
+    }
+  }
+
   return {
     'init': init,
     'setContact': setContact,
     'toggleFavorite': toggleFavorite,
     'render': render,
-    'onLineChanged': checkOnline
+    'onLineChanged': checkOnline,
+    'reMark': reMark
   };
 })();

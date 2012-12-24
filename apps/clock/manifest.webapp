@@ -9,8 +9,9 @@
   },
   "permissions": {
     "alarms":{},
-    "settings":{ "access": "readonly" },
-    "attention":{}
+    "settings":{ "access": "readwrite" },
+    "attention":{},
+    "audio-channel-alarm":{}
   },
   "locales": {
     "ar": {

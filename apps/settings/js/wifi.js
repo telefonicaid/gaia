@@ -76,11 +76,15 @@ onLocalized(function wifiSettings() {
   };
 
   gWifiManager.onenabled = function onWifiEnabled() {
+    // enable UI toogle
+    gWifiCheckBox.disabled = false;
     updateNetworkState();
     gNetworkList.scan();
   };
 
   gWifiManager.ondisabled = function onWifiDisabled() {
+    // enable UI toogle
+    gWifiCheckBox.disabled = false;
     gWifiInfoBlock.textContent = _('disabled');
     gNetworkList.clear(false);
     gNetworkList.autoscan = false;
@@ -643,11 +647,17 @@ onLocalized(function wifiSettings() {
 
       // OK|Cancel buttons
       function submit() {
+        if (dialogID === 'wifi-joinHidden') {
+          network.ssid = dialog.querySelector('input[name=ssid]').value;
+        }
         if (key) {
           setPassword(password.value, identity.value);
         }
         if (callback) {
           callback();
+          if (dialogID === 'wifi-joinHidden') {
+            gKnownNetworkList.scan();
+          }
         }
         reset();
       };
@@ -666,9 +676,10 @@ onLocalized(function wifiSettings() {
     gWifiInfoBlock.textContent =
         _('fullStatus-' + networkStatus, gWifiManager.connection.network);
 
-    if (networkStatus === 'connectingfailed') {
+    if (networkStatus === 'connectingfailed' && gCurrentNetwork) {
       // connection has failed, probably an authentication issue...
-      delete(gCurrentNetwork.password); // force a new authentication dialog
+      delete(gCurrentNetwork.password);
+      gWifiManager.forget(gCurrentNetwork); // force a new authentication dialog
       gNetworkList.display(gCurrentNetwork,
           _('shortStatus-connectingfailed'));
       gCurrentNetwork = null;
@@ -699,15 +710,6 @@ onLocalized(function wifiSettings() {
       gWifiInfoBlock.textContent = _('fullStatus-initializing');
       gNetworkList.clear(true);
 
-      // record MAC address value
-      var macAddress = gWifiManager.macAddress;
-      settings.createLock().set({'deviceinfo.mac': macAddress});
-
-      var mac = document.querySelectorAll('[data-l10n-id="macAddress"] span');
-      for (var i = 0; i < mac.length; i++) {
-         mac[i].textContent = macAddress;
-      }
-
     } else {
       gWifiInfoBlock.textContent = _('disabled');
       if (gWpsInProgress) {
@@ -724,6 +726,9 @@ onLocalized(function wifiSettings() {
   settings.addObserver('wifi.enabled', function(event) {
     if (lastMozSettingValue == event.settingValue)
       return;
+
+    // lock UI toggle
+    gWifiCheckBox.disabled = true;
 
     lastMozSettingValue = event.settingValue;
     setMozSettingsEnabled(event.settingValue);

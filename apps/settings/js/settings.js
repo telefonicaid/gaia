@@ -26,10 +26,27 @@ var Settings = {
     // register web activity handler
     navigator.mozSetMessageHandler('activity', this.webActivityHandler);
 
-    // update <input> values when the corresponding setting is changed
+    // update corresponding setting when it changes
     settings.onsettingchange = function settingChanged(event) {
       var key = event.settingName;
       var value = event.settingValue;
+
+      // update <span> values when the corresponding setting is changed
+      var rule = '[data-name="' + key + '"]:not([data-ignore])';
+      var spanField = document.querySelector(rule);
+      if (spanField) {
+        // check whether this setting comes from a select option
+        rule = '[data-setting="' + key + '"] [value="' + value + '"]';
+        var option = document.querySelector(rule);
+        if (option) {
+          spanField.dataset.l10nId = option.dataset.l10nId;
+          spanField.textContent = option.textContent;
+        } else {
+          spanField.textContent = value;
+        }
+      }
+
+      // update <input> values when the corresponding setting is changed
       var input = document.querySelector('input[name="' + key + '"]');
       if (!input)
         return;
@@ -91,7 +108,8 @@ var Settings = {
 
     // activate all links
     var self = this;
-    var links = panel.querySelectorAll('a[href^="http"], [data-href]');
+    var rule = 'a[href^="http"], a[href^="tel"], [data-href]';
+    var links = panel.querySelectorAll(rule);
     for (i = 0; i < links.length; i++) {
       var link = links[i];
       if (!link.dataset.href) {
@@ -115,9 +133,6 @@ var Settings = {
         };
       }
     }
-
-    // display panel if required
-    panel.hidden = false;
   },
 
   presetPanel: function settings_presetPanel(panel) {
@@ -187,12 +202,41 @@ var Settings = {
       }
 
       // preset all span with data-name fields
-      rule = 'span[data-name]:not([data-ignore])';
+      rule = '[data-name]:not([data-ignore])';
       var spanFields = panel.querySelectorAll(rule);
       for (i = 0; i < spanFields.length; i++) {
         var key = spanFields[i].dataset.name;
-        if (key && request.result[key] != undefined)
-          spanFields[i].textContent = request.result[key];
+
+        if (key && request.result[key] != undefined) {
+          // check whether this setting comes from a select option
+          // (it may be in a different panel, so query the whole document)
+          rule = '[data-setting="' + key + '"] ' +
+            '[value="' + request.result[key] + '"]';
+          var option = document.querySelector(rule);
+          if (option) {
+            spanFields[i].dataset.l10nId = option.dataset.l10nId;
+            spanFields[i].textContent = option.textContent;
+          } else {
+            spanFields[i].textContent = request.result[key];
+          }
+        } else { // request.result[key] is undefined
+          switch (key) {
+            //XXX bug 816899 will also provide 'deviceinfo.software' from Gecko
+            //  which is {os name + os version}
+            case 'deviceinfo.software':
+              var _ = navigator.mozL10n.get;
+              var text = _('brandShortName') + ' ' +
+                request.result['deviceinfo.os'];
+              spanFields[i].textContent = text;
+              break;
+
+            //XXX workaround request from bug 808892 comment 22
+            //  hide this field if it's undefined/empty.
+            case 'deviceinfo.firmware_revision':
+              spanFields[i].parentNode.hidden = true;
+              break;
+          }
+        }
       }
     };
   },
@@ -242,7 +286,9 @@ var Settings = {
       case 'radio':
       case 'text':
       case 'password':
-        value = input.value; // text
+        value = input.value; // default as text
+        if (input.dataset.valueType === 'integer') // integer
+          value = parseInt(value);
         break;
     }
 
@@ -290,11 +336,34 @@ var Settings = {
     req.send();
   },
 
+  loadLastUpdated: function settings_loadLastUpdated() {
+    var settings = this.mozSettings;
+    if (!settings) {
+      return;
+    }
+
+    var lastUpdateDate = document.getElementById('last-update-date');
+    var lock = settings.createLock();
+    var key = 'deviceinfo.last_updated';
+    var request = lock.get(key);
+    request.onsuccess = function() {
+      var lastUpdated = request.result[key];
+      if (!lastUpdated) {
+        return;
+      }
+
+      var f = new navigator.mozL10n.DateTimeFormat();
+      var _ = navigator.mozL10n.get;
+      lastUpdateDate.textContent = f.localeFormat(new Date(lastUpdated),
+                                                  _('shortDateTimeFormat'));
+    };
+  },
+
   openDialog: function settings_openDialog(dialogID) {
     var settings = this.mozSettings;
     var dialog = document.getElementById(dialogID);
     var fields =
-        dialog.querySelectorAll('input[data-setting]:not([data-ignore])');
+        dialog.querySelectorAll('[data-setting]:not([data-ignore])');
 
     /**
      * In Settings dialog boxes, we don't want the input fields to be preset
@@ -306,7 +375,7 @@ var Settings = {
      * explicitely when the dialog is shown.  If the dialog is validated
      * (submit), their values are stored into B2G settings.
      *
-     * XXX warning, this only supports text/password/radio input types.
+     * XXX warning, this only supports text/password/radio/select input types.
      */
 
     // initialize all setting fields in the dialog box
@@ -346,7 +415,7 @@ var Settings = {
     openDialog(dialogID, submit);
   },
 
-  openUserGuide: function settings_openUserGuide() {
+  getUserGuide: function settings_getUserGuide(callback) {
     var settings = this.mozSettings;
     if (!settings)
       return;
@@ -356,7 +425,7 @@ var Settings = {
     req.onsuccess = function userGuide() {
       var url = 'http://support.mozilla.org/1/firefox-os/' +
         req.result[key] + '/gonk/' + document.documentElement.lang + '/';
-      openLink(url);
+      callback(url);
     };
   },
 
@@ -403,28 +472,117 @@ var Settings = {
     }
 
     var _ = navigator.mozL10n.get;
-    var updateStatus = document.getElementById('update-status');
+    var updateStatus = document.getElementById('update-status'),
+        systemStatus = updateStatus.querySelector('.system-update-status');
 
-    updateStatus.textContent = _('checking-for-update');
-    updateStatus.hidden = false;
-
-    settings.addObserver('gecko.updateStatus', function onUpdateStatus(event) {
+    function onUpdateStatus(setting, event) {
       var value = event.settingValue;
-      switch (value) {
-        case 'check-complete':
-          updateStatus.hidden = true;
-          break;
-        default:
-          updateStatus.textContent = _(value, null, value);
-          break;
+      checkStatus[setting].value = value;
+
+      /* possible return values:
+       * for system updates:
+       * - no-updates
+       * - already-latest-version
+       * - check-complete
+       * - retry-when-online
+       *
+       * for apps updates:
+       * - check-complete
+       *
+       * use
+       * http://mxr.mozilla.org/mozilla-central/ident?i=setUpdateStatus&tree=mozilla-central&filter=&strict=1
+       * to check if this is still current
+       */
+      if (value !== 'check-complete') {
+        systemStatus.textContent = _(value, null, value);
       }
-      settings.removeObserver('gecko.updateStatus', onUpdateStatus);
-    });
+
+      checkIfStatusComplete();
+
+      settings.removeObserver(setting, checkStatus[setting].cb);
+      checkStatus[setting].cb = null;
+    }
+
+    function checkIfStatusComplete() {
+      var hasAllCheckComplete =
+        Object.keys(checkStatus).every(function(setting) {
+          return checkStatus[setting].value === 'check-complete';
+        });
+
+      var hasAllResponses =
+        Object.keys(checkStatus).every(function(setting) {
+          return !!checkStatus[setting].value;
+        });
+
+      if (hasAllCheckComplete) {
+        updateStatus.classList.remove('visible');
+        systemStatus.textContent = '';
+      }
+
+      if (hasAllResponses) {
+        updateStatus.classList.remove('checking');
+      }
+    }
+
+    /* Firefox currently doesn't implement adding 2 classes in one call */
+    /* see Bug 814014 */
+    updateStatus.classList.add('checking');
+    updateStatus.classList.add('visible');
+
+    /* remove whatever was there before */
+    systemStatus.textContent = '';
+
+    var checkStatus = {
+      'gecko.updateStatus': {},
+      'apps.updateStatus': {}
+    };
+
+    for (var setting in checkStatus) {
+      checkStatus[setting].cb = onUpdateStatus.bind(null, setting);
+      settings.addObserver(setting, checkStatus[setting].cb);
+    }
 
     var lock = settings.createLock();
     lock.set({
       'gaia.system.checkForUpdates': true
     });
+  },
+
+  getSupportedLanguages: function settings_getLanguages(callback) {
+    var LANGUAGES = 'shared/resources/languages.json';
+
+    if (this._languages) {
+      callback(this._languages);
+    } else {
+      var self = this;
+      var xhr = new XMLHttpRequest();
+      xhr.onreadystatechange = function loadSupportedLocales() {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 0 || xhr.status === 200) {
+            self._languages = xhr.response;
+            callback(self._languages);
+          } else {
+            console.error('Failed to fetch languages.json: ', xhr.statusText);
+          }
+        }
+      };
+      xhr.open('GET', LANGUAGES, true); // async
+      xhr.responseType = 'json';
+      xhr.send();
+    }
+  },
+
+  updateLanguagePanel: function settings_updateLanguagePanel() {
+    var panel = document.getElementById('languages');
+    if (panel) { // update the date and time samples in the 'languages' panel
+      var d = new Date();
+      var f = new navigator.mozL10n.DateTimeFormat();
+      var _ = navigator.mozL10n.get;
+      panel.querySelector('#region-date').textContent =
+          f.localeFormat(d, _('longDateFormat'));
+      panel.querySelector('#region-time').textContent =
+          f.localeFormat(d, _('shortTimeFormat'));
+    }
   }
 };
 
@@ -434,6 +592,7 @@ window.addEventListener('load', function loadSettings() {
   window.addEventListener('change', Settings);
   window.addEventListener('click', Settings); // XXX really needed?
   Settings.init();
+  handleDataConnectivity();
 
   // panel lazy-loading
   function lazyLoad(panel) {
@@ -469,14 +628,19 @@ window.addEventListener('load', function loadSettings() {
       case 'sound':               // <input type="range">
         bug344618_polyfill();     // XXX to be removed when bug344618 is fixed
         break;
-      case 'languages':           // update date and time samples
-        var d = new Date();
-        var f = new navigator.mozL10n.DateTimeFormat();
-        var _ = navigator.mozL10n.get;
-        panel.querySelector('#region-date').textContent =
-            f.localeFormat(d, _('longDateFormat'));
-        panel.querySelector('#region-time').textContent =
-            f.localeFormat(d, _('shortTimeFormat'));
+      case 'languages':           // fill language selector
+        var langSel = document.querySelector('select[name="language.current"]');
+        langSel.innerHTML = '';
+        Settings.getSupportedLanguages(function fillLanguageList(languages) {
+          for (var lang in languages) {
+            var option = document.createElement('option');
+            option.value = lang;
+            option.textContent = languages[lang];
+            option.selected = (lang == document.documentElement.lang);
+            langSel.appendChild(option);
+          }
+        });
+        Settings.updateLanguagePanel();
         break;
       case 'about':               // handle specific link + load gaia_commit.txt
         document.getElementById('check-update-now').onclick =
@@ -484,10 +648,13 @@ window.addEventListener('load', function loadSettings() {
         document.getElementById('ftuLauncher').onclick =
           Settings.launchFTU.bind(Settings);
         Settings.loadGaiaCommit();
+        Settings.loadLastUpdated();
         break;
       case 'help':                // handle specific link
-        document.querySelector('[data-l10n-id="user-guide"]').onclick =
-          Settings.openUserGuide.bind(Settings);
+        Settings.getUserGuide(function userGuideCallback(url) {
+          document.querySelector('[data-l10n-id="user-guide"]').onclick =
+            function openUserGuide() { openLink(url) };
+        });
         break;
       case 'mediaStorage':        // full media storage status + panel startup
         MediaStorage.initUI();
@@ -510,6 +677,7 @@ window.addEventListener('load', function loadSettings() {
 
     // load panel (+ dependencies) if necessary -- this should be synchronous
     lazyLoad(newPanel);
+    newPanel.hidden = false;
 
     // switch previous/current classes -- the timeout is required to make the
     // transition smooth after lazy-loading a panel
@@ -529,6 +697,52 @@ window.addEventListener('load', function loadSettings() {
       if ((window.scrollX !== 0) || (window.scrollY !== 0)) {
         window.scrollTo(0, 0);
       }
+
+      setTimeout(function setInit() {
+        document.body.classList.remove('uninit');
+      });
+
+      // Bug 818056 - When multiple visible panels are present,
+      // they are not painted correctly. This appears to fix the issue.
+      // Only do this after the first load
+      if (oldPanel.className === 'current')
+        return;
+
+      oldPanel.addEventListener('transitionend', function onTransitionEnd() {
+        oldPanel.removeEventListener('transitionend', onTransitionEnd);
+        oldPanel.hidden = true;
+      });
+    });
+  }
+
+  function handleDataConnectivity() {
+    function updateDataConnectivity(disabled) {
+      var item = document.querySelector('#data-connectivity');
+      var link = document.querySelector('#menuItem-cellularAndData');
+      if (!item || !link)
+        return;
+
+      if (disabled) {
+        item.classList.add('carrier-disabled');
+        link.onclick = function() { return false; }
+      } else {
+        item.classList.remove('carrier-disabled');
+        link.onclick = null;
+      }
+    }
+
+    var key = 'ril.radio.disabled';
+
+    var settings = Settings.mozSettings;
+    if (!settings)
+      return;
+
+    var req = settings.createLock().get(key);
+    req.onsuccess = function() {
+      updateDataConnectivity(req.result[key]);
+    };
+    settings.addObserver(key, function(evt) {
+      updateDataConnectivity(evt.settingValue);
     });
   }
 
@@ -578,27 +792,10 @@ window.addEventListener('localized', function showLanguages() {
   document.documentElement.dir = navigator.mozL10n.language.direction;
 
   // display the current locale in the main panel
-  var LANGUAGES = 'shared/resources/languages.json';
-  if (Settings.languages) {
+  Settings.getSupportedLanguages(function displayLang(languages) {
     document.getElementById('language-desc').textContent =
-        Settings.languages[navigator.mozL10n.language.code];
-  } else {
-    // store supported languages in `Settings.language'
-    var xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function loadSupportedLocales() {
-      if (xhr.readyState === 4) {
-        if (xhr.status === 0 || xhr.status === 200) {
-          Settings.languages = JSON.parse(xhr.responseText);
-          document.getElementById('language-desc').textContent =
-              Settings.languages[navigator.mozL10n.language.code];
-        } else {
-          console.error('Failed to fetch languages.json: ', xhr.statusText);
-        }
-      }
-    };
-    xhr.open('GET', LANGUAGES, true); // async
-    xhr.responseType = 'text';
-    xhr.send();
-  }
+        languages[navigator.mozL10n.language.code];
+  });
+  Settings.updateLanguagePanel();
 });
 

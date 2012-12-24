@@ -11,8 +11,9 @@
     }
   },
   "permissions": {
-    "device-storage:apps":{ "access": "readwrite" },
-    "webapps-manage":{}
+    "device-storage:apps":{ "access": "readonly" },
+    "webapps-manage":{},
+    "settings": { "access": "readonly" }
   },
   "icons": {
     "60": "/style/icons/60/Feedback.png"

@@ -3,6 +3,7 @@
 var _ = navigator.mozL10n.get;
 
 var AppManager = {
+  thereIsSIM: false,
   init: function init() {
     this.isLocalized = true;
     WifiManager.init();
@@ -10,7 +11,7 @@ var AppManager = {
     TimeManager.init();
     UIManager.init();
     Navigation.init();
-
+    DataMobile.init();
     var kSplashTimeout = 700;
     // Retrieve mobile connection if available
     var conn = window.navigator.mozMobileConnection;
@@ -29,11 +30,13 @@ var AppManager = {
     setTimeout(function() {
       // TODO Include VIVO SIM Card management
       // https://bugzilla.mozilla.org/show_bug.cgi?id=801269#c6
+      var self = this;
       var req = conn.getCardLock('pin');
       req.onsuccess = function spl_checkSuccess() {
+        AppManager.thereIsSIM = true;
         if (req.result.enabled) {
           UIManager.pincodeScreen.classList.add('show');
-          document.getElementById('sim-pin').focus();
+          document.getElementById('fake-sim-pin').focus();
         } else {
           UIManager.activationScreen.classList.add('show');
           window.location.hash = '#languages';
@@ -42,7 +45,7 @@ var AppManager = {
       req.onerror = function() {
         UIManager.activationScreen.classList.add('show');
         window.location.hash = '#languages';
-      }
+      };
       // Remove the splash
       UIManager.splashScreen.classList.remove('show');
     }, kSplashTimeout);

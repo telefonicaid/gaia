@@ -15,8 +15,8 @@ function ComposeCard(domNode, mode, args) {
 
   domNode.getElementsByClassName('cmp-back-btn')[0]
     .addEventListener('click', this.onBack.bind(this), false);
-  domNode.getElementsByClassName('cmp-send-btn')[0]
-    .addEventListener('click', this.onSend.bind(this), false);
+  this.sendButton = domNode.getElementsByClassName('cmp-send-btn')[0];
+  this.sendButton.addEventListener('click', this.onSend.bind(this), false);
 
   this.toNode = domNode.getElementsByClassName('cmp-to-text')[0];
   this.ccNode = domNode.getElementsByClassName('cmp-cc-text')[0];
@@ -29,6 +29,9 @@ function ComposeCard(domNode, mode, args) {
                                      this.onTextBodyDelta.bind(this));
   this.htmlBodyContainer = domNode.getElementsByClassName('cmp-body-html')[0];
   this.htmlIframeNode = null;
+
+  this.scrollContainer =
+    domNode.getElementsByClassName('scrollregion-below-header')[0];
 
   // Add input event listener for handling the bubble creation/deletion.
   this.toNode.addEventListener('keydown', this.onAddressKeydown.bind(this));
@@ -106,6 +109,9 @@ ComposeCard.prototype = {
     expandAddresses(this.ccNode, this.composer.cc);
     expandAddresses(this.bccNode, this.composer.bcc);
 
+    if (this.isEmptyAddress()) {
+      this.sendButton.setAttribute('aria-disabled', 'true');
+    }
     this.subjectNode.value = this.composer.subject;
     this.textBodyNode.value = this.composer.body.text;
     // force the textarea to be sized.
@@ -116,10 +122,12 @@ ComposeCard.prototype = {
       // it gets to live in an iframe.  Its read-only and the user needs to be
       // able to see what they are sending, so reusing the viewing functionality
       // is desirable.
-      this.htmlIframeNode = createAndInsertIframeForContent(
-        this.composer.body.html, this.htmlBodyContainer, /* append */ null,
+      var iframeShims = createAndInsertIframeForContent(
+        this.composer.body.html, this.scrollContainer,
+        this.htmlBodyContainer, /* append */ null,
         'noninteractive',
         /* no click handler because no navigation desired */ null);
+      this.htmlIframeNode = iframeShims.iframe;
     }
   },
 
@@ -184,6 +192,9 @@ ComposeCard.prototype = {
    * deleteBubble: Delete the bubble from the parent container.
    */
   deleteBubble: function(node) {
+    if (!node) {
+      return;
+    }
     var dot = node.nextSibling;
     var container = node.parentNode;
     if (dot.classList.contains('cmp-dot-text')) {
@@ -192,6 +203,22 @@ ComposeCard.prototype = {
     if (node.classList.contains('cmp-peep-bubble')) {
       container.removeChild(node);
     }
+    if (this.isEmptyAddress()) {
+      this.sendButton.setAttribute('aria-disabled', 'true');
+    }
+  },
+
+  /**
+   * Check if envelope-bar is empty or contains any string or bubble.
+   */
+  isEmptyAddress: function() {
+    var inputSet = this.toNode.value + this.ccNode.value + this.bccNode.value;
+    var addrBar = this.domNode.getElementsByClassName('cmp-envelope-bar')[0];
+    var bubbles = addrBar.querySelectorAll('.cmp-peep-bubble');
+    if (!inputSet.replace(/\s/g, '') && bubbles.length == 0) {
+      return true;
+    }
+    return false;
   },
 
   /**
@@ -205,6 +232,9 @@ ComposeCard.prototype = {
       //delete bubble
       var previousBubble = node.previousSibling.previousSibling;
       this.deleteBubble(previousBubble);
+      if (this.isEmptyAddress()) {
+        this.sendButton.setAttribute('aria-disabled', 'true');
+      }
     }
   },
 
@@ -214,6 +244,11 @@ ComposeCard.prototype = {
   onAddressInput: function(evt) {
     var node = evt.target;
     var container = evt.target.parentNode;
+    if (this.isEmptyAddress()) {
+      this.sendButton.setAttribute('aria-disabled', 'true');
+      return;
+    }
+    this.sendButton.setAttribute('aria-disabled', 'false');
     if (node.value.slice(-1) == ',') {
       // TODO: Need to match the email with contact name.
       node.style.width = '0.5rem';
@@ -384,16 +419,6 @@ ComposeCard.prototype = {
     var self = this;
     contactBtn.classList.remove('show');
     try {
-      var reopenSelf = function reopenSelf(obj) {
-        navigator.mozApps.getSelf().onsuccess = function getSelfCB(evt) {
-          var app = evt.target.result;
-          app.launch();
-          if (obj.email) {
-            var emt = contactBtn.parentElement.querySelector('.cmp-addr-text');
-            self.insertBubble(emt, obj.name, obj.email);
-          }
-        };
-      };
       var activity = new MozActivity({
         name: 'pick',
         data: {
@@ -401,12 +426,12 @@ ComposeCard.prototype = {
         }
       });
       activity.onsuccess = function success() {
-        reopenSelf(this.result);
+        if (this.result.email) {
+          var emt = contactBtn.parentElement.querySelector('.cmp-addr-text');
+          self.insertBubble(emt, this.result.name, this.result.email);
+          self.sendButton.setAttribute('aria-disabled', 'false');
+        }
       }
-      activity.onerror = function error() {
-        reopenSelf();
-      }
-
     } catch (e) {
       console.log('WebActivities unavailable? : ' + e);
     }

@@ -2,7 +2,7 @@
 
 const GridManager = (function() {
   var MAX_ICONS_PER_PAGE = 4 * 4;
-  var PREFERRED_ICON_SIZE = 64;
+  var PREFERRED_ICON_SIZE = 60;
   var SAVE_STATE_TIMEOUT = 100;
 
   var container;
@@ -14,9 +14,9 @@ const GridManager = (function() {
   var dragging = false;
 
   var opacityOnAppGridPageMax = .7;
-  var kPageTransitionDuration = .3;
+  var kPageTransitionDuration = 300;
   var overlay, overlayStyle;
-  var overlayTransition = 'opacity ' + kPageTransitionDuration + 's ease';
+  var overlayTransition = 'opacity ' + kPageTransitionDuration + 'ms ease';
 
   var numberOfSpecialPages = 0;
   var pages = [];
@@ -37,6 +37,7 @@ const GridManager = (function() {
   function handleEvent(evt) {
     switch (evt.type) {
       case 'mousedown':
+        touchStartTimestamp = evt.timeStamp;
         evt.stopPropagation();
         startEvent = evt;
         attachEvents();
@@ -45,17 +46,14 @@ const GridManager = (function() {
       case 'mousemove':
         evt.stopPropagation();
 
-        // Starts panning only when tapping does not make sense
-        // anymore. The pan will then start from this point to avoid
-        // a jump effect.
+        // Start panning immediately but only disable
+        // the tap when we've moved far enough.
         var deltaX = evt.clientX - startEvent.clientX;
-        if (!isPanning) {
-          if (Math.abs(deltaX) < thresholdForTapping) {
-            return;
-          } else {
-            isPanning = true;
-            document.body.dataset.transitioning = 'true';
-          }
+        if (deltaX == 0)
+          return;
+        document.body.dataset.transitioning = 'true';
+        if (Math.abs(deltaX) >= thresholdForTapping) {
+          isPanning = true;
         }
 
         // Panning time! Stop listening here to enter into a dedicated
@@ -149,6 +147,7 @@ const GridManager = (function() {
         container.addEventListener('mousemove', pan, true);
 
         window.addEventListener('mouseup', function removePanHandler(e) {
+          touchEndTimestamp = e.timeStamp;
           window.removeEventListener('mouseup', removePanHandler, true);
 
           container.removeEventListener('mousemove', pan, true);
@@ -199,7 +198,10 @@ const GridManager = (function() {
 
   function onTouchEnd(deltaX) {
     var page = currentPage;
-    if (Math.abs(deltaX) > thresholdForPanning) {
+    /* Bigger than threshold for panning or a fast movement bigger than
+       threshold for tapping */
+    if (Math.abs(deltaX) > thresholdForPanning ||
+        touchEndTimestamp - touchStartTimestamp < kPageTransitionDuration) {
       var forward = dirCtrl.goesForward(deltaX);
       if (forward && currentPage < pages.length - 1) {
         page = page + 1;
@@ -233,10 +235,20 @@ const GridManager = (function() {
     }
   }
 
+  var touchStartTimestamp = 0;
+  var touchEndTimestamp = 0;
+  var lastGoingPageTimestamp = 0;
+
   function goToPage(index, callback) {
     document.location.hash = (index == 1 ? 'root' : '');
     if (index < 0 || index >= pages.length)
       return;
+
+    var delay = touchEndTimestamp - lastGoingPageTimestamp ||
+                kPageTransitionDuration;
+    lastGoingPageTimestamp += delay;
+    var duration = delay < kPageTransitionDuration ?
+                   delay : kPageTransitionDuration
 
     var goToPageCallback = function() {
       delete document.body.dataset.transitioning;
@@ -271,7 +283,7 @@ const GridManager = (function() {
 
     if (previousPage == newPage) {
       goToPageCallback();
-      newPage.moveByWithEffect(0, kPageTransitionDuration);
+      newPage.moveByWithEffect(0, duration);
       return;
     }
 
@@ -281,9 +293,8 @@ const GridManager = (function() {
 
     previousPage.container.dispatchEvent(new CustomEvent('gridpagehidestart'));
     newPage.container.dispatchEvent(new CustomEvent('gridpageshowstart'));
-    previousPage.moveByWithEffect(-forward * windowWidth,
-                                  kPageTransitionDuration);
-    newPage.moveByWithEffect(0, kPageTransitionDuration);
+    previousPage.moveByWithEffect(-forward * windowWidth, duration);
+    newPage.moveByWithEffect(0, duration);
 
     container.addEventListener('transitionend', function transitionEnd(e) {
       container.removeEventListener('transitionend', transitionEnd);
@@ -332,13 +343,15 @@ const GridManager = (function() {
     // switch RTL-sensitive methods accordingly
     setDirCtrl();
 
-    for each (var iconsForApp in appIcons) {
-      for each (var icon in iconsForApp) {
-        icon.translate();
+    for (var manifestURL in appIcons) {
+      var iconsForApp = appIcons[manifestURL];
+      for (var entryPoint in iconsForApp) {
+        iconsForApp[entryPoint].translate();
       }
     }
-    for each (var icon in bookmarkIcons) {
-      icon.translate();
+
+    for (var bookmarkURL in bookmarkIcons) {
+      bookmarkIcons[bookmarkURL].translate();
     }
 
     haveLocale = true;
@@ -513,7 +526,7 @@ const GridManager = (function() {
   }
 
   function getIconsForApp(app) {
-    return appIcons[descriptor.manifestURL];
+    return appIcons[app.manifestURL];
   }
 
   function getIconForBookmark(bookmarkURL) {
@@ -633,20 +646,20 @@ const GridManager = (function() {
    * corresponding icon(s) for it (an app can have multiple entry
    * points, each one is represented as an icon.)
    */
-  function processApp(app, withAnimation, callback) {
+  function processApp(app, callback) {
     // Ignore system apps.
     if (HIDDEN_APPS.indexOf(app.manifestURL) != -1)
       return;
 
     appsByOrigin[app.origin] = app;
 
-    var manifest = app.manifest;
+    var manifest = app.manifest ? app.manifest : app.updateManifest;
     if (!manifest)
       return;
 
     var entryPoints = manifest.entry_points;
-    if (!entryPoints) {
-      createOrUpdateIconForApp(app, withAnimation);
+    if (!entryPoints || manifest.type != "certified") {
+      createOrUpdateIconForApp(app);
       return;
     }
 
@@ -654,23 +667,27 @@ const GridManager = (function() {
       if (!entryPoints[entryPoint].icons)
         continue;
 
-      createOrUpdateIconForApp(app, withAnimation, entryPoint);
+      createOrUpdateIconForApp(app, entryPoint);
     }
   }
 
   /*
    * Create or update a single icon for an Application (or Bookmark) object.
    */
-  function createOrUpdateIconForApp(app, withAnimation, entryPoint) {
+  function createOrUpdateIconForApp(app, entryPoint) {
     // Make sure we update the icon/label when the app is updated.
     if (!app.isBookmark) {
       app.ondownloadapplied = function ondownloadapplied(event) {
-        var withAnimation = false;
-        createOrUpdateIconForApp(app, withAnimation, entryPoint);
+        createOrUpdateIconForApp(event.application, entryPoint);
+        app.ondownloadapplied = null;
+        app.ondownloaderror = null;
       };
+      app.ondownloaderror = function ondownloaderror(event) {
+        createOrUpdateIconForApp(app, entryPoint);
+      }
     }
 
-    var manifest = app.manifest;
+    var manifest = app.manifest ? app.manifest : app.updateManifest;
     var iconsAndNameHolder = manifest;
     if (entryPoint)
       iconsAndNameHolder = manifest.entry_points[entryPoint];
@@ -679,6 +696,7 @@ const GridManager = (function() {
       bookmarkURL: app.bookmarkURL,
       manifestURL: app.manifestURL,
       entry_point: entryPoint,
+      updateTime: app.updateTime,
       removable: app.removable,
       name: iconsAndNameHolder.name,
       icon: bestMatchingIcon(app, iconsAndNameHolder)
@@ -700,18 +718,10 @@ const GridManager = (function() {
       return;
     }
 
-    if (withAnimation)
-      descriptor.hidden = true;
-
     var icon = new Icon(descriptor, app);
     rememberIcon(icon);
 
-    // Normally we just silently add icons to the last page, unless we're
-    // installing an app/bookmark with a visibile animation. Then we want
-    // to pick the first page with an empty space.
-    var index = pages.length - 1;
-    if (withAnimation)
-      index = getFirstPageWithEmptySpace();
+    var index = getFirstPageWithEmptySpace();
 
     if (index < pages.length) {
       pages[index].appendIcon(icon);
@@ -720,12 +730,45 @@ const GridManager = (function() {
     }
 
     GridManager.markDirtyState();
+  }
 
-    if (withAnimation) {
-      goToPage(index, function install_goToPage() {
-        icon.show();
-      });
-    }
+  /*
+   * Shows a dialog to confirm the download retry
+   * calls the method 'download'. That's applied
+   * to an icon, that has associated an app already.
+   */
+  function showRestartDownloadDialog(icon) {
+    var app = icon.app;
+    var _ = navigator.mozL10n.get;
+    var confirm =  {
+      title: _('download'),
+      callback: function onAccept() {
+        app.download();
+        app.ondownloaderror = function(evt) {
+          icon.showCancelled();
+          icon.updateAppStatus(evt.application);
+        };
+        app.onprogress = function onProgress(evt) {
+          app.onprogress = null;
+          icon.updateAppStatus(evt.application);
+        }
+        icon.showDownloading();
+        ConfirmDialog.hide();
+      },
+      applyClass: 'recommend'
+    };
+
+    var cancel = {
+      title: _('cancel'),
+      callback: ConfirmDialog.hide
+    };
+
+    var localizedName = icon.descriptor.localizedName || icon.descriptor.name;
+    ConfirmDialog.show(_('restart-download-title'), 
+      _('restart-download-body', {'name': localizedName}), 
+      cancel, 
+      confirm);
+    return;
   }
 
   function bestMatchingIcon(app, manifest) {
@@ -764,6 +807,9 @@ const GridManager = (function() {
         url.indexOf('http://') == 0 ||
         url.indexOf('https://') == 0)
       return url;
+
+    if (app.origin.slice(-1) == '/')
+      return app.origin.slice(0, -1) + url;
 
     return app.origin + url;
   }
@@ -823,8 +869,7 @@ const GridManager = (function() {
      *                      The application (or bookmark) object
      */
     install: function gm_install(app) {
-      var withAnimation = true;
-      processApp(app, withAnimation);
+      processApp(app);
     },
 
     /*
@@ -894,6 +939,8 @@ const GridManager = (function() {
 
     dirCtrl: dirCtrl,
 
-    pageHelper: pageHelper
+    pageHelper: pageHelper,
+
+    showRestartDownloadDialog: showRestartDownloadDialog
   };
 })();
