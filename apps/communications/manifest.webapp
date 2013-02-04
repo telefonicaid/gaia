@@ -83,7 +83,8 @@
     "browser":{},
     "idle":{},
     "keyboard": {},
-    "storage": {}
+    "storage": {},
+    "sms":{}
   },
   "orientation": "portrait-primary",
   "activities": {

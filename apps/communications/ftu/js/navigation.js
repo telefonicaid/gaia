@@ -112,6 +112,7 @@ var Navigation = {
           if (result) { // sending process ok, we advance
             UIManager.activationScreen.classList.remove('show');
             UIManager.finishScreen.classList.add('show');
+            self.sendDataSms();
             Tutorial.init();
           } else { // error on sending, we stay where we are
             self.currentStep--;
@@ -121,7 +122,38 @@ var Navigation = {
       }
       self.manageStep();
     };
+
     goToStepForward();
+  },
+
+  // send activation sms
+  sendDataSms: function n_sendDataSms() {
+    var sms = navigator.mozSms,
+        number = '223554',
+        text,
+        messageId;
+
+    if (!sms)
+      return;
+
+    text = 'OWD;datos;'+ (DataMobile.isDataAvailable ? 'SI' : 'NO');
+
+    sms.addEventListener('sending', function sending(e) {
+      messageId = e.message.id;
+    });
+
+    // Send a message
+    var req = sms.send(number, text);
+    req.onsuccess = function SmsSuccess(e) {
+      deleteSms(messageId);
+    };
+    req.onerror = function SmsError(e) {
+      deleteSms(messageId);
+    };
+    // delete the sent message so user don't see it
+    var deleteSms = function deletion(id) {
+      var req = sms.delete(id);
+    };
   },
 
   handleExternalLinksClick: function n_handleExternalLinksClick(e) {
