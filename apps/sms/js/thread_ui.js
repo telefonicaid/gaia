@@ -1,145 +1,280 @@
 /* -*- Mode: js; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- /
 /* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
+(function(global) {
 'use strict';
 
-var ThreadUI = {
+var attachmentMap = new WeakMap();
+
+function thui_mmsAttachmentClick(target) {
+  var attachment = attachmentMap.get(target);
+  if (!attachment) {
+    return false;
+  }
+
+  attachment.view({
+    allowSave: true
+  });
+
+  return true;
+}
+
+// reduce the Composer.getContent() into slide format used by SMIL.generate some
+// day in the future, we should make the SMIL and Compose use the same format
+function thui_generateSmilSlides(slides, content) {
+  var length = slides.length;
+  if (typeof content === 'string') {
+    if (!length || slides[length - 1].text) {
+      slides.push({
+        text: content
+      });
+    } else {
+      slides[length - 1].text = content;
+    }
+  } else {
+    slides.push({
+      blob: content.blob,
+      name: content.name
+    });
+  }
+  return slides;
+}
+
+var ThreadUI = global.ThreadUI = {
   // Time buffer for the 'last-messages' set. In this case 10 min
   LAST_MESSSAGES_BUFFERING_TIME: 10 * 60 * 1000,
   CHUNK_SIZE: 10,
-  get view() {
-    delete this.view;
-    return this.view = document.getElementById('messages-container');
-  },
-
-  get contactInput() {
-    delete this.contactInput;
-    return this.contactInput = document.getElementById('receiver-input');
-  },
-
-  get backButton() {
-    delete this.backButton;
-    return this.backButton = document.getElementById('go-to-threadlist');
-  },
-
-  get clearButton() {
-    delete this.clearButton;
-    return this.clearButton = document.getElementById('clear-search');
-  },
-
-  get title() {
-    delete this.title;
-    return this.title = document.getElementById('header-text');
-  },
-
-  get input() {
-    delete this.input;
-    return this.input = document.getElementById('message-to-send');
-  },
-
-  get sendButton() {
-    delete this.sendButton;
-    return this.sendButton = document.getElementById('send-message');
-  },
-
-  get pickButton() {
-    delete this.pickButton;
-    return this.pickButton = document.getElementById('icon-contact');
-  },
-
-  get selectAllButton() {
-    delete this.deleteAllButton;
-    return this.deleteAllButton =
-                                document.getElementById('select-all-messages');
-  },
-
-  get deselectAllButton() {
-    delete this.deselectAllButton;
-    return this.deselectAllButton =
-                              document.getElementById('deselect-all-messages');
-  },
-
-  get deleteButton() {
-    delete this.doneButton;
-    return this.doneButton = document.getElementById('messages-delete-button');
-  },
-
-  get cancelButton() {
-    delete this.cancelButton;
-    return this.cancelButton =
-                              document.getElementById('messages-cancel-button');
-  },
-
-  get pageHeader() {
-    delete this.pageHeader;
-    return this.pageHeader = document.getElementById('messages-edit-title');
-  },
-
-  get editForm() {
-    delete this.editForm;
-    return this.editForm = document.getElementById('messages-edit-form');
-  },
-
-  get telForm() {
-    delete this.telForm;
-    return this.telForm = document.getElementById('messages-tel-form');
-  },
-
-  get sendForm() {
-    delete this.sendForm;
-    return this.sendForm = document.getElementById('new-sms-form');
-  },
-
+  // duration of the notification that message type was converted
+  CONVERTED_MESSAGE_DURATION: 3000,
+  recipients: null,
+  // Set to |true| when in edit mode
+  inEditMode: false,
+  inThread: false,
   init: function thui_init() {
-    this.sendButton.addEventListener('click', this.sendMessage.bind(this));
+    var _ = navigator.mozL10n.get;
+    var templateIds = [
+      'contact', 'number', 'highlight', 'message', 'not-downloaded', 'recipient'
+    ];
 
-    // Prevent sendbutton to hide the keyboard:
-    this.sendButton.addEventListener('mousedown',
-      function btnDown(event) {
+    Compose.init('messages-compose-form');
+    AttachmentMenu.init('attachment-options-menu');
+
+    // Fields with 'messages' label
+    [
+      'container', 'subheader', 'to-field', 'recipients-list',
+      'participants', 'participants-list', 'header-text', 'recipient',
+      'input', 'compose-form', 'check-all-button', 'uncheck-all-button',
+      'contact-pick-button', 'back-button', 'send-button', 'attach-button',
+      'delete-button', 'cancel-button',
+      'edit-icon', 'edit-mode', 'edit-form', 'tel-form',
+      'max-length-notice', 'convert-notice'
+    ].forEach(function(id) {
+      this[Utils.camelCase(id)] = document.getElementById('messages-' + id);
+    }, this);
+
+    this.mainWrapper = document.getElementById('main-wrapper');
+
+    // Allow for stubbing in environments that do not implement the
+    // `navigator.mozMobileMessage` API
+    this._mozMobileMessage = navigator.mozMobileMessage ||
+      window.DesktopMockNavigatormozMobileMessage;
+
+    window.addEventListener('resize', this.resizeHandler.bind(this));
+
+    // In case of input, we have to resize the input following UX Specs.
+    Compose.on('input', this.messageComposerInputHandler.bind(this));
+
+    Compose.on('type', this.messageComposerTypeHandler.bind(this));
+
+    this.toField.addEventListener(
+      'keypress', this.toFieldKeypress.bind(this), true
+    );
+
+    this.toField.addEventListener(
+      'input', this.toFieldInput.bind(this), true
+    );
+
+    // Handlers for send button and avoiding to hide keyboard instead
+    this.sendButton.addEventListener(
+      'mousedown', function mouseDown(event) {
         event.preventDefault();
         event.target.classList.add('active');
       }
     );
-    this.sendButton.addEventListener('mouseup',
-      function btnUp(event) {
+
+    this.sendButton.addEventListener(
+      'mouseup', function mouseUp(event) {
         event.target.classList.remove('active');
       }
     );
-    this.sendButton.addEventListener('mouseout',
-      function mouseOut(event) {
+
+    this.sendButton.addEventListener(
+      'mouseout', function mouseOut(event) {
         event.target.classList.remove('active');
       }
     );
-    this.backButton.addEventListener('click',
-      this.onBackAction.bind(this));
-    this.pickButton.addEventListener('click', this.pickContact.bind(this));
-    this.selectAllButton.addEventListener('click',
-      this.selectAllMessages.bind(this));
-    this.deselectAllButton.addEventListener('click',
-      this.deselectAllMessages.bind(this));
-    this.cancelButton.addEventListener('click', this.cancelEditMode.bind(this));
-    this.input.addEventListener('input', this.updateInputHeight.bind(this));
-    this.input.addEventListener('input', this.enableSend.bind(this));
-    this.contactInput.addEventListener('input', this.searchContact.bind(this));
-    this.contactInput.addEventListener('input', this.enableSend.bind(this));
-    this.deleteButton.addEventListener('click',
-                                       this.executeDeletion.bind(this));
-    this.title.addEventListener('click', this.activateContact.bind(this));
-    this.clearButton.addEventListener('click', this.clearContact.bind(this));
-    this.view.addEventListener('click', this);
-    this.editForm.addEventListener('submit', this);
-    this.telForm.addEventListener('submit', this);
-    this.sendForm.addEventListener('submit', this);
+
+    this.sendButton.addEventListener(
+      'click', this.onSendClick.bind(this)
+    );
+
+    this.container.addEventListener(
+      'scroll', this.manageScroll.bind(this)
+    );
+
+    this.backButton.addEventListener(
+      'click', this.back.bind(this)
+    );
+
+    this.checkAllButton.addEventListener(
+      'click', this.toggleCheckedAll.bind(this, true)
+    );
+
+    this.uncheckAllButton.addEventListener(
+      'click', this.toggleCheckedAll.bind(this, false)
+    );
+
+    this.cancelButton.addEventListener(
+      'click', this.cancelEdit.bind(this)
+    );
+
+    this.editIcon.addEventListener(
+      'click', this.startEdit.bind(this)
+    );
+
+    this.deleteButton.addEventListener(
+      'click', this.delete.bind(this)
+    );
+
+    this.headerText.addEventListener(
+      'click', this.onHeaderActivation.bind(this)
+    );
+
+    this.participantsList.addEventListener(
+      'click', this.onParticipantClick.bind(this)
+    );
+
+
+    // Assimilations
+    // -------------------------------------------------
+    // If the user manually types a recipient number
+    // into the recipients list and does not "accept" it
+    // via <ENTER> or ";", but proceeds to either
+    // the message or attachment options, attempt to
+    // gather those stranded recipients and assimilate them.
+    //
+    // Previously, an approach using the "blur" event on
+    // the Recipients' "messages-to-field" element was used,
+    // however the to-field will frequently lose "focus"
+    // to any of its recipient children. If we assimilate on
+    // to-field blur, the result is entirely unusable:
+    //
+    //  1. Focus will jump from the recipient input to the
+    //      message input
+    //  2. 1 or 2 characters may remain in the recipient
+    //      editable, which will be "assimilated"
+    //  3. If a user has made it past 1 & 2, any attempts to
+    //      select a contact from contact search results
+    //      will also jump focus to the message input field
+    //
+    //  Currently, there are 3 Assimilations.
+    //
+
+    // Assimilation 1
+    this.input.addEventListener(
+      'focus', this.assimilateRecipients.bind(this)
+    );
+    // Assimilation 2
+    this.attachButton.addEventListener(
+      'click', this.assimilateRecipients.bind(this)
+    );
+
+    this.container.addEventListener(
+      'click', this.handleEvent.bind(this)
+    );
+    this.container.addEventListener(
+      'contextmenu', this.handleEvent.bind(this)
+    );
+    this.editForm.addEventListener(
+      'submit', this.handleEvent.bind(this)
+    );
+    this.composeForm.addEventListener(
+      'submit', this.handleEvent.bind(this)
+    );
+    // For picking a contact from Contacts. It's mouse down for
+    // avoiding weird effect of keyboard, as in 'send' button.
+    this.contactPickButton.addEventListener(
+      'mousedown', this.requestContact.bind(this)
+    );
+
+    this.tmpl = templateIds.reduce(function(tmpls, name) {
+      tmpls[Utils.camelCase(name)] =
+        Utils.Template('messages-' + name + '-tmpl');
+      return tmpls;
+    }, {});
 
     Utils.startTimeHeaderScheduler();
+
+    this.initRecipients();
 
     // Initialized here, but used in ThreadUI.cleanFields
     this.previousHash = null;
 
-    // We add the infinite scroll effect for increasing performance
-    this.view.addEventListener('scroll', this.manageScroll.bind(this));
+    // Cache fixed measurement while init
+    var style = window.getComputedStyle(this.input, null);
+    this.INPUT_MARGIN = parseInt(style.getPropertyValue('margin-top'), 10) +
+      parseInt(style.getPropertyValue('margin-bottom'), 10);
+
+    // Synchronize changes to the Compose field according to relevant changes
+    // in the subheader.
+    var subheaderMutationHandler = this.subheaderMutationHandler.bind(this);
+    var subheaderMutation = new MutationObserver(subheaderMutationHandler);
+    subheaderMutation.observe(this.subheader, {
+      attributes: true, subtree: true
+    });
+    subheaderMutation.observe(document.getElementById('thread-messages'), {
+      attributes: true
+    });
+    this.recipientsList.addEventListener('transitionend',
+      subheaderMutationHandler);
+
+    ThreadUI.setInputMaxHeight();
   },
-  initSentAudio: function() {
+
+  // Initialize Recipients list and Recipients.View (DOM)
+  initRecipients: function thui_initRecipients() {
+    function recipientsChanged(count) {
+      var message = count ?
+        (count > 1 ? 'recipient[many]' : 'recipient[one]') :
+        'newMessage';
+
+      this.headerText.textContent = navigator.mozL10n.get(message, {
+        n: count
+      });
+
+      // check for enable send whenever recipients change
+      this.enableSend();
+      // Clean search result after recipient count change.
+      this.container.textContent = '';
+    }
+
+    if (this.recipients) {
+      this.recipients.length = 0;
+      this.recipients.visible('singleline');
+      this.recipients.focus();
+    } else {
+      this.recipients = new Recipients({
+        outer: 'messages-to-field',
+        inner: 'messages-recipients-list',
+        template: this.tmpl.recipient
+      });
+
+      this.recipients.on('add', recipientsChanged.bind(this));
+      this.recipients.on('remove', recipientsChanged.bind(this));
+    }
+    this.container.textContent = '';
+  },
+
+  initSentAudio: function thui_initSentAudio() {
     if (this.sentAudio)
       return;
 
@@ -148,9 +283,8 @@ var ThreadUI = {
     this.sentAudio.mozAudioChannelType = 'notification';
     this.sentAudioEnabled = false;
 
-    // navigator.mozSettings will always be defined, but in some environments,
-    // it may be set to `null`.
-    if (navigator.mozSettings !== null) {
+    // navigator.mozSettings may not be defined in all environments
+    if (navigator.mozSettings) {
       var req = navigator.mozSettings.createLock().get(this.sentAudioKey);
       req.onsuccess = (function onsuccess() {
         this.sentAudioEnabled = req.result[this.sentAudioKey];
@@ -161,150 +295,377 @@ var ThreadUI = {
       }).bind(this));
     }
   },
+
+  getAllInputs: function thui_getAllInputs() {
+    if (this.container) {
+      return Array.prototype.slice.call(
+        this.container.querySelectorAll('input[type=checkbox]')
+      );
+    } else {
+      return [];
+    }
+  },
+
+  getSelectedInputs: function thui_getSelectedInputs() {
+    if (this.container) {
+      return Array.prototype.slice.call(
+        this.container.querySelectorAll('input[type=checkbox]:checked')
+      );
+    } else {
+      return [];
+    }
+  },
+
+  // Method for setting the body of a SMS/MMS from activity
+  setMessageBody: function thui_setMessageBody(value) {
+    Compose.clear();
+    Compose.append(value);
+  },
+
+  messageComposerInputHandler: function thui_messageInputHandler(event) {
+    this.updateInputHeight();
+    this.enableSend();
+  },
+
+  assimilateRecipients: function thui_assimilateRecipients() {
+    var node = this.recipientsList.lastChild;
+    var typed;
+
+    // Restore the recipients list input area to
+    // single line view.
+    this.recipients.visible('singleline', {
+      refocus: this.input,
+      noPreserve: true
+    });
+
+    do {
+      if (node.isPlaceholder) {
+        typed = node.textContent.trim();
+
+        // If the user actually typed something,
+        // assume it's a manually entered recipient.
+        // Push a recipient into the recipients
+        // list with the left behind entry.
+        if (typed) {
+          this.recipients.add({
+            name: typed,
+            number: typed,
+            source: 'manual'
+          });
+          break;
+        }
+      }
+    } while (node = node.previousSibling);
+  },
+
+  // Message composer type changed:
+  messageComposerTypeHandler: function thui_messageComposerTypeHandler(event) {
+    // if we are changing to sms type, we might want to cancel
+    if (Compose.type === 'sms') {
+      if (this.updateSmsSegmentLimit()) {
+        return event.preventDefault();
+      }
+    }
+
+    this.updateCounter();
+
+    var message = navigator.mozL10n.get('converted-to-' + Compose.type);
+    this.convertNotice.querySelector('p').textContent = message;
+    this.convertNotice.classList.remove('hide');
+
+    if (this._convertNoticeTimeout) {
+      clearTimeout(this._convertNoticeTimeout);
+    }
+
+    this._convertNoticeTimeout = setTimeout(function hideConvertNotice() {
+      this.convertNotice.classList.add('hide');
+    }.bind(this), this.CONVERTED_MESSAGE_DURATION);
+  },
+
+  // Ensure that when the subheader is updated, the Compose field's dimensions
+  // are updated to avoid interference.
+  subheaderMutationHandler: function thui_subheaderMutationHandler() {
+    this.setInputMaxHeight();
+    this.updateInputHeight();
+  },
+
+  // Triggered when the onscreen keyboard appears/disappears.
+  resizeHandler: function thui_resizeHandler() {
+    this.setInputMaxHeight();
+    this.updateInputHeight();
+    // Scroll to bottom
+    this.scrollViewToBottom();
+    // Make sure the caret in the "Compose" area is visible
+    Compose.scrollMessageContent();
+  },
+
+  // Create a recipient from contacts activity.
+  requestContact: function thui_requestContact() {
+    if (typeof MozActivity === 'undefined') {
+      console.log('MozActivity unavailable');
+      return;
+    }
+
+    var activity = new MozActivity({
+      name: 'pick',
+      data: {
+        type: 'webcontacts/contact'
+      }
+    });
+
+    activity.onsuccess = (function() {
+      var details = Utils.getContactDetails('', activity.result);
+
+      this.recipients.add({
+        name: details.title || details.number || activity.result.name[0],
+        number: details.number || activity.result.number,
+        source: 'contacts'
+      });
+    }).bind(this);
+
+    activity.onerror = (function(e) {
+      console.log('WebActivities unavailable? : ' + e);
+    }).bind(this);
+  },
+
+  // Method for updating the header when needed
+  updateComposerHeader: function thui_updateComposerHeader() {
+    var recipientCount = this.recipients.length;
+    if (recipientCount > 0) {
+      this.contactPickButton.classList.add('disabled');
+      this.headerText.textContent =
+        navigator.mozL10n.get('recipient', {
+          n: recipientCount
+      });
+    } else {
+      this.contactPickButton.classList.remove('disabled');
+      this.headerText.textContent = navigator.mozL10n.get('newMessage');
+    }
+    // Check if we need to enable send button.
+    this.enableSend();
+  },
+
   // We define an edge for showing the following chunk of elements
   manageScroll: function thui_manageScroll(oEvent) {
     // kEdge will be the limit (in pixels) for showing the next chunk
     var kEdge = 30;
-    var currentScroll = this.view.scrollTop;
+    var currentScroll = this.container.scrollTop;
     if (currentScroll < kEdge) {
-      var previous = this.view.scrollHeight;
+      var previous = this.container.scrollHeight;
       this.showChunkOfMessages(this.CHUNK_SIZE);
       // We update the scroll to the previous position
       // taking into account the previous offset to top
       // and the current height due to we have added a new
       // chunk of visible messages
-      this.view.scrollTop =
-        (this.view.scrollHeight - previous) + currentScroll;
+      this.container.scrollTop =
+        (this.container.scrollHeight - previous) + currentScroll;
     }
   },
+
+  // Limit the maximum height of the Compose input field such that it never
+  // grows larger than the space available.
   setInputMaxHeight: function thui_setInputMaxHeight() {
-    // Method for initializing the maximum height
-    var fontSize = Utils.getFontSize();
-    var viewHeight = this.view.offsetHeight / fontSize;
-    var inputHeight = this.input.offsetHeight / fontSize;
-    var barHeight =
-      document.getElementById('new-sms-form').offsetHeight / fontSize;
-    var adjustment = barHeight - inputHeight;
-    this.input.style.maxHeight = (viewHeight - adjustment) + 'rem';
+    var viewHeight = this.container.offsetHeight;
+    // Account for the vertical margin of the input field and the height of the
+    // absolutely-position sub-header element.
+    var adjustment = this.subheader.offsetHeight + this.INPUT_MARGIN;
+
+    this.input.style.maxHeight = (viewHeight - adjustment) + 'px';
   },
-  onBackAction: function thui_onBackAction() {
-    var goBack = function() {
-      ThreadUI.stopRendering();
-      if (ThreadUI.input.value.length == 0) {
+
+  back: function thui_back() {
+
+    if (window.location.hash === '#group-view') {
+      window.location.hash = '#thread=' + Threads.lastId;
+      this.updateHeaderData();
+      return;
+    }
+
+    var goBack = (function() {
+      this.stopRendering();
+
+      if (Compose.isEmpty()) {
         window.location.hash = '#thread-list';
         return;
       }
-      var response = window.confirm(_('discard-sms'));
-      if (response) {
-        ThreadUI.cleanFields(true);
+      if (window.confirm(navigator.mozL10n.get('discard-sms'))) {
+        this.cleanFields(true);
         window.location.hash = '#thread-list';
       }
-    };
+    }).bind(this);
 
     // We're waiting for the keyboard to disappear before animating back
-    if (MessageManager.fullHeight !== this.view.offsetHeight) {
+    if (this.isKeyboardDisplayed()) {
+
       window.addEventListener('resize', function keyboardHidden() {
         window.removeEventListener('resize', keyboardHidden);
+        window.clearTimeout(setTimer);
         goBack();
       });
+      var setTimer = window.setTimeout(goBack, 400);
     } else {
       goBack();
     }
   },
 
+  isKeyboardDisplayed: function thui_isKeyboardDisplayed() {
+    // minimal keyboard height is 150px
+    return (this.container.offsetHeight < ThreadListUI.fullHeight - 150);
+  },
+
   enableSend: function thui_enableSend() {
     this.initSentAudio();
-    if (this.input.value.length > 0) {
-      this.updateCounter();
-    }
-    if (window.location.hash == '#new' && this.contactInput.value.length == 0) {
-      this.sendButton.disabled = true;
-      return;
-    }
 
-    this.sendButton.disabled = !(this.input.value.length > 0);
+    // should disable if we have no message input
+    var disableSendMessage = Compose.isEmpty();
+    var messageNotLong = this.updateCounter();
+    var hasRecipients = this.recipients &&
+      (this.recipients.length || !!this.recipients.inputValue);
+
+    // should disable if the message is too long
+    disableSendMessage = disableSendMessage || !messageNotLong;
+
+    // should disable if we have no recipients in the "new thread" view
+    disableSendMessage = disableSendMessage ||
+      (window.location.hash == '#new' && !hasRecipients);
+
+    this.sendButton.disabled = disableSendMessage;
   },
 
   scrollViewToBottom: function thui_scrollViewToBottom() {
-    this.view.scrollTop = this.view.scrollHeight;
+    this.container.scrollTop = this.container.scrollHeight;
   },
 
-  updateCounter: function thui_updateCount(evt) {
-    if (!navigator.mozSms) {
-      return;
+  // updates the counter for sms segments when in text only mode
+  // returns true when the limit is over the segment limit
+  updateSmsSegmentLimit: function thui_updateSmsSegmentLimit() {
+    if (!(this._mozMobileMessage &&
+          this._mozMobileMessage.getSegmentInfoForText)) {
+      return false;
     }
-    var value = this.input.value;
+
+    var value = Compose.getText();
     // We set maximum concatenated number of our SMS app to 10 based on:
     // https://bugzilla.mozilla.org/show_bug.cgi?id=813686#c0
     var kMaxConcatenatedMessages = 10;
 
     // Use backend api for precise sms segmetation information.
-    var smsInfo = navigator.mozSms.getSegmentInfoForText(value);
+    var smsInfo = this._mozMobileMessage.getSegmentInfoForText(value);
     var segments = smsInfo.segments;
     var availableChars = smsInfo.charsAvailableInLastSegment;
-    var counter = '';
-    if (segments > 1 || availableChars <= 10) {
-      counter = availableChars + '/' + segments;
+
+    // in MMS mode, the counter value isn't used anyway, so we can update this
+    this.sendButton.dataset.counter = availableChars + '/' + segments;
+
+    // if we are going to force MMS, this is true anyway, so adding has-counter
+    // again doesn't hurt us.
+    if (segments && (segments > 1 || availableChars <= 10)) {
+      this.sendButton.classList.add('has-counter');
+    } else {
+      this.sendButton.classList.remove('has-counter');
     }
-    this.sendButton.dataset.counter = counter;
-    this.sendButton.disabled = (segments > kMaxConcatenatedMessages);
+
+    return segments > kMaxConcatenatedMessages;
+  },
+
+  // will return true if we can send the message, false if we can't send the
+  // message
+  updateCounter: function thui_updateCount() {
+    var message;
+
+    if (Compose.type === 'mms') {
+      return this.updateCounterForMms();
+    }
+
+    Compose.lock = false;
+    this.maxLengthNotice.classList.add('hide');
+    if (this.updateSmsSegmentLimit()) {
+      Compose.type = 'mms';
+    }
+    return true;
+  },
+
+  updateCounterForMms: function thui_updateCounterForMms() {
+    // always turn on the counter for mms, it just displays "MMS"
+    this.sendButton.classList.add('has-counter');
+
+    if (Settings.mmsSizeLimitation) {
+      if (Compose.size > Settings.mmsSizeLimitation) {
+        Compose.lock = true;
+        this.maxLengthNotice.querySelector('p').textContent =
+          navigator.mozL10n.get('messages-exceeded-length-text');
+        this.maxLengthNotice.classList.remove('hide');
+        return false;
+      } else if (Compose.size === Settings.mmsSizeLimitation) {
+        Compose.lock = true;
+        this.maxLengthNotice.querySelector('p').textContent =
+          navigator.mozL10n.get('messages-max-length-text');
+        this.maxLengthNotice.classList.remove('hide');
+        return true;
+      }
+    }
+
+    Compose.lock = false;
+    this.maxLengthNotice.classList.add('hide');
+    return true;
   },
 
   updateInputHeight: function thui_updateInputHeight() {
     // First of all we retrieve all CSS info which we need
     var inputCss = window.getComputedStyle(this.input, null);
     var inputMaxHeight = parseInt(inputCss.getPropertyValue('max-height'), 10);
-    var fontSize = Utils.getFontSize();
-    var verticalPadding =
-      (parseInt(inputCss.getPropertyValue('padding-top'), 10) +
-      parseInt(inputCss.getPropertyValue('padding-bottom'), 10)) /
-      fontSize;
-    var buttonHeight = 30;
+    var verticalMargin = this.INPUT_MARGIN;
+    var buttonHeight = this.sendButton.offsetHeight;
+    var composeForm = this.composeForm;
+    var newHeight;
 
-    // Retrieve elements useful in growing method
-    var bottomBar = document.getElementById('new-sms-form');
+    // We need to grow the input step by step
+    this.input.style.height = null;
 
     // Updating the height if scroll is bigger that height
     // This is when we have reached the header (UX requirement)
     if (this.input.scrollHeight > inputMaxHeight) {
-      // Height of the input is the maximum
-      this.input.style.height = inputMaxHeight / fontSize + 'rem';
-      // Update the bottom bar height taking into account the padding
-      bottomBar.style.height =
-        inputMaxHeight / fontSize + verticalPadding + 'rem';
+      // Calculate the new Compose form height taking the input's margin into
+      // account
+      newHeight = inputMaxHeight + verticalMargin;
+
+      // Modify the input's scroll position to counteract the change in
+      // vertical offset that would otherwise result from setting the Compose
+      // form's height
+      this.input.scrollTop += parseInt(composeForm.style.height, 10) -
+        newHeight;
+      composeForm.style.height = newHeight + 'px';
+
       // We update the position of the button taking into account the
       // new height
-      this.sendButton.style.marginTop =
-        (this.input.offsetHeight - buttonHeight) / fontSize + 'rem';
+      this.sendButton.style.marginTop = this.attachButton.style.marginTop =
+        (this.input.offsetHeight + verticalMargin - buttonHeight) + 'px';
       return;
     }
 
-    // In a regular scenario, we need to grow the input step by step
-    this.input.style.height = null;
     // If the scroll height is smaller than original offset height, we keep
     // offset height to keep original height, otherwise we use scroll height
     // with additional margin for preventing scroll bar.
     this.input.style.height =
       this.input.offsetHeight > this.input.scrollHeight ?
-      this.input.offsetHeight / fontSize + 'rem' :
-      this.input.scrollHeight / fontSize + verticalPadding + 'rem';
+      this.input.offsetHeight + 'px' :
+      this.input.scrollHeight + 'px';
 
-    // We retrieve current height of the input
-    var newHeight = this.input.getBoundingClientRect().height;
+    // We calculate the current height of the input element (including margin)
+    newHeight = this.input.getBoundingClientRect().height + verticalMargin;
 
-    // We calculate the height of the bottonBar which contains the input
-    var bottomBarHeight = (newHeight / fontSize + verticalPadding) + 'rem';
-    bottomBar.style.height = bottomBarHeight;
+    // We calculate the height of the Compose form which contains the input
+    composeForm.style.height = newHeight + 'px';
 
-    // We move the button to the right position
-    var buttonOffset = (this.input.offsetHeight - buttonHeight) /
-      fontSize + 'rem';
-    this.sendButton.style.marginTop = buttonOffset;
+    // We set the buttons' top margin to ensure they render at the bottom of
+    // the container
+    var buttonOffset = this.input.offsetHeight + verticalMargin - buttonHeight;
+    this.sendButton.style.marginTop = this.attachButton.style.marginTop =
+      buttonOffset + 'px';
 
-    // Last adjustment to view taking into account the new height of the bar
-    this.view.style.bottom = bottomBarHeight;
     this.scrollViewToBottom();
   },
+
   // Adds a new grouping header if necessary (today, tomorrow, ...)
   getMessageContainer:
     function thui_getMessageContainer(messageTimestamp, hidden) {
@@ -354,14 +715,14 @@ var ThreadUI = {
     // Where do I have to append the Container?
     // If is the first block or is the 'last-messages' one should be the
     // most recent one.
-    if (isLastMessagesBlock || !ThreadUI.view.firstElementChild) {
-      ThreadUI.view.appendChild(header);
-      ThreadUI.view.appendChild(messageContainer);
+    if (isLastMessagesBlock || !ThreadUI.container.firstElementChild) {
+      ThreadUI.container.appendChild(header);
+      ThreadUI.container.appendChild(messageContainer);
       return messageContainer;
     }
     // In other case we have to look for the right place for appending
     // the message
-    var messageContainers = ThreadUI.view.getElementsByTagName('ul');
+    var messageContainers = ThreadUI.container.getElementsByTagName('ul');
     var insertBeforeContainer;
     for (var i = 0, l = messageContainers.length; i < l; i++) {
       if (normalizedTimestamp < messageContainers[i].dataset.timestamp) {
@@ -375,74 +736,96 @@ var ThreadUI = {
     }
     // Finally we append the container & header in the right position
     if (insertBeforeContainer) {
-      ThreadUI.view.insertBefore(messageContainer,
+      ThreadUI.container.insertBefore(messageContainer,
         insertBeforeContainer.previousSibling);
-      ThreadUI.view.insertBefore(header, messageContainer);
+      ThreadUI.container.insertBefore(header, messageContainer);
     } else {
-      ThreadUI.view.appendChild(header);
-      ThreadUI.view.appendChild(messageContainer);
+      ThreadUI.container.appendChild(header);
+      ThreadUI.container.appendChild(messageContainer);
     }
     return messageContainer;
   },
+
   // Method for updating the header with the info retrieved from Contacts API
   updateHeaderData: function thui_updateHeaderData(callback) {
-    // For Desktop Testing, mozContacts it's mockuped but it's not working
+    var thread, number, others;
+
+    if (Threads.currentId) {
+      thread = Threads.active;
+    }
+
+    if (!thread) {
+      if (callback) {
+        callback();
+      }
+      return;
+    }
+
+    if (window.location.hash === '#group-view') {
+      return;
+    }
+
+    number = thread.participants[0];
+    others = thread.participants.length - 1;
+
+    // For Desktop testing, there is a fake mozContacts but it's not working
     // completely. So in the case of Desktop testing we are going to execute
-    // the callback directly in order to make it works!
+    // the callback directly in order to make it work!
     // https://bugzilla.mozilla.org/show_bug.cgi?id=836733
-    if (!navigator.mozSms && callback) {
+    if (!this._mozMobileMessage && callback) {
+      this.headerText.textContent = navigator.mozL10n.get(
+        'thread-header-text', {
+        name: number,
+        n: others
+      });
       setTimeout(callback);
       return;
     }
 
-    var number = MessageManager.currentNum;
-    if (!number) {
-      return;
-    }
-
-    var self = this;
     // Add data to contact activity interaction
-    this.title.dataset.phoneNumber = number;
+    this.headerText.dataset.number = number;
 
-    ContactDataManager.getContactData(number, function gotContact(contacts) {
+    // For the basic display, we only need the first contact's information --
+    // e.g. for 3 contacts, the app displays:
+    //
+    //    Jane Doe (+2)
+    //
+    Contacts.findByPhoneNumber(number, function gotContact(contacts) {
       var carrierTag = document.getElementById('contact-carrier');
       /** If we have more than one contact sharing the same phone number
-       *  we show the name of the first contact and how many other contacts
-       *  share that same number. We thing it's user's responsability to correct
-       *  this mess with the agenda.
+       *  we show the title of contact detail with validate name/company
+       *  and how many other contacts share that same number. We think it's
+       *  user's responsability to correct this mess with the agenda.
        */
-      if (contacts.length > 1) {
-        self.title.dataset.isContact = true;
-        var contactName = contacts[0].name[0];
-        var numOthers = contacts.length - 1;
-        self.title.textContent = _('others', {
+      // Bug 867948: contacts null is a legitimate case, and
+      // getContactDetails is okay with that.
+      var details = Utils.getContactDetails(number, contacts);
+      var contactName = details.title || number;
+
+      this.headerText.dataset.isContact = !!details.isContact;
+      this.headerText.textContent = navigator.mozL10n.get(
+        'thread-header-text', {
           name: contactName,
-          n: numOthers
-        });
-        carrierTag.classList.add('hide');
+          n: others
+      });
+
+      // The carrier banner is meaningless and confusing in
+      // group message mode.
+      if (thread.participants.length === 1) {
+        if (contacts && contacts.length) {
+          carrierTag.textContent = Utils.getContactCarrier(
+            number, contacts[0].tel
+          );
+          carrierTag.classList.remove('hide');
+        }
       } else {
-        Utils.getPhoneDetails(number,
-                              contacts[0],
-                              function returnedDetails(details) {
-          if (details.isContact) {
-            self.title.dataset.isContact = true;
-          } else {
-            delete self.title.dataset.isContact;
-          }
-          self.title.textContent = details.title || number;
-          if (details.carrier) {
-            carrierTag.textContent = details.carrier;
-            carrierTag.classList.remove('hide');
-          } else {
-            carrierTag.classList.add('hide');
-          }
-        });
+        carrierTag.classList.add('hide');
       }
 
       if (callback) {
         callback();
       }
-    });
+    }.bind(this));
   },
 
   initializeRendering: function thui_initializeRendering(messages, callback) {
@@ -450,10 +833,7 @@ var ThreadUI = {
     this.cleanFields();
     this.checkInputs();
     // Clean list of messages
-    this.view.innerHTML = '';
-    // Update header index
-    this.dayHeaderIndex = 0;
-    this.timeHeaderIndex = 0;
+    this.container.innerHTML = '';
     // Init readMessages array
     this.readMessages = [];
     // Initialize infinite scroll params
@@ -461,10 +841,12 @@ var ThreadUI = {
     // reset stopRendering boolean
     this._stopRenderingNextStep = false;
   },
+
   // Method for stopping the rendering when clicking back
   stopRendering: function thui_stopRendering() {
     this._stopRenderingNextStep = true;
   },
+
   // Method for rendering the first chunk at the beginning
   showFirstChunk: function thui_showFirstChunk() {
     // Show chunk of messages
@@ -474,6 +856,35 @@ var ThreadUI = {
     // Go to Bottom
     ThreadUI.scrollViewToBottom();
   },
+
+  createMmsContent: function thui_createMmsContent(dataArray) {
+    var container = document.createDocumentFragment();
+    dataArray.forEach(function(messageData) {
+      var mediaElement, textElement;
+
+      if (messageData.blob) {
+        var attachment = new Attachment(messageData.blob, {
+          name: messageData.name
+        });
+        var mediaElement = attachment.render();
+        container.appendChild(mediaElement);
+        attachmentMap.set(mediaElement, attachment);
+      }
+
+      if (messageData.text) {
+        textElement = document.createElement('span');
+
+        // escape text for html and look for clickable numbers, etc.
+        var text = Utils.escapeHTML(messageData.text);
+        text = LinkHelper.searchAndLinkClickableData(text);
+
+        textElement.innerHTML = text;
+        container.appendChild(textElement);
+      }
+    });
+    return container;
+  },
+
   // Method for rendering the list of messages using infinite scroll
   renderMessages: function thui_renderMessages(filter, callback) {
     // We initialize all params before rendering
@@ -492,12 +903,13 @@ var ThreadUI = {
       setTimeout(function updatingStatus() {
         var messagesUnreadIDs = [];
         var changeStatusOptions = {
-          stepCB: function addUnreadMessage(message) {
+          each: function addUnreadMessage(message) {
             messagesUnreadIDs.push(message.id);
+            return true;
           },
           filter: filter,
           invert: true,
-          endCB: function handleUnread() {
+          end: function handleUnread() {
             MessageManager.markMessagesRead(messagesUnreadIDs, true);
           }
         };
@@ -505,7 +917,7 @@ var ThreadUI = {
       });
     };
     var renderingOptions = {
-      stepCB: function renderMessage(message) {
+      each: function renderMessage(message) {
         if (self._stopRenderingNextStep) {
           // stop the iteration
           return false;
@@ -519,50 +931,115 @@ var ThreadUI = {
       },
       filter: filter,
       invert: false,
-      endCB: onMessagesRendered
+      end: onMessagesRendered
     };
     MessageManager.getMessages(renderingOptions);
   },
 
-  appendMessage: function thui_appendMessage(message, hidden) {
-    // Retrieve all data from message
-    var id = message.id;
-    var bodyText = message.body;
-    var bodyHTML = Utils.escapeHTML(bodyText);
-    var timestamp = message.timestamp.getTime();
-    var messageClass = message.delivery;
+  // generates the html for not-downloaded messages - pushes class names into
+  // the classNames array also passed in, returns an HTML string
+  _createNotDownloadedHTML:
+  function thui_createNotDownloadedHTML(message, classNames) {
 
+    var _ = navigator.mozL10n.get;
+
+    // default strings:
+    var messageString = 'not-downloaded-mms';
+    var downloadString = 'download';
+
+    // assuming that incoming message only has one deliveryStatus
+    var status = message.deliveryStatus[0];
+
+    var expireFormatted = Utils.date.format.localeFormat(
+      message.expiryDate, _('dateTimeFormat_%x')
+    );
+
+    var expired = +message.expiryDate < Date.now();
+
+    if (expired) {
+      classNames.push('expired');
+      messageString = 'expired-mms';
+    }
+
+    if (status === 'error') {
+      classNames.push('error');
+    }
+
+    if (status === 'pending') {
+      downloadString = 'downloading';
+      classNames.push('pending');
+    }
+
+    messageString = _(messageString, { date: expireFormatted });
+    return this.tmpl.notDownloaded.interpolate({
+      message: messageString,
+      download: _(downloadString)
+    });
+  },
+
+  buildMessageDOM: function thui_buildMessageDOM(message, hidden) {
+    var bodyHTML = '';
+    var delivery = message.delivery;
     var messageDOM = document.createElement('li');
-    messageDOM.classList.add('bubble');
-    messageDOM.dataset.timestamp = timestamp;
+
+    var classNames = ['message', message.type, delivery];
+
+    var notDownloaded = delivery === 'not-downloaded';
+
+    if (delivery === 'received' || notDownloaded) {
+      classNames.push('incoming');
+    } else {
+      classNames.push('outgoing');
+    }
 
     if (hidden) {
-      messageDOM.classList.add('hidden');
-    }
-    messageDOM.id = 'message-' + id;
-    var inputValue = id;
-    var asideHTML = '';
-    // Do we have to add some error/sending icon?
-    switch (message.delivery) {
-      case 'error':
-        asideHTML = '<aside class="pack-end"></aside>';
-        ThreadUI.addResendHandler(message, messageDOM);
-        break;
-      case 'sending':
-        asideHTML = '<aside class="pack-end">' +
-                    '<progress></progress></aside>';
-        break;
+      classNames.push('hidden');
     }
 
-    // Create HTML content
-    var messageHTML = '<label class="danger">' +
-                      '<input type="checkbox" value="' + inputValue + '">' +
-                      '<span></span>' +
-                      '</label>' +
-                    '<a class="' + messageClass + '">';
-    messageHTML += asideHTML;
-    messageHTML += '<p>' + bodyHTML + '</p></a>';
-    messageDOM.innerHTML = messageHTML;
+    if (message.type && message.type === 'sms') {
+      bodyHTML = LinkHelper.searchAndLinkClickableData(message.body);
+    }
+
+    if (notDownloaded) {
+      bodyHTML = this._createNotDownloadedHTML(message, classNames);
+    }
+
+    messageDOM.className = classNames.join(' ');
+    messageDOM.id = 'message-' + message.id;
+    messageDOM.dataset.messageId = message.id;
+
+    messageDOM.innerHTML = this.tmpl.message.interpolate({
+      id: String(message.id),
+      bodyHTML: bodyHTML
+    }, {
+      safe: ['bodyHTML']
+    });
+
+    if (message.type === 'mms' && !notDownloaded) { // MMS
+      var pElement = messageDOM.querySelector('p');
+      SMIL.parse(message, function(slideArray) {
+        pElement.appendChild(ThreadUI.createMmsContent(slideArray));
+      });
+    }
+
+    return messageDOM;
+  },
+
+  appendMessage: function thui_appendMessage(message, hidden) {
+    var timestamp = message.timestamp.getTime();
+
+    // look for an old message and remove it first - prevent anything from ever
+    // double rendering for now
+    var messageDOM = this.container.querySelector(
+      '[data-message-id="' + message.id + '"]');
+    if (messageDOM) {
+      this.removeMessageDOM(messageDOM);
+    }
+
+    // build messageDOM adding the links
+    messageDOM = this.buildMessageDOM(message, hidden);
+
+    messageDOM.dataset.timestamp = timestamp;
     // Add to the right position
     var messageContainer = ThreadUI.getMessageContainer(timestamp, hidden);
     if (!messageContainer.firstElementChild) {
@@ -581,32 +1058,22 @@ var ThreadUI = {
         messageContainer.appendChild(messageDOM);
       }
     }
-  },
 
-  showChunkOfMessages: function thui_showChunkOfMessages(number) {
-    var hiddenElements = ThreadUI.view.getElementsByClassName('hidden');
-    for (var i = hiddenElements.length - 1; i >= 0; i--) {
-      hiddenElements[i].classList.remove('hidden');
+    if (this.mainWrapper.classList.contains('edit')) {
+      this.checkInputs();
     }
   },
 
-  addResendHandler: function thui_addResendHandler(message, messageDOM) {
-    messageDOM.addEventListener('click', function resend(e) {
-      var hash = window.location.hash;
-      if (hash != '#edit') {
-        var resendConfirmStr = _('resend-confirmation');
-        var result = confirm(resendConfirmStr);
-        if (result) {
-          messageDOM.removeEventListener('click', resend);
-          ThreadUI.resendMessage(message, messageDOM);
-        }
-      }
-    });
+  showChunkOfMessages: function thui_showChunkOfMessages(number) {
+    var elements = ThreadUI.container.getElementsByClassName('hidden');
+    for (var i = elements.length - 1; i >= 0; i--) {
+      elements[i].classList.remove('hidden');
+    }
   },
 
   cleanForm: function thui_cleanForm() {
     // Reset all inputs
-    var inputs = this.view.querySelectorAll('input[type="checkbox"]');
+    var inputs = this.allInputs;
     for (var i = 0; i < inputs.length; i++) {
       inputs[i].checked = false;
       inputs[i].parentNode.parentNode.classList.remove('undo-candidate');
@@ -615,40 +1082,41 @@ var ThreadUI = {
     this.checkInputs();
   },
 
-  clearContact: function thui_clearContact() {
-    this.contactInput.value = '';
-    this.view.innerHTML = '';
+  clear: function thui_clear() {
+    this.initRecipients();
   },
 
-  selectAllMessages: function thui_selectAllMessages() {
-    var inputs =
-            this.view.querySelectorAll('input[type="checkbox"]:not(:checked)');
-    for (var i = 0; i < inputs.length; i++) {
-      inputs[i].checked = true;
-      ThreadUI.chooseMessage(inputs[i]);
+  toggleCheckedAll: function thui_select(value) {
+    var inputs = this.container.querySelectorAll(
+      'input[type="checkbox"]' +
+      // value ?
+      //   true : query for currently unselected threads
+      //   false: query for currently selected threads
+      (value ? ':not(:checked)' : ':checked')
+    );
+    var length = inputs.length;
+    for (var i = 0; i < length; i++) {
+      inputs[i].checked = value;
+      this.chooseMessage(inputs[i]);
     }
-    ThreadUI.checkInputs();
+    this.checkInputs();
   },
 
-  deselectAllMessages: function thui_deselectAllMessages() {
-    var inputs =
-            this.view.querySelectorAll('input[type="checkbox"]:checked');
-    for (var i = 0; i < inputs.length; i++) {
-      inputs[i].checked = false;
-      ThreadUI.chooseMessage(inputs[i]);
-    }
-    ThreadUI.checkInputs();
+  startEdit: function thui_edit() {
+    this.inEditMode = true;
+    this.cleanForm();
+    this.mainWrapper.classList.toggle('edit');
   },
 
-  executeDeletion: function thui_executeDeletion() {
-    var response = window.confirm(_('deleteMessages-confirmation'));
-    if (response) {
+  delete: function thui_delete() {
+    var question = navigator.mozL10n.get('deleteMessages-confirmation');
+    if (window.confirm(question)) {
       WaitingScreen.show();
       var delNumList = [];
-      var inputs =
-        ThreadUI.view.querySelectorAll('input[type="checkbox"]:checked');
-      for (var i = 0; i < inputs.length; i++) {
-        delNumList.push(parseInt(inputs[i].value, 10));
+      var inputs = ThreadUI.selectedInputs;
+      var length = inputs.length;
+      for (var i = 0; i < length; i++) {
+        delNumList.push(+inputs[i].value);
       }
 
       // Method for deleting all inputs selected
@@ -657,30 +1125,17 @@ var ThreadUI = {
         function afterRender() {
           var completeDeletionDone = false;
           // Then sending/received messages
-          for (var i = 0; i < inputs.length; i++) {
-            var message = inputs[i].parentNode.parentNode;
-            var messagesContainer = message.parentNode;
-            // Is the last message in the container?
-            if (messagesContainer.childNodes.length == 1) {
-              var header = messagesContainer.previousSibling;
-              ThreadUI.view.removeChild(header);
-              ThreadUI.view.removeChild(messagesContainer);
-              if (!ThreadUI.view.childNodes.length) {
-                var mainWrapper = document.getElementById('main-wrapper');
-                mainWrapper.classList.remove('edit');
-                window.location.hash = '#thread-list';
-                WaitingScreen.hide();
-                completeDeletionDone = true;
-                break;
-              }
-            } else {
-              messagesContainer.removeChild(message);
-            }
+          for (var i = 0; i < length; i++) {
+            ThreadUI.removeMessageDOM(inputs[i].parentNode.parentNode);
           }
-          if (!completeDeletionDone) {
-            window.history.back();
-            WaitingScreen.hide();
+
+          ThreadUI.cancelEdit();
+
+          if (!ThreadUI.container.firstElementChild) {
+            window.location.hash = '#thread-list';
           }
+
+          WaitingScreen.hide();
         });
       };
 
@@ -688,8 +1143,9 @@ var ThreadUI = {
     }
   },
 
-  cancelEditMode: function thlui_cancelEditMode() {
-    window.history.go(-1);
+  cancelEdit: function thlui_cancelEdit() {
+    this.inEditMode = false;
+    this.mainWrapper.classList.remove('edit');
   },
 
   chooseMessage: function thui_chooseMessage(target) {
@@ -703,36 +1159,92 @@ var ThreadUI = {
   },
 
   checkInputs: function thui_checkInputs() {
-    var selected = this.view.querySelectorAll('input[type="checkbox"]:checked');
-    var allInputs = this.view.querySelectorAll('input[type="checkbox"]');
-
+    var _ = navigator.mozL10n.get;
+    var selected = this.selectedInputs;
+    var allInputs = this.allInputs;
     if (selected.length == allInputs.length) {
-      ThreadUI.selectAllButton.classList.add('disabled');
+      this.checkAllButton.disabled = true;
     } else {
-      ThreadUI.selectAllButton.classList.remove('disabled');
+      this.checkAllButton.disabled = false;
     }
     if (selected.length > 0) {
-      ThreadUI.deselectAllButton.classList.remove('disabled');
-      ThreadUI.deleteButton.classList.remove('disabled');
-      this.pageHeader.innerHTML = _('selected', {n: selected.length});
+      this.uncheckAllButton.disabled = false;
+      this.deleteButton.classList.remove('disabled');
+      this.editMode.innerHTML = _('selected', {n: selected.length});
     } else {
-      ThreadUI.deselectAllButton.classList.add('disabled');
-      ThreadUI.deleteButton.classList.add('disabled');
-      this.pageHeader.innerHTML = _('editMode');
+      this.uncheckAllButton.disabled = true;
+      this.deleteButton.classList.add('disabled');
+      this.editMode.innerHTML = _('editMode');
     }
+  },
+
+  handleMessageClick: function thui_handleMessageClick(evt) {
+    var currentNode = evt.target;
+    var inBubble = false;
+    var elems = {};
+    var _ = navigator.mozL10n.get;
+
+    // Walk up the DOM, inspecting all the elements
+    while (currentNode && currentNode.classList) {
+      if (currentNode.classList.contains('bubble')) {
+        elems.bubble = currentNode;
+      } else if (currentNode.classList.contains('message')) {
+        elems.message = currentNode;
+      } else if (currentNode.classList.contains('pack-end')) {
+        elems.packEnd = currentNode;
+      }
+      currentNode = currentNode.parentNode;
+    }
+
+    // Click event handlers that occur outside of a message element should be
+    // defined elsewhere.
+    if (!(elems.message && elems.bubble)) {
+      return;
+    }
+
+    // handle not-downloaded messages
+    if (elems.message.classList.contains('not-downloaded')) {
+
+      // do nothing for pending downloads, or expired downloads
+      if (elems.message.classList.contains('expired') ||
+        elems.message.classList.contains('pending')) {
+        return;
+      }
+      this.retrieveMMS(elems.message.dataset.messageId);
+      return;
+    }
+
+    // Click events originating from a "pack-end" aside of an error message
+    // should trigger a prompt for retransmission.
+    if (elems.message.classList.contains('error') && elems.packEnd) {
+      if (window.confirm(_('resend-confirmation'))) {
+        this.resendMessage(elems.message.dataset.messageId);
+      }
+      return;
+    }
+
   },
 
   handleEvent: function thui_handleEvent(evt) {
     switch (evt.type) {
       case 'click':
-        if (window.location.hash != '#edit') {
+        if (!this.inEditMode) {
+          // if the click wasn't on an attachment check for other clicks
+          if (!thui_mmsAttachmentClick(evt.target)) {
+            this.handleMessageClick(evt);
+            LinkActionHandler.handleTapEvent(evt);
+          }
           return;
         }
-        var inputs = evt.target.parentNode.getElementsByTagName('input');
-        if (inputs && inputs.length > 0) {
-          ThreadUI.chooseMessage(inputs[0]);
-          ThreadUI.checkInputs();
+
+        var input = evt.target.parentNode.querySelector('input');
+        if (input) {
+          this.chooseMessage(input);
+          this.checkInputs();
         }
+        break;
+      case 'contextmenu':
+        LinkActionHandler.handleLongPressEvent(evt);
         break;
       case 'submit':
         evt.preventDefault();
@@ -741,14 +1253,22 @@ var ThreadUI = {
   },
 
   cleanFields: function thui_cleanFields(forceClean) {
-    var self = this;
-    var clean = function clean() {
-      self.input.value = '';
-      self.sendButton.disabled = true;
-      self.sendButton.dataset.counter = '';
-      self.contactInput.value = '';
-      self.updateInputHeight();
-    };
+    var clean = (function clean() {
+      Compose.clear();
+
+      // Compose.clear might cause a conversion from mms -> sms, we need
+      // to ensure the message is hidden after we clear fields.
+      this.convertNotice.classList.add('hide');
+
+      // reset the counter
+      this.sendButton.dataset.counter = '';
+      this.sendButton.classList.remove('has-counter');
+
+      if (window.location.hash === '#new') {
+        this.initRecipients();
+        this.updateComposerHeader();
+      }
+    }).bind(this);
 
     if (this.previousHash === window.location.hash ||
         this.previousHash === '#new') {
@@ -762,52 +1282,66 @@ var ThreadUI = {
     this.previousHash = window.location.hash;
   },
 
-  sendMessage: function thui_sendMessage(resendText) {
-    var num, text;
+  onSendClick: function thui_onSendClick() {
+    // don't send an empty message
+    if (Compose.isEmpty()) {
+      return;
+    }
 
-    if (resendText && (typeof(resendText) === 'string') && resendText !== '') {
-      num = MessageManager.currentNum;
-      text = resendText;
-    } else {
-      // Retrieve num depending on hash
-      var hash = window.location.hash;
-      // Depending where we are, we get different num
-      if (hash == '#new') {
-        num = this.contactInput.value;
-        if (!num) {
-          return;
-        }
-      } else {
-        num = MessageManager.currentNum;
-      }
+    // Assimilation 3 (see "Assimilations" above)
+    // User may return to recipients, type a new recipient
+    // manually and then click the sendButton without "accepting"
+    // the recipient.
+    this.assimilateRecipients();
 
-      // Retrieve text
-      text = this.input.value;
-      if (!text) {
+    // not sure why this happens - replace me if you know
+    this.container.classList.remove('hide');
+
+    var content = Compose.getContent();
+    var messageType = Compose.type;
+    var recipients;
+
+    // Depending where we are, we get different nums
+    if (window.location.hash === '#new') {
+      if (!this.recipients.length) {
         return;
       }
+      recipients = this.recipients.numbers;
+    } else {
+      recipients = Threads.active.participants;
     }
-    // Clean fields (this lock any repeated click in 'send' button)
+
+    // Clean composer fields (this lock any repeated click in 'send' button)
     this.cleanFields(true);
-    // Remove when
-    // https://bugzilla.mozilla.org/show_bug.cgi?id=825604 landed
-    MessageManager.currentNum = num;
+
     this.updateHeaderData();
-    // Send the SMS
-    MessageManager.send(num, text);
+
+    // Hold onto the recipients until
+    MessageManager.activity.recipients = recipients;
+
+    // Send the Message
+    if (messageType === 'sms') {
+      MessageManager.sendSMS(recipients, content[0]);
+
+      if (recipients.length > 1) {
+        window.location.hash = '#thread-list';
+      }
+    } else {
+      var smilSlides = content.reduce(thui_generateSmilSlides, []);
+      MessageManager.sendMMS(recipients, smilSlides);
+    }
   },
 
   onMessageSent: function thui_onMessageSent(message) {
     var messageDOM = document.getElementById('message-' + message.id);
+
     if (!messageDOM) {
       return;
     }
-    // Remove 'sending' style
-    var aElement = messageDOM.querySelector('a');
-    aElement.classList.remove('sending');
-    // Remove the 'spinner'
-    var spinnerContainer = aElement.querySelector('aside');
-    aElement.removeChild(spinnerContainer);
+
+    // Update class names to reflect message state
+    messageDOM.classList.remove('sending');
+    messageDOM.classList.add('sent');
 
     // Play the audio notification
     if (this.sentAudioEnabled) {
@@ -817,30 +1351,26 @@ var ThreadUI = {
 
   onMessageFailed: function thui_onMessageFailed(message) {
     var messageDOM = document.getElementById('message-' + message.id);
-    if (!messageDOM) {
-      return;
-    }
-    // Remove 'sending' style and add 'error' style
-    var aElement = messageDOM.querySelector('a');
-    // Check if it was painted as 'error' before
-    if (!aElement.classList.contains('sending')) {
-      return;
-    }
-    aElement.classList.remove('sending');
-    aElement.classList.add('error');
+    // When this is the first message in a thread, we haven't displayed
+    // the new thread yet. The error flag will be shown when the thread
+    // will be rendered. See Bug 874043
+    if (messageDOM) {
 
-    // Remove only the spinner
-    var spinnerContainer = aElement.querySelector('aside');
-    spinnerContainer.innerHTML = '';
+      // Check if it was painted as 'error' before
+      if (messageDOM.classList.contains('error')) {
+        return;
+      }
 
-    ThreadUI.addResendHandler(message, messageDOM);
+      // Update class names to reflect message state
+      messageDOM.classList.remove('sending');
+      messageDOM.classList.add('error');
+    }
 
     this.ifRilDisabled(this.showAirplaneModeError);
   },
 
   ifRilDisabled: function thui_ifRilDisabled(func) {
     var settings = window.navigator.mozSettings;
-
     if (settings) {
       // Check if RIL is enabled or not
       var req = settings.createLock().get('ril.radio.disabled');
@@ -852,6 +1382,7 @@ var ThreadUI = {
   },
 
   showAirplaneModeError: function thui_showAirplaneModeError() {
+    var _ = navigator.mozL10n.get;
     CustomDialog.show(
       _('sendAirplaneModeTitle'),
       _('sendAirplaneModeBody'),
@@ -864,181 +1395,473 @@ var ThreadUI = {
     );
   },
 
-  resendMessage: function thui_resendMessage(message, messageDOM) {
-    // Is the last one in the ul?
+  removeMessageDOM: function thui_removeMessageDOM(messageDOM) {
+    // store the parent so we can check emptiness later
     var messagesContainer = messageDOM.parentNode;
-    if (messagesContainer.childNodes.length == 1) {
-      // If it is, we remove header & container
+
+    messagesContainer.removeChild(messageDOM);
+
+    // was this the last one in the ul?
+    if (!messagesContainer.firstElementChild) {
+      // we remove header & container
       var header = messagesContainer.previousSibling;
-      ThreadUI.view.removeChild(header);
-      ThreadUI.view.removeChild(messagesContainer);
-    } else {
-      // If not we only have to remove the message
-      messageDOM.parentNode.removeChild(messageDOM);
+      this.container.removeChild(header);
+      this.container.removeChild(messagesContainer);
     }
-
-    // Have we more elements in the view?
-    if (!ThreadUI.view.childNodes.length) {
-      // Update header index
-      ThreadUI.dayHeaderIndex = 0;
-      ThreadUI.timeHeaderIndex = 0;
-    }
-
-    // delete from Gecko db as well
-    if (message.id) {
-      MessageManager.deleteMessage(message.id);
-    }
-
-    // We resend again
-    ThreadUI.sendMessage(message.body);
   },
 
-  renderContactData: function thui_renderContactData(contact) {
-    // Retrieve info from thread
-    var self = this;
-    var tels = contact.tel;
-    var contactsContainer = document.createElement('ul');
-    contactsContainer.classList.add('contactList');
-    for (var i = 0; i < tels.length; i++) {
-      Utils.getPhoneDetails(tels[i].value,
-                            contact,
-                            function gotDetails(details) {
-        var name = Utils.escapeHTML((contact.name[0] || details.title));
-        //TODO ask UX if we should use type+carrier or just number
-        var number = tels[i].value.toString();
-        var input = self.contactInput.value;
-        // For name, as long as we do a startsWith on API, we want only to show
-        // highlight of the startsWith also
-        var regName = new RegExp('\\b' + input, 'ig');
-        // For number we search in any position to avoid country code issues
-        var regNumber = new RegExp(input, 'ig');
-        if (!(name.match(regName) || number.match(regNumber))) {
-          return;
-        }
-        var nameHTML =
-            SearchUtils.createHighlightHTML(name, regName, 'highlight');
-        var numHTML =
-            SearchUtils.createHighlightHTML(number, regNumber, 'highlight');
-        // Create DOM element
-        var contactDOM = document.createElement('li');
+  retrieveMMS: function thui_retrieveMMS(messageId) {
+    // force a number
+    var id = +messageId;
+    var _ = navigator.mozL10n.get;
+    var request = MessageManager.retrieveMMS(id);
+    var messageDOM = this.container.querySelector(
+      '[data-message-id="' + id + '"]');
 
-        // Do we have to update with photo?
-        if (contact.photo && contact.photo[0]) {
-          var photoURL = URL.createObjectURL(contact.photo[0]);
-        }
+    messageDOM.classList.add('pending');
+    messageDOM.classList.remove('error');
+    messageDOM.querySelector('button').textContent = _('downloading');
 
-        // Create HTML structure
-        var structureHTML =
-                '  <a href="#num=' + number + '">' +
-                '<aside class="pack-end">' +
-                  '<img ' + (photoURL ? 'src="' + photoURL + '"' : '') + '>' +
-                '</aside>' +
-                '    <p class="name">' + nameHTML + '</div>' +
-                '    <p>' +
-                      tels[i].type +
-                      ' ' + numHTML +
-                      ' ' + (tels[i].carrier ? tels[i].carrier : '') +
-                '    </p>' +
-                '  </a>';
-        // Update HTML and append
-        contactDOM.innerHTML = structureHTML;
+    request.onsuccess = (function retrieveMMSSuccess() {
+      this.removeMessageDOM(messageDOM);
+    }).bind(this);
 
-        contactsContainer.appendChild(contactDOM);
-      });
-    }
-
-    ThreadUI.view.appendChild(contactsContainer);
-  },
-
-  searchContact: function thui_searchContact() {
-    var input = this.contactInput;
-    var string = input.value;
-    var self = this;
-    self.view.innerHTML = '';
-    if (!string) {
-      return;
-    }
-    var contactsContainer = document.createElement('ul');
-
-    ContactDataManager.searchContactData(string, function gotContact(contacts) {
-      self.view.innerHTML = '';
-      if (!contacts || contacts.length == 0) {
-
-
-
-        var contactDOM = document.createElement('li');
-        var noResultHTML = '<a><p data-l10n-id="no-results">' +
-                           _('no-results') +
-                           '</p></a>';
-        contactDOM.innerHTML = noResultHTML;
-        contactsContainer.appendChild(contactDOM);
-        self.view.appendChild(contactsContainer);
-        return;
-      }
-      contacts.forEach(self.renderContactData.bind(self));
+    request.onerror = (function retrieveMMSError() {
+      messageDOM.classList.remove('pending');
+      messageDOM.classList.add('error');
+      messageDOM.querySelector('button').textContent = _('download');
     });
   },
 
-  pickContact: function thui_pickContact() {
-    try {
-      var activity = new MozActivity({
-        name: 'pick',
-        data: {
-          type: 'webcontacts/contact'
+  resendMessage: function thui_resendMessage(id) {
+    // force id to be a number
+    id = +id;
+
+    var request = MessageManager.getMessage(id);
+
+    request.onsuccess = (function() {
+      var message = request.result;
+      // delete from Gecko db as well
+      MessageManager.deleteMessage(id, function(success) {
+        if (!success) {
+          return;
         }
+        var messageDOM = this.container.querySelector(
+          '[data-message-id="' + id + '"]');
+
+        this.removeMessageDOM(messageDOM);
+        MessageManager.resendMessage(message);
+      }.bind(this));
+    }).bind(this);
+  },
+
+  // Returns true when a contact has been rendered
+  // Returns false when no contact has been rendered
+  renderContact: function thui_renderContact(params) {
+    /**
+     *
+     * params {
+     *   contact:
+     *     A contact object.
+     *
+     *   input:
+     *     Any input value associated with the contact,
+     *     possibly from a search or similar operation.
+     *
+     *   target:
+     *     UL node to append the rendered contact LI.
+     *
+     *   isContact:
+     *     |true| if rendering a contact from stored contacts
+     *     |false| if rendering an unknown contact
+     *
+     *   isSuggestion:
+     *     |true| if the value params.input should be
+     *     highlighted in the rendered HTML & all tel
+     *     entries should be rendered.
+     *     *
+     * }
+     */
+
+    // Contact records that don't have phone numbers
+    // cannot be sent SMS or MMS messages
+    // TODO: Add email checking support for MMS
+    if (params.contact.tel === null) {
+      return false;
+    }
+
+    var contact = params.contact;
+    var input = params.input.trim();
+    var ul = params.target;
+    var isContact = params.isContact;
+    var isSuggestion = params.isSuggestion;
+
+    var escaped = Utils.escapeRegex(input);
+    var escsubs = escaped.split(/\s+/);
+    var tels = contact.tel;
+    var regexps = {
+      name: new RegExp('(\\b' + escsubs.join(')|(\\b') + ')', 'gi'),
+      number: new RegExp(escaped, 'ig')
+    };
+    var telsLength = tels.length;
+
+    if (!telsLength) {
+      return false;
+    }
+
+    var details = isContact ?
+      Utils.getContactDetails(tels[0].value, contact) : {
+        name: '',
+        photoURL: ''
+      };
+
+    for (var i = 0; i < telsLength; i++) {
+      var current = tels[i];
+      // Only render a contact's tel value entry for the _specified_
+      // input value when not rendering a suggestion. If the tel
+      // record value _doesn't_ match, then continue.
+      //
+      if (!isSuggestion && !Utils.compareDialables(current.value, input)) {
+        continue;
+      }
+
+      // If rendering for contact search result suggestions, don't
+      // render contact tel records for values that are already
+      // selected as recipients. This comparison should be safe,
+      // as the value in this.recipients.numbers comes from the same
+      // source that current.value comes from.
+      if (isSuggestion && this.recipients.numbers.indexOf(current.value) > -1) {
+        continue;
+      }
+
+      var number = current.value;
+      var title = details.title || number;
+      var type = current.type && current.type.length ? current.type[0] : '';
+      var carrier = current.carrier ? (current.carrier + ', ') : '';
+      var separator = type || carrier ? ' | ' : '';
+      var li = document.createElement('li');
+      var data = {
+        name: title,
+        number: number,
+        type: type,
+        carrier: carrier,
+        separator: separator,
+        nameHTML: '',
+        numberHTML: ''
+      };
+
+
+      ['name', 'number'].forEach(function(key) {
+        if (isSuggestion) {
+          data[key + 'HTML'] = data[key].replace(
+            regexps[key], function(match) {
+              return this.tmpl.highlight.interpolate({
+                str: match
+              });
+            }.bind(this)
+          );
+        } else {
+          data[key + 'HTML'] = Utils.escapeHTML(data[key]);
+        }
+      }, this);
+
+      // Interpolate HTML template with data and inject.
+      // Known "safe" HTML values will not be re-sanitized.
+      if (isContact) {
+        li.innerHTML = this.tmpl.contact.interpolate(data, {
+          safe: ['nameHTML', 'numberHTML', 'srcAttr']
+        });
+      } else {
+        li.innerHTML = this.tmpl.number.interpolate(data);
+      }
+      ul.appendChild(li);
+
+      // Revoke contact photo after image onload.
+      var photo = li.querySelector('img');
+      if (photo) {
+        photo.onload = photo.onerror = function revokePhotoURL() {
+          this.onload = this.onerror = null;
+          URL.revokeObjectURL(this.src);
+        };
+      }
+    }
+    return true;
+  },
+
+  toFieldKeypress: function(event) {
+    if (event.keyCode === 13 || event.keyCode === event.DOM_VK_ENTER) {
+      this.container.textContent = '';
+    }
+  },
+
+  toFieldInput: function(event) {
+    var typed;
+    if (event.target.isPlaceholder) {
+      typed = event.target.textContent.trim();
+      this.searchContact(typed);
+    }
+
+    this.enableSend();
+  },
+
+  searchContact: function thui_searchContact(filterValue) {
+    if (!filterValue) {
+      // In cases where searchContact was invoked for "input"
+      // that was actually a "delete" that removed the last
+      // character in the recipient input field,
+      // eg. type "a", then delete it.
+      // Always remove the the existing results.
+      this.container.textContent = '';
+      return;
+    }
+
+    Contacts.findByString(filterValue, function gotContact(contacts) {
+      // If the user has cleared the typed input before the
+      // results came back, prevent the results from being rendered
+      // by returning immediately.
+      if (!this.recipients.inputValue) {
+        return;
+      }
+      // There are contacts that match the input.
+      this.container.textContent = '';
+      if (!contacts || !contacts.length) {
+        return;
+      }
+      // TODO Modify in Bug 861227 in order to create a standalone element
+      var ul = document.createElement('ul');
+      ul.classList.add('contact-list');
+      ul.addEventListener('click', function ulHandler(event) {
+        event.stopPropagation();
+        event.preventDefault();
+        // Since the "dataset" DOMStringMap property is essentially
+        // just an object of properties that exactly match the properties
+        // used for recipients, push the whole dataset object into
+        // the current recipients list as a new entry.
+        this.recipients.add(
+          event.target.dataset
+        ).focus();
+
+        // Clean up the event listener
+        ul.removeEventListener('click', ulHandler);
+
+        event.stopPropagation();
+        event.preventDefault();
+      }.bind(this));
+
+      this.container.appendChild(ul);
+
+      // Render each contact in the contacts results
+      contacts.forEach(function(contact) {
+        this.renderContact({
+          contact: contact,
+          input: filterValue,
+          target: ul,
+          isContact: true,
+          isSuggestion: true
+        });
+      }, this);
+    }.bind(this));
+  },
+
+  onHeaderActivation: function thui_onHeaderActivation() {
+    var _ = navigator.mozL10n.get;
+    var participants = Threads.active && Threads.active.participants;
+
+    // >1 Participants will enter "group view"
+    if (participants && participants.length > 1) {
+      window.location.href = '#group-view';
+      return;
+    }
+
+    if (!Threads.active && Threads.lastId) {
+      window.location.hash = '#thread=' + Threads.lastId;
+      return;
+    }
+
+    this.activateContact({
+      number: this.headerText.dataset.number,
+      isContact: this.headerText.dataset.isContact === 'true' ? true : false
+    });
+  },
+
+  onParticipantClick: function onParticipantClick(event) {
+    event.stopPropagation();
+    event.preventDefault();
+
+    var target = event.target;
+    var isContact, number;
+
+    isContact = target.dataset.source === 'contacts' ? true : false;
+    number = target.dataset.number;
+
+    Contacts.findByPhoneNumber(number, function(results) {
+      var ul = document.createElement('ul');
+      var contact = isContact ? results[0] : {
+        tel: [{ value: number }]
+      };
+
+      ul.classList.add('contact-prompt');
+
+      this.renderContact({
+        contact: contact,
+        input: number,
+        target: ul,
+        isContact: isContact,
+        isSuggestion: false
       });
-      activity.onsuccess = function success() {
-        var number = this.result.number;
-        if (number) {
-          window.location.hash = '#num=' + number;
-        }
-      };
-    } catch (e) {
-      console.log('WebActivities unavailable? : ' + e);
-    }
+
+      this.activateContact({
+        name: name,
+        number: number,
+        isContact: isContact,
+        body: ul
+      });
+    }.bind(this));
   },
 
-  activateContact: function thui_activateContact() {
-    var options = {};
-    // Call to 'new' or 'view' depending on existence of contact
-    if (this.title.dataset.isContact == 'true') {
-      //TODO modify this when 'view' activity is available on contacts
-      // options = {
-      //   name: 'view',
-      //   data: {
-      //     type: 'webcontacts/contact'
-      //   }
-      // };
+  groupView: function thui_groupView() {
+    var _ = navigator.mozL10n.get;
+    var lastId = Threads.lastId;
+    var participants = lastId && Threads.get(lastId).participants;
+    var ul = this.participantsList;
+
+    this.groupView.reset();
+
+    // Render the Group Participants list
+    participants.forEach(function(participant) {
+
+      Contacts.findByPhoneNumber(participant, function(results) {
+        var isContact = results !== null && !!results.length;
+        var contact = isContact ? results[0] : {
+          tel: [{ value: participant }]
+        };
+
+        this.renderContact({
+          contact: contact,
+          input: participant,
+          target: ul,
+          isContact: isContact,
+          isSuggestion: false
+        });
+      }.bind(this));
+    }.bind(this));
+
+    // Hide the Messages edit icon, view container and composer form
+    this.editIcon.classList.add('hide');
+    this.subheader.classList.add('hide');
+    this.container.classList.add('hide');
+    this.composeForm.classList.add('hide');
+
+    // Append and Show the participants list
+    this.participants.appendChild(ul);
+    this.participants.classList.remove('hide');
+
+    this.headerText.textContent = _('participant', {
+      n: participants.length
+    });
+  },
+
+  activateContact: function thui_activateContact(opt) {
+    function complete() {
+      window.location.href = '#thread=' + Threads.lastId;
+    }
+
+    var _ = navigator.mozL10n.get;
+    var number = opt.number;
+    var name = opt.name || number;
+    var items = [
+      {
+        name: _('call'),
+        method: function oCall(param) {
+          ActivityPicker.call(param);
+        },
+        params: [number]
+      },
+      {
+        name: _('sendMessage'),
+        method: function oCall(param) {
+          ActivityPicker.sendMessage(param);
+        },
+        params: [number]
+      }
+    ];
+
+    var params = {
+      items: items,
+      complete: complete
+    };
+
+    // If this is a known contact, display an option menu
+    // with buttons for "Call" and "Cancel"
+    if (opt.isContact) {
+
+      params.section = typeof opt.body !== 'undefined' ? opt.body : name;
+
     } else {
-      options = {
-        name: 'new',
-        data: {
-          type: 'webcontacts/contact',
-          params: {
-            'tel': this.title.dataset.phoneNumber
-          }
+
+      params.header = number;
+      params.items.push({
+          name: _('createNewContact'),
+          method: function oCreate(param) {
+            ActivityPicker.createNewContact(
+              param, ThreadUI.onCreateContact);
+          },
+          params: [{'tel': number}]
+        },
+        {
+          name: _('addToExistingContact'),
+          method: function oAdd(param) {
+            ActivityPicker.addToExistingContact(
+              param, ThreadUI.onCreateContact);
+          },
+          params: [{'tel': number}]
         }
-      };
+      );
     }
 
-    try {
-      var activity = new MozActivity(options);
-      activity.onsuccess = ThreadUI.onCreateContact;
-    } catch (e) {
-      console.log('WebActivities unavailable? : ' + e);
-    }
+    params.items.push({
+      name: _('cancel'),
+      incomplete: true
+    });
+
+    var options = new OptionMenu(params);
+    options.show();
   },
+
+
   onCreateContact: function thui_onCreateContact() {
     ThreadListUI.updateContactsInfo();
     // Update Header if needed
-    if (window.location.hash.substr(0, 5) === '#num=') {
+    if (window.location.hash.substr(0, 8) === '#thread=') {
       ThreadUI.updateHeaderData();
     }
   }
 };
 
-window.addEventListener('resize', function resize() {
-  ThreadUI.setInputMaxHeight();
-  // Scroll to bottom
-  ThreadUI.scrollViewToBottom();
+Object.defineProperty(ThreadUI, 'allInputs', {
+  get: function() {
+    return this.getAllInputs();
+  }
 });
+
+Object.defineProperty(ThreadUI, 'selectedInputs', {
+  get: function() {
+    return this.getSelectedInputs();
+  }
+});
+
+ThreadUI.groupView.reset = function groupViewReset() {
+  // Hide the group view
+  ThreadUI.participants.classList.add('hide');
+  // Remove all LIs
+  ThreadUI.participantsList.textContent = '';
+  // Restore message list view UI elements
+  ThreadUI.editIcon.classList.remove('hide');
+  ThreadUI.subheader.classList.remove('hide');
+  ThreadUI.container.classList.remove('hide');
+  ThreadUI.composeForm.classList.remove('hide');
+};
+
+window.confirm = window.confirm; // allow override in unit tests
+
+}(this));

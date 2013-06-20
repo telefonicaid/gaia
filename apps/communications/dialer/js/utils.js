@@ -35,9 +35,9 @@ var Utils = {
   getPhoneNumberPrimaryInfo: function ut_getPhoneNumberPrimaryInfo(matchingTel,
     contact) {
     if (contact) {
-      if (contact.name && String(contact.name) !== '') {
+      if (contact.name && contact.name.length && contact.name[0] !== '') {
         return contact.name;
-      } else if (contact.org && String(contact.org) !== '') {
+      } else if (contact.org && contact.org.length && contact.org[0] !== '') {
         return contact.org;
       }
     }
@@ -47,16 +47,22 @@ var Utils = {
     return null;
   },
 
+  toCamelCase: function ut_toCamelCase(str) {
+    return str.replace(/\-(.)/g, function replacer(str, p1) {
+      return p1.toUpperCase();
+    });
+  },
+
   // XXX: this is way too complex for the task accomplished
   getPhoneNumberAdditionalInfo: function ut_getPhoneNumberAdditionalInfo(
-    matchingTel, associatedContact) {
+    matchingTel, associatedContact, inputNumber) {
     var additionalInfo, phoneType, phoneCarrier,
         contactPhoneEntry, contactPhoneNumber, contactPhoneType,
         contactPhoneCarrier, multipleNumbersSameCarrier,
         length = associatedContact.tel.length;
 
     // Phone type is a mandatory field.
-    contactPhoneNumber = matchingTel.value;
+    contactPhoneNumber = inputNumber;
     additionalInfo = matchingTel.type;
     phoneType = matchingTel.type;
     if (matchingTel.carrier) {
@@ -87,6 +93,82 @@ var Utils = {
       }
     }
     return additionalInfo;
+  },
+
+  addEllipsis: function ut_addEllipsis(view, fakeView, ellipsisSide) {
+    var side = ellipsisSide || 'begin';
+    LazyL10n.get(function localized(_) {
+      var localizedSide;
+      if (navigator.mozL10n.language.direction === 'rtl') {
+        localizedSide = (side === 'begin' ? 'right' : 'left');
+      } else {
+        localizedSide = (side === 'begin' ? 'left' : 'right');
+      }
+      var computedStyle = window.getComputedStyle(view, null);
+      var currentFontSize = parseInt(
+        computedStyle.getPropertyValue('font-size')
+      );
+      var viewWidth = view.getBoundingClientRect().width;
+      fakeView.style.fontSize = currentFontSize + 'px';
+      fakeView.innerHTML = view.value ? view.value : view.innerHTML;
+
+      var value = fakeView.innerHTML;
+
+      // Guess the possible position of the ellipsis in order to minimize
+      // the following while loop iterations:
+      var counter = value.length -
+        (viewWidth *
+         (fakeView.textContent.length /
+           fakeView.getBoundingClientRect().width));
+
+      var newPhoneNumber;
+      while (fakeView.getBoundingClientRect().width > viewWidth) {
+
+        if (localizedSide == 'left') {
+          newPhoneNumber = '\u2026' + value.substr(-value.length + counter);
+        } else if (localizedSide == 'right') {
+          newPhoneNumber = value.substr(0, value.length - counter) + '\u2026';
+        }
+
+        fakeView.innerHTML = newPhoneNumber;
+        counter++;
+      }
+
+      if (newPhoneNumber) {
+        if (view.value) {
+          view.value = newPhoneNumber;
+        } else {
+          view.innerHTML = newPhoneNumber;
+        }
+      }
+    });
+  },
+
+  getNextFontSize:
+    function ut_getNextFontSize(view, fakeView, maxFontSize,
+      minFontSize, fontStep) {
+        var computedStyle = window.getComputedStyle(view, null);
+        var fontSize = parseInt(computedStyle.getPropertyValue('font-size'));
+        var viewWidth = view.getBoundingClientRect().width;
+        var viewHeight = view.getBoundingClientRect().height;
+        fakeView.style.fontSize = fontSize + 'px';
+        fakeView.innerHTML = (view.value ? view.value : view.innerHTML);
+
+        var rect = fakeView.getBoundingClientRect();
+
+        while ((rect.width < viewWidth) && (fontSize < maxFontSize)) {
+          fontSize = Math.min(fontSize + fontStep, maxFontSize);
+          fakeView.style.fontSize = fontSize + 'px';
+          rect = fakeView.getBoundingClientRect();
+        }
+
+        while ((rect.width > viewWidth) && (fontSize > minFontSize)) {
+          fontSize = Math.max(fontSize - fontStep, minFontSize);
+          fakeView.style.fontSize = fontSize + 'px';
+          rect = fakeView.getBoundingClientRect();
+        }
+
+        return fontSize;
   }
 };
 

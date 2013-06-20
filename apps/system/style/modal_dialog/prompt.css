@@ -4,9 +4,8 @@
     menu-dialoges/core.css
     other/buttons/style.css
  * ---------------------------------- */
- 
+
 [role="dialog"] p {
-  font-family: 'MozTT', Sans-serif;
   font-weight: lighter;
   font-size: 2.2rem;
   color: #FAFAFA;
@@ -17,13 +16,9 @@
   overflow-x: hidden;
   overflow-y: auto;
   word-wrap: break-word;
-  /*screen height - menu data-items - dialog padding - title height*/
-  /*almost 60% screen height*/
-  max-height: 28rem;
 }
 
 [role="dialog"] .content {
-  font-family: 'MozTT', Sans-serif;
   font-weight: lighter;
   font-size: 2.2rem;
   color: #fff;
@@ -43,7 +38,6 @@
 
 [role="dialog"] .content small {
   font-size: 1.4rem;
-  font-family: 'MozTT', Sans-serif;
   font-weight: normal;
   color: #cbcbcb;
   display: block;

@@ -4,9 +4,14 @@
     <meta charset="utf-8" />
     <meta http-equiv="pragma" content="no-cache" />
     <title>Music</title>
-    <link rel="stylesheet" href="style/music.css" type="text/css" />
+    <!-- multi-resolution support -->
+    <link rel="stylesheet" href="/shared/style/responsive.css">
     <!-- Include shared building blocks -->
     <link rel="stylesheet" type="text/css" href="shared/style/headers.css"/>
+    <link rel="stylesheet" type="text/css" href="shared/style/input_areas.css"/>
+    <link rel="stylesheet" type="text/css" href="shared/style_unstable/progress_activity.css"/>
+    <link rel="stylesheet" type="text/css" href="shared/style_unstable/tabs.css"/>
+    <link rel="stylesheet" type="text/css" href="style/music.css"/>
     <!-- Localization -->
     <link rel="resource" type="application/l10n" href="locales/locales.ini">
     <!-- Shared code -->
@@ -15,6 +20,7 @@
     <script defer src="shared/js/mediadb.js"></script>
     <script defer src="shared/js/lazy_loader.js"></script>
     <script defer src="shared/js/async_storage.js"></script>
+    <script defer src="shared/js/text_normalizer.js"></script>
     <!-- Specific code -->
     <script defer src="js/utils.js"></script>
     <script defer src="js/music.js"></script>
@@ -26,13 +32,34 @@
         <button id="title-back"><span class="icon icon-back"></span></button>
         <menu type="toolbar">
           <button id="title-player" hidden><span class="icon icon-player">player</span></button>
+          <button id="title-done" hidden><span class="icon icon-done"></span></button>
         </menu>
         <h1 id="title-text" data-l10n-id="music">Music</h1>
       </header>
     </section>
     <div id="views">
-      <div id="views-tiles" class="view hidden"></div>
-      <div id="views-list" class="view hidden"></div>
+      <div id="views-tiles" class="view hidden">
+        <form id="views-tiles-search" role="search" class="skin-dark">
+          <button id="views-tiles-search-close" type="submit">close</button>
+          <p>
+            <input id="views-tiles-search-input" type="search"
+                   data-l10n-id="search-music" placeholder="SearcH MusiC">
+            <button id="views-tiles-search-clear" type="reset">Clear</button>
+          </p>
+        </form>
+        <div id="views-tiles-anchor"></div>
+      </div>
+      <div id="views-list" class="view hidden">
+        <form id="views-list-search" role="search" class="skin-dark">
+          <button id="views-list-search-close" type="submit">close</button>
+          <p>
+            <input id="views-list-search-input" type="search"
+                   data-l10n-id="search-music" placeholder="SearcH MusiC">
+            <button id="views-list-search-clear" type="reset">Clear</button>
+          </p>
+        </form>
+        <div id="views-list-anchor"></div>
+      </div>
       <div id="views-sublist" class="view hidden">
         <div id="views-sublist-header">
           <div id="views-sublist-header-default">
@@ -81,15 +108,54 @@
         <audio id="player-audio" class="hidden"></audio>
       </div>
     </div>
+    <div id="search" class="hidden">
+      <section role="region" class="skin-dark">
+        <div id="views-search-artists" class="search-category hidden">
+          <header>
+            <h2><span data-l10n-id="search-artists">ArtistS</span>
+              (<span class="search-result-count"></span>)</h2>
+          </header>
+          <div class="search-results"></div>
+        </div>
+        <div id="views-search-albums" class="search-category hidden">
+          <header>
+            <h2><span data-l10n-id="search-albums">AlbumS</span>
+              (<span class="search-result-count"></span>)</h2>
+          </header>
+          <div class="search-results"></div>
+        </div>
+        <div id="views-search-titles" class="search-category hidden">
+          <header>
+            <h2><span data-l10n-id="search-titles">TrackS</span>
+              (<span class="search-result-count"></span>)</h2>
+          </header>
+          <div class="search-results"></div>
+        </div>
+      </section>
+    </div>
+    <!-- BB tabs -->
     <div id="tabs">
-      <button class="tabs-button" id="tabs-mix" data-option="mix"></button>
-      <button class="tabs-button" id="tabs-playlists" data-option="playlist"></button>
-      <button class="tabs-button" id="tabs-artists" data-option="artist"></button>
-      <button class="tabs-button" id="tabs-albums" data-option="album"></button>
+      <ul role="tablist" data-items="5" class="bottom">
+        <li id="mix" role="tab">
+          <a href="#mix" id="tabs-mix" data-option="mix" class="icon">mix</a>
+        </li>
+        <li id="playlists" role="tab">
+          <a href="#playlists" id="tabs-playlists" data-option="playlist" class="icon">playlists</a>
+        </li>
+        <li id="artists" role="tab">
+          <a href="#artists" id="tabs-artists" data-option="artist" class="icon">artists</a>
+        </li>
+        <li id="albums" role="tab">
+          <a href="#albums" id="tabs-albums" data-option="album" class="icon">albums</a>
+        </li>
+        <li id="songs" role="tab">
+          <a href="#songs" id="tabs-songs" data-option="title" class="icon">songs</a>
+        </li>
+      </ul>
     </div>
     <!-- display scanning progress over the titlebar -->
     <div id="scan-progress" class="hidden">
-      <div id="scan-spinner"></div>
+      <progress id="scan-spinner"></progress>
       <div id="scan-count"></div>
       <div id="scan-artist"></div>
       <div id="scan-title"></div>
@@ -102,7 +168,7 @@
       </div>
     </div>
     <!-- display this at startup while we load music -->
-    <div id="spinner-overlay"><div id="spinner"></div></div>
+    <div id="spinner-overlay"><progress id="spinner"></progress></div>
   </body>
 </html>
 

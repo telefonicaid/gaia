@@ -29,6 +29,13 @@ var MockUtils = {
     return matchingTel.value % 2 == 0 ? matchingTel.value : undefined;
   },
 
+  addEllipsis: function ut_addEllipsis() {},
+
+  getNextFontSize: function ut_getNextFontSize(view, fakeView, maxFontSize,
+    minFontSize, fontStep) {
+    return maxFontSize;
+  },
+
   mTearDown: function tearDown() {
     this.mCalledPrettyDate = false;
     this.mCalledHeaderDate = false;
@@ -44,7 +51,7 @@ var MockUtils = {
       if (contact.name && String(contact.name) !== '') {
         return contact.name;
       } else if (contact.org && String(contact.org) !== '') {
-        return  contact.org;
+        return contact.org;
       }
     }
     if (matchingTel) {

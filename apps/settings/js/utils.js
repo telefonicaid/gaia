@@ -6,11 +6,13 @@
 /**
  * Constants
  */
+
 var DEBUG = false;
 
 /**
  * Debug method
  */
+
 function debug(msg, optObject) {
   if (DEBUG) {
     var output = '[DEBUG # Settings] ' + msg;
@@ -24,6 +26,7 @@ function debug(msg, optObject) {
 /**
  * Move settings to foreground
  */
+
 function reopenSettings() {
   navigator.mozApps.getSelf().onsuccess = function getSelfCB(evt) {
     var app = evt.target.result;
@@ -56,10 +59,10 @@ function openLink(url) {
  */
 
 function openDialog(dialogID, onSubmit, onReset) {
-  if ('#' + dialogID == document.location.hash)
+  if ('#' + dialogID == Settings.currentPanel)
     return;
 
-  var origin = document.location.hash;
+  var origin = Settings.currentPanel;
   var dialog = document.getElementById(dialogID);
 
   var submit = dialog.querySelector('[type=submit]');
@@ -67,7 +70,7 @@ function openDialog(dialogID, onSubmit, onReset) {
     submit.onclick = function onsubmit() {
       if (onSubmit)
         (onSubmit.bind(dialog))();
-      document.location.hash = origin; // hide dialog box
+      Settings.currentPanel = origin; // hide dialog box
     };
   }
 
@@ -76,11 +79,11 @@ function openDialog(dialogID, onSubmit, onReset) {
     reset.onclick = function onreset() {
       if (onReset)
         (onReset.bind(dialog))();
-      document.location.hash = origin; // hide dialog box
+      Settings.currentPanel = origin; // hide dialog box
     };
   }
 
-  document.location.hash = dialogID; // show dialog box
+  Settings.currentPanel = dialogID; // show dialog box
 }
 
 /**
@@ -105,6 +108,52 @@ function audioPreview(element, type) {
   } else {
     audio.play();
   }
+}
+
+/**
+ * JSON loader
+ */
+
+function loadJSON(href, callback) {
+  if (!callback)
+    return;
+  var xhr = new XMLHttpRequest();
+  xhr.onerror = function() {
+    console.error('Failed to fetch file: ' + href, xhr.statusText);
+  };
+  xhr.onload = function() {
+    callback(xhr.response);
+  };
+  xhr.open('GET', href, true); // async
+  xhr.responseType = 'json';
+  xhr.send();
+}
+
+/**
+ * L10n helper
+ */
+
+function localize(element, id, args) {
+  var mozL10n = navigator.mozL10n;
+  if (!element || !mozL10n)
+    return;
+
+  if (id) {
+    element.dataset.l10nId = id;
+  } else {
+    element.dataset.l10nId = '';
+    element.textContent = '';
+  }
+
+  if (args) {
+    element.dataset.l10nArgs = JSON.stringify(args);
+  } else {
+    element.dataset.l10nArgs = '';
+  }
+
+  mozL10n.ready(function l10nReady() {
+    mozL10n.translate(element);
+  });
 }
 
 /**
@@ -158,24 +207,6 @@ var DeviceStorageHelper = (function DeviceStorageHelper() {
     };
   }
 
-  function getStats(types, callback) {
-    var results = {};
-
-    var current = types.length;
-
-    for (var i = 0; i < types.length; i++) {
-      getStat(types[i], function(totalBytes, freeBytes, type) {
-
-        results[type] = totalBytes;
-        results['free'] = freeBytes;
-        current--;
-        if(current == 0)
-          callback(results);
-          
-      });
-    }
-  }
-
   function getFreeSpace(callback) {
     var deviceStorage = navigator.getDeviceStorage('sdcard');
 
@@ -189,12 +220,28 @@ var DeviceStorageHelper = (function DeviceStorageHelper() {
     };
   }
 
+  function showFormatedSize(element, l10nId, size) {
+    if (size === undefined || isNaN(size)) {
+      element.textContent = '';
+      return;
+    }
+
+    // KB - 3 KB (nearest ones), MB, GB - 1.2 MB (nearest tenth)
+    var fixedDigits = (size < 1024 * 1024) ? 0 : 1;
+    var sizeInfo = FileSizeFormatter.getReadableFileSize(size, fixedDigits);
+
+    var _ = navigator.mozL10n.get;
+    element.textContent = _(l10nId, {
+      size: sizeInfo.size,
+      unit: _('byteUnit-' + sizeInfo.unit)
+    });
+  }
+
   return {
     getStat: getStat,
-    getStats: getStats,
-    getFreeSpace: getFreeSpace
+    getFreeSpace: getFreeSpace,
+    showFormatedSize: showFormatedSize
   };
-
 })();
 
 /**
@@ -207,7 +254,15 @@ function bug344618_polyfill() {
   var range = document.createElement('input');
   range.type = 'range';
   if (range.type == 'range') {
+    // In some future version of gaia that will only be used with gecko v23+,
+    // we can remove the bug344618_polyfill stuff.
     console.warn("bug344618 has landed, there's some dead code to remove.");
+    var sel = 'label:not(.without_bug344618_polyfill) > input[type="range"]';
+    var ranges = document.querySelectorAll(sel);
+    for (var i = 0; i < ranges.length; i++) {
+      var label = ranges[i].parentNode;
+      label.classList.add('without_bug344618_polyfill');
+    }
     return; // <input type="range"> is already supported, early way out.
   }
 
@@ -260,8 +315,11 @@ function bug344618_polyfill() {
 
     // move the throbber to the proper position, according to mouse events
     var updatePosition = function updatePosition(event) {
+      var pointer = event.changedTouches && event.changedTouches[0] ?
+                    event.changedTouches[0] :
+                    event;
       var rect = slider.getBoundingClientRect();
-      var pos = (event.clientX - rect.left) / rect.width;
+      var pos = (pointer.clientX - rect.left) / rect.width;
       pos = Math.max(pos, 0);
       pos = Math.min(pos, 1);
       fill.style.width = (100 * pos) + '%';
@@ -285,6 +343,8 @@ function bug344618_polyfill() {
     var onDragMove = function onDragMove(event) {
       if (isDragging) {
         updatePosition(event);
+        // preventDefault prevents vertical scrolling
+        event.preventDefault();
       }
     };
     var onDragStop = function onDragStop(event) {
@@ -298,10 +358,16 @@ function bug344618_polyfill() {
       updatePosition(event);
       notify();
     };
-    slider.onmousedown = onClick;
-    thumb.onmousedown = onDragStart;
-    label.onmousemove = onDragMove;
-    label.onmouseup = onDragStop;
+
+    slider.addEventListener('mousedown', onClick);
+    slider.addEventListener('touchstart', onClick);
+    thumb.addEventListener('mousedown', onDragStart);
+    thumb.addEventListener('touchstart', onDragStart);
+    label.addEventListener('mousemove', onDragMove);
+    label.addEventListener('touchmove', onDragMove);
+    label.addEventListener('mouseup', onDragStop);
+    label.addEventListener('touchend', onDragStop);
+    label.addEventListener('touchcancel', onDragStop);
 
     // expose the 'refresh' method on <input>
     // XXX remember to call it after setting input.value manually...
@@ -329,8 +395,8 @@ var getMobileConnection = function() {
     return navigator.mozMobileConnection;
 
   var initialized = false;
-  var fakeICCInfo = { shortName: 'Fake Free-Mobile', mcc: 208, mnc: 15 };
-  var fakeNetwork = { shortName: 'Fake Orange F', mcc: 208, mnc: 1 };
+  var fakeICCInfo = { shortName: 'Fake Free-Mobile', mcc: '208', mnc: '15' };
+  var fakeNetwork = { shortName: 'Fake Orange F', mcc: '208', mnc: '1' };
   var fakeVoice = {
     state: 'notSearching',
     roaming: true,
@@ -361,149 +427,16 @@ var getMobileConnection = function() {
   };
 };
 
-// create a fake mozWifiManager if required (e.g. desktop browser)
-var getWifiManager = function() {
+var getBluetooth = function() {
   var navigator = window.navigator;
-  if ('mozWifiManager' in navigator)
-    return navigator.mozWifiManager;
-
-  /**
-   * fake network list, where each network object looks like:
-   * {
-   *   ssid              : SSID string (human-readable name)
-   *   bssid             : network identifier string
-   *   capabilities      : array of strings (supported authentication methods)
-   *   relSignalStrength : 0-100 signal level (integer)
-   *   connected         : boolean state
-   * }
-   */
-
-  var fakeNetworks = {
-    'Mozilla-G': {
-      ssid: 'Mozilla-G',
-      bssid: 'xx:xx:xx:xx:xx:xx',
-      capabilities: ['WPA-EAP'],
-      relSignalStrength: 67,
-      connected: false
-    },
-    'Livebox 6752': {
-      ssid: 'Livebox 6752',
-      bssid: 'xx:xx:xx:xx:xx:xx',
-      capabilities: ['WEP'],
-      relSignalStrength: 32,
-      connected: false
-    },
-    'Mozilla Guest': {
-      ssid: 'Mozilla Guest',
-      bssid: 'xx:xx:xx:xx:xx:xx',
-      capabilities: [],
-      relSignalStrength: 98,
-      connected: false
-    },
-    'Freebox 8953': {
-      ssid: 'Freebox 8953',
-      bssid: 'xx:xx:xx:xx:xx:xx',
-      capabilities: ['WPA2-PSK'],
-      relSignalStrength: 89,
-      connected: false
-    }
-  };
-
-  function getFakeNetworks() {
-    var request = { result: fakeNetworks };
-
-    setTimeout(function() {
-      if (request.onsuccess) {
-        request.onsuccess();
-      }
-    }, 1000);
-
-    return request;
-  }
-
+  if ('mozBluetooth' in navigator)
+    return navigator.mozBluetooth;
   return {
-    // true if the wifi is enabled
     enabled: false,
-    macAddress: 'xx:xx:xx:xx:xx:xx',
-
-    // enables/disables the wifi
-    setEnabled: function fakeSetEnabled(bool) {
-      var self = this;
-      var request = { result: bool };
-
-      setTimeout(function() {
-        if (request.onsuccess) {
-          request.onsuccess();
-        }
-        if (bool) {
-          self.onenabled();
-        } else {
-          self.ondisabled();
-        }
-      });
-
-      self.enabled = bool;
-      return request;
-    },
-
-    // returns a list of visible/known networks
-    getNetworks: getFakeNetworks,
-    getKnownNetworks: getFakeNetworks,
-
-    // selects a network
-    associate: function fakeAssociate(network) {
-      var self = this;
-      var connection = { result: network };
-      var networkEvent = { network: network };
-
-      setTimeout(function fakeConnecting() {
-        self.connection.network = network;
-        self.connection.status = 'connecting';
-        self.onstatuschange(networkEvent);
-      }, 0);
-
-      setTimeout(function fakeAssociated() {
-        self.connection.network = network;
-        self.connection.status = 'associated';
-        self.onstatuschange(networkEvent);
-      }, 1000);
-
-      setTimeout(function fakeConnected() {
-        network.connected = true;
-        self.connected = network;
-        self.connection.network = network;
-        self.connection.status = 'connected';
-        self.onstatuschange(networkEvent);
-      }, 2000);
-
-      return connection;
-    },
-
-    // forgets a network (disconnect)
-    forget: function fakeForget(network) {
-      var self = this;
-      var networkEvent = { network: network };
-
-      setTimeout(function() {
-        network.connected = false;
-        self.connected = null;
-        self.connection.network = null;
-        self.connection.status = 'disconnected';
-        self.onstatuschange(networkEvent);
-      }, 0);
-    },
-
-    // event listeners
+    addEventListener: function(type, callback, bubble) {},
     onenabled: function(event) {},
+    onadapteradded: function(event) {},
     ondisabled: function(event) {},
-    onstatuschange: function(event) {},
-
-    // returns a network object for the currently connected network (if any)
-    connected: null,
-
-    connection: {
-      status: 'disconnected',
-      network: null
-    }
+    getDefaultAdapter: function() {}
   };
 };

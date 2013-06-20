@@ -87,10 +87,9 @@ var ScreenManager = {
   _idleTimerId: 0,
 
   /*
-   * If the screen off is triggered by promixity during phon call then
-   * we need wake it up while phone is ended.
+   * To track the reason caused screen off?
    */
-  _screenOffByProximity: false,
+  _screenOffBy: null,
 
   /*
    * Request wakelock during in_call state.
@@ -110,20 +109,13 @@ var ScreenManager = {
 
     if (power) {
       power.addWakeLockListener(function scm_handleWakeLock(topic, state) {
-        switch (topic) {
-          case 'screen':
-            self._screenWakeLocked = (state == 'locked-foreground');
+        if (topic == 'screen') {
+          self._screenWakeLocked = (state == 'locked-foreground');
 
-            if (self._screenWakeLocked)
-              // Turn screen on if wake lock is acquire
-              self.turnScreenOn();
-            self._reconfigScreenTimeout();
-            break;
-
-          case 'cpu':
-            power.cpuSleepAllowed = (state != 'locked-foreground' &&
-                                     state != 'locked-background');
-            break;
+          if (self._screenWakeLocked)
+            // Turn screen on if wake lock is acquire
+            self.turnScreenOn();
+          self._reconfigScreenTimeout();
         }
       });
     }
@@ -199,6 +191,7 @@ var ScreenManager = {
         break;
 
       case 'sleep':
+        this._screenOffBy = 'powerkey';
         this.turnScreenOff(true);
         break;
 
@@ -207,7 +200,15 @@ var ScreenManager = {
         break;
 
       case 'userproximity':
-        this._screenOffByProximity = evt.near;
+        var telephony = window.navigator.mozTelephony;
+        if (Bluetooth.connected ||
+            telephony.speakerEnabled ||
+            StatusBar.headphonesActive)
+            // XXX: Remove this hack in Bug 868348
+            // We shouldn't access headset status from statusbar.
+          break;
+
+        this._screenOffBy = evt.near ? 'proximity' : '';
         if (evt.near) {
           this.turnScreenOff(true);
         } else {
@@ -218,12 +219,11 @@ var ScreenManager = {
       case 'callschanged':
         var telephony = window.navigator.mozTelephony;
         if (!telephony.calls.length) {
-          if (this._screenOffByProximity) {
+          if (this._screenOffBy == 'proximity') {
             this.turnScreenOn();
           }
 
           window.removeEventListener('userproximity', this);
-          this._screenOffByProximity = false;
 
           if (this._cpuWakeLock) {
            this._cpuWakeLock.unlock();
@@ -233,11 +233,11 @@ var ScreenManager = {
         }
 
         // If the _cpuWakeLock is already set we are in a multiple
-        // call setup, turning the screen on to let user see the
-        // notification.
+        // call setup, the user will be notified by a tone.
         if (this._cpuWakeLock) {
-          this.turnScreenOn();
-
+          // In case of user making an extra call, the attention screen
+          // may be hidden at top so we need to confirm it's shown again.
+          AttentionScreen.show();
           break;
         }
 
@@ -249,12 +249,13 @@ var ScreenManager = {
 
       case 'statechange':
         var call = evt.target;
-        if (call.state !== 'connected') {
+        if (call.state !== 'connected' && call.state !== 'alerting') {
           break;
         }
 
-        // The call is connected. Remove the statechange listener
-        // and enable the user proximity sensor.
+        // The call is connected (MT call) or alerting (MO call).
+        // Remove the statechange listener and enable the user proximity
+        // sensor.
         call.removeEventListener('statechange', this);
 
         this._cpuWakeLock = navigator.requestWakeLock('cpu');
@@ -265,6 +266,9 @@ var ScreenManager = {
 
   toggleScreen: function scm_toggleScreen() {
     if (this.screenEnabled) {
+      // Currently there is no one used toggleScreen, so just set reason as
+      // toggle. If it is used by someone in the future, we can rename it.
+      this._screenOffBy = 'toggle';
       this.turnScreenOff();
     } else {
       this.turnScreenOn();
@@ -281,9 +285,9 @@ var ScreenManager = {
     // we turn the screen back on.
     self._savedBrightness = navigator.mozPower.screenBrightness;
 
-    // Remove the cpuWakeLock if screen is not turned off by
-    // userproximity event.
-    if (!this._screenOffByProximity && this._cpuWakeLock) {
+    // Remove the cpuWakeLock and listening of proximity event, if screen is
+    // turned off by power key.
+    if (this._cpuWakeLock != null && this._screenOffBy == 'powerkey') {
       window.removeEventListener('userproximity', this);
       this._cpuWakeLock.unlock();
       this._cpuWakeLock = null;
@@ -314,9 +318,7 @@ var ScreenManager = {
     };
 
     if (instant) {
-      if (!WindowManager.isFtuRunning()) {
-        screenOff();
-      }
+      screenOff();
       return true;
     }
 
@@ -333,6 +335,7 @@ var ScreenManager = {
   },
 
   turnScreenOn: function scm_turnScreenOn(instant) {
+    this._screenOffBy = '';
     if (this.screenEnabled) {
       if (this._inTransition) {
         // Cancel the dim out
@@ -388,12 +391,12 @@ var ScreenManager = {
       this._setIdleTimeout(10, true);
       var self = this;
       var stopShortIdleTimeout = function scm_stopShortIdleTimeout() {
-        window.removeEventListener('unlock', stopShortIdleTimeout);
+        window.removeEventListener('will-unlock', stopShortIdleTimeout);
         window.removeEventListener('lockpanelchange', stopShortIdleTimeout);
         self._setIdleTimeout(self._idleTimeout, false);
       };
 
-      window.addEventListener('unlock', stopShortIdleTimeout);
+      window.addEventListener('will-unlock', stopShortIdleTimeout);
       window.addEventListener('lockpanelchange', stopShortIdleTimeout);
     } else {
       this._setIdleTimeout(this._idleTimeout, false);
@@ -482,6 +485,7 @@ var ScreenManager = {
 
     var self = this;
     var idleCallback = function idle_proxy() {
+      self._screenOffBy = 'idle_timeout';
       self.turnScreenOff(instant);
     };
     var activeCallback = function active_proxy() {

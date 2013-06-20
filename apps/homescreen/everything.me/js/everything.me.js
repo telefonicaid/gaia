@@ -27,7 +27,8 @@ var EverythingME = {
       });
 
       EverythingME.load(function success() {
-        EvmeFacade.onShow();
+        if (EverythingME.displayed)
+          EvmeFacade.onShow();
         var loadingOverlay = document.querySelector('#loading-overlay');
         loadingOverlay.style.opacity = 0;
         setTimeout(function starting() {
@@ -81,16 +82,16 @@ var EverythingME = {
                     'modules/Apps/Apps.js',
                     'modules/BackgroundImage/BackgroundImage.js',
                     'modules/Banner/Banner.js',
-                    'modules/Dialog/Dialog.js',
                     'modules/Location/Location.js',
                     'modules/Shortcuts/Shortcuts.js',
                     'modules/ShortcutsCustomize/ShortcutsCustomize.js',
                     'modules/Searchbar/Searchbar.js',
                     'modules/SearchHistory/SearchHistory.js',
                     'modules/Helper/Helper.js',
-                    'modules/Tip/Tip.js',
                     'modules/ConnectionMessage/ConnectionMessage.js',
                     'modules/SmartFolder/SmartFolder.js',
+                    'modules/Tasker/Tasker.js',
+                    'modules/Features/Features.js',
                     'js/helpers/Storage.js',
                     'js/plugins/Scroll.js',
                     'js/external/uuid.js',
@@ -104,13 +105,10 @@ var EverythingME = {
                      'modules/Apps/Apps.css',
                      'modules/BackgroundImage/BackgroundImage.css',
                      'modules/Banner/Banner.css',
-                     'modules/Dialog/Dialog.css',
                      'modules/Shortcuts/Shortcuts.css',
                      'modules/ShortcutsCustomize/ShortcutsCustomize.css',
                      'modules/Searchbar/Searchbar.css',
-                     'modules/SearchHistory/SearchHistory.css',
                      'modules/Helper/Helper.css',
-                     'modules/Tip/Tip.css',
                      'modules/ConnectionMessage/ConnectionMessage.css',
                      'modules/SmartFolder/SmartFolder.css'];
     var head = document.head;

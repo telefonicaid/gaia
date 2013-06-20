@@ -12,15 +12,89 @@ window.onload = function() {
   var activity;
   var blob;
   var url;
+  var gestureDetector = new GestureDetector(preview);
+  // position of the image while dragging
+  var posX = 0;
+  var posY = 0;
+  // maximum number of pixel we can drag the image
+  var limitX;
+  var limitY;
+  var scale;
+  var previewImage = document.getElementById('previewImage');
 
   function startShare(request) {
+    cancelButton.addEventListener('click', cancelShare);
+
+    gestureDetector.startDetecting();
+
     activity = request;
     blob = activity.source.data.blobs[0];
     url = URL.createObjectURL(blob);
 
-    preview.style.backgroundImage = 'url(' + url + ')';
-    setButton.addEventListener('click', setWallpaper);
-    cancelButton.addEventListener('click', cancelShare);
+    previewImage.onload = function() {
+      var scalex = window.innerWidth / previewImage.width;
+      var scaley = window.innerHeight / previewImage.height;
+
+      scale = Math.max(scalex, scaley);
+
+      previewImage.width = previewImage.width * scale;
+
+      limitX = window.innerWidth - previewImage.width;
+      limitY = window.innerHeight - previewImage.height;
+
+      posX = Math.round(limitX / 2);
+      posY = Math.round(limitY / 2);
+      previewImage.style.transform =
+        'translate(' + posX + 'px, ' + posY + 'px)';
+
+      setButton.addEventListener('click', scaleImage);
+      previewImage.addEventListener('pan', moveBackground);
+    };
+
+    previewImage.src = url;
+  }
+
+  function moveBackground(evt) {
+    var positions = evt.detail.relative;
+
+    posX += positions.dx;
+    if (posX > 0) {
+      posX = 0;
+    } else if (posX < limitX) {
+      posX = limitX;
+    }
+
+    posY += positions.dy;
+    if (posY > 0) {
+      posY = 0;
+    } else if (posY < limitY) {
+      posY = limitY;
+    }
+
+    previewImage.style.transform = 'translate(' + posX + 'px, ' + posY + 'px)';
+  }
+
+  function scaleImage() {
+      var canvas = document.createElement('canvas');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      var ctx = canvas.getContext('2d');
+
+      var w = Math.round(canvas.width / scale);
+      var h = Math.round(canvas.height / scale);
+      var x = Math.round(-1 * posX / scale);
+      var y = Math.round(-1 * posY / scale);
+
+      ctx.drawImage(
+        previewImage,
+        x, y, w, h,
+        0, 0, canvas.width, canvas.height
+      );
+
+      canvas.toBlob(function(newBlob) {
+        blob = newBlob;
+        setWallpaper();
+      }, 'image/jpeg');
   }
 
   function setWallpaper() {
@@ -54,7 +128,8 @@ window.onload = function() {
 
   function endShare() {
     activity = null;
-    URL.revokeObjectURL(url);
+    window.URL.revokeObjectURL(url);
+    window.URL.revokeObjectURL(previewImage.src);
     setButton.removeEventListener('click', setWallpaper);
     cancelButton.removeEventListener('click', cancelShare);
   }

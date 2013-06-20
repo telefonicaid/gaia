@@ -1,12 +1,11 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('timespan.js');
-  requireLib('utils/overlap.js');
-  requireLib('utils/ordered_map.js');
-  requireLib('templates/day.js');
-  requireLib('views/day_based.js');
-});
+requireLib('querystring.js');
+requireLib('timespan.js');
+requireLib('utils/overlap.js');
+requireLib('utils/ordered_map.js');
+requireLib('templates/day.js');
+requireLib('views/day_based.js');
 
-suite('views/day_based', function() {
+suiteGroup('Views.DayBased', function() {
 
   var OrderedMap;
 
@@ -275,6 +274,14 @@ suite('views/day_based', function() {
       assert.equal(el.style.height, '325%', 'height');
     });
 
+    test('cross the next day', function() {
+      var endDate = new Date(2012, 0, 2, 11, 00);
+      var busy = record(time(23, 00), endDate);
+      subject._assignPosition(busy, el);
+
+      assert.ok(!el.style.top, 'no top');
+      assert.equal(el.style.height, '100%', 'height');
+    });
   });
 
   suite('#_createRecord', function() {
@@ -697,6 +704,88 @@ suite('views/day_based', function() {
         'should have rendered:' + hour
       );
     }
+  });
+
+  suite('#_onHourClick', function() {
+    var startDate, endDate;
+
+    setup(function() {
+      var time = subject.date.getTime();
+      this.sinon.stub(subject.date, 'getTime').returns(time);
+      startDate = new Date(time);
+      startDate.setHours(0);
+      startDate.setMinutes(0);
+      startDate.setSeconds(0);
+
+      endDate = new Date(time);
+      endDate.setHours(0);
+      endDate.setMinutes(0);
+      endDate.setSeconds(0);
+    });
+
+    teardown(function() {
+      subject.date.getTime.restore();
+    });
+
+    test('should not redirect if we clicked on an event', function() {
+      var clickedOnEvent = this.sinon.stub(subject, '_clickedOnEvent');
+      clickedOnEvent.returns(true);
+      var expectation = this.sinon.mock(subject.app).expects('go');
+      expectation.never();
+
+      subject._onHourClick({});
+
+      expectation.verify();
+      clickedOnEvent.restore();
+    });
+
+    test('should redirect and set urlparams if all day', function() {
+      var clickedOnEvent = this.sinon.stub(subject, '_clickedOnEvent');
+      clickedOnEvent.returns(false);
+      endDate.setDate(startDate.getDate() + 1);
+      var expectation =
+        this.sinon.mock(subject.app)
+          .expects('go')
+          .withArgs('/event/add/?' + Calendar.QueryString.stringify({
+            isAllDay: true,
+            startDate: startDate.toString(),
+            endDate: endDate.toString()
+          }));
+      expectation.once();
+
+      subject._onHourClick({}, {
+        getAttribute: function(key) {
+          return Calendar.Calc.ALLDAY;
+        }
+      });
+
+      expectation.verify();
+      clickedOnEvent.restore();
+    });
+
+    test('should redirect and set urlparams if not all day', function() {
+      var clickedOnEvent = this.sinon.stub(subject, '_clickedOnEvent');
+      clickedOnEvent.returns(false);
+      startDate.setHours(5);
+      endDate.setHours(6);
+      var expectation =
+        this.sinon.mock(subject.app)
+          .expects('go')
+          .withArgs('/event/add/?' + Calendar.QueryString.stringify({
+            startDate: startDate.toString(),
+            endDate: endDate.toString()
+          }));
+      expectation.once();
+
+      subject._onHourClick({}, {
+        getAttribute: function(key) {
+          return '5';
+        }
+      });
+
+      expectation.verify();
+      clickedOnEvent.restore();
+    });
   });
 
   suite('activate/deactivate', function() {

@@ -15,6 +15,7 @@ Calendar.ns('Views').ModifyEvent = (function() {
 
     selectors: {
       element: '#modify-event-view',
+      alarmList: '#modify-event-view .alarms',
       form: '#modify-event-view form',
       status: '#modify-event-view section[role="status"]',
       errors: '#modify-event-view .errors',
@@ -31,6 +32,7 @@ Calendar.ns('Views').ModifyEvent = (function() {
       var calendars = this.app.store('Calendar');
 
       calendars.on('add', this._addCalendarId.bind(this));
+      calendars.on('preRemove', this._removeCalendarId.bind(this));
       calendars.on('remove', this._removeCalendarId.bind(this));
       calendars.on('update', this._updateCalendarId.bind(this));
 
@@ -40,12 +42,14 @@ Calendar.ns('Views').ModifyEvent = (function() {
 
       var allday = this.getEl('allday');
       allday.addEventListener('change', this._toggleAllDay);
+
+      this.alarmList.addEventListener('change', this._changeAlarm.bind(this));
     },
 
     /**
      * Fired when the allday checkbox changes.
      */
-    _toggleAllDay: function() {
+    _toggleAllDay: function(e) {
       var allday = this.getEl('allday').checked;
 
       if (allday) {
@@ -55,27 +59,82 @@ Calendar.ns('Views').ModifyEvent = (function() {
         // disable case
         this.element.classList.remove(this.ALLDAY);
       }
+
+      // because of race conditions it is theoretically possible
+      // for the user to check/uncheck this value
+      // when we don't actually have a model loaded.
+      if (this.event) {
+        this.event.isAllDay = !!allday;
+      }
+
+      // Reset alarms if we come from a user event
+      if (e) {
+        this.event.alarms = [];
+        this.updateAlarms(allday);
+      }
+    },
+
+    /**
+     * Called when any alarm is changed
+     */
+    _changeAlarm: function(e) {
+      var template = Calendar.Templates.Alarm;
+      if (e.target.value == 'none') {
+        var parent = e.target.parentNode;
+        parent.parentNode.removeChild(parent);
+        return;
+      }
+
+      // Append a new alarm select only if we don't have an empty one
+      var allAlarms = this.element.querySelectorAll('[name="alarm[]"]');
+      for (var i = 0, alarmEl; alarmEl = allAlarms[i]; i++) {
+        if (alarmEl.value == 'none') {
+          return;
+        }
+      }
+
+      var newAlarm = document.createElement('div');
+      newAlarm.innerHTML = template.picker.render({
+        layout: this.event.isAllDay ? 'allday' : 'standard'
+      });
+      this.alarmList.appendChild(newAlarm);
+    },
+
+    /**
+     * Check if current event has been stored in the database
+     */
+    isSaved: function() {
+        return !!this.provider;
     },
 
     /**
      * Build the initial list of calendar ids.
      */
-    _buildCalendarIds: function() {
-      var calendars = this.app.store('Calendar');
-      var list = calendars.findWithCapability('createEvent');
-      var element = this.getEl('calendarId');
-      var option;
-      var cal;
-      var len = list.length;
-      var i = 0;
+    onfirstseen: function() {
+      var calendarStore = this.app.store('Calendar');
+      calendarStore.all(function(err, calendars) {
+        if (err) {
+          console.log('Could not build list of calendars');
+          return;
+        }
 
-      for (; i < len; i++) {
-        cal = list[i];
-        option = document.createElement('option');
-        option.value = cal._id;
-        option.text = cal.name;
-        element.add(option);
-      }
+        var pending = 0;
+        var self = this;
+
+        function next() {
+          if (!--pending) {
+            if (self.onafteronfirstseen) {
+              self.onafteronfirstseen();
+            }
+          }
+        }
+
+        for (var id in calendars) {
+          pending++;
+          this._addCalendarId(id, calendars[id], next);
+        }
+
+      }.bind(this));
     },
 
     /**
@@ -88,19 +147,26 @@ Calendar.ns('Views').ModifyEvent = (function() {
       var element = this.getEl('calendarId');
       var option = element.querySelector('[value="' + id + '"]');
       var store = this.app.store('Calendar');
-      var provider = store.providerFor(calendar);
-      var caps = provider.calendarCapabilities(
-        calendar
-      );
 
-      if (!caps.canCreateEvent) {
-        this._removeCalendarId(id);
-        return;
-      }
+      store.providerFor(calendar, function(err, provider) {
+        var caps = provider.calendarCapabilities(
+          calendar
+        );
 
-      if (option) {
-        option.text = calendar.name;
-      }
+        if (!caps.canCreateEvent) {
+          this._removeCalendarId(id);
+          return;
+        }
+
+        if (option) {
+          option.text = calendar.remote.name;
+        }
+
+
+        if (this.oncalendarupdate) {
+          this.oncalendarupdate(calendar);
+        }
+      }.bind(this));
     },
 
     /**
@@ -109,20 +175,36 @@ Calendar.ns('Views').ModifyEvent = (function() {
      * @param {String} id calendar id.
      * @param {Calendar.Model.Calendar} calendar calendar to add.
      */
-    _addCalendarId: function(id, calendar) {
+    _addCalendarId: function(id, calendar, callback) {
       var store = this.app.store('Calendar');
-      var provider = store.providerFor(calendar);
-      var caps = provider.calendarCapabilities(
-        calendar
-      );
+      store.providerFor(calendar, function(err, provider) {
+        var caps = provider.calendarCapabilities(
+          calendar
+        );
 
-      var option;
-      var element = this.getEl('calendarId');
+        if (!caps.canCreateEvent) {
+          if (callback) {
+            Calendar.nextTick(callback);
+          }
+          return;
+        }
 
-      option = document.createElement('option');
-      option.text = calendar.name;
-      option.value = id;
-      element.add(option);
+        var option;
+        var element = this.getEl('calendarId');
+
+        option = document.createElement('option');
+        option.text = calendar.remote.name;
+        option.value = id;
+        element.add(option);
+
+        if (callback) {
+          Calendar.nextTick(callback);
+        }
+
+        if (this.onaddcalendar) {
+          this.onaddcalendar(calendar);
+        }
+      }.bind(this));
     },
 
     /**
@@ -135,7 +217,11 @@ Calendar.ns('Views').ModifyEvent = (function() {
 
       var option = element.querySelector('[value="' + id + '"]');
       if (option) {
-        option.parentNode.remove(option);
+        element.removeChild(option);
+      }
+
+      if (this.onremovecalendar) {
+        this.onremovecalendar(id);
       }
     },
 
@@ -154,6 +240,10 @@ Calendar.ns('Views').ModifyEvent = (function() {
       }
     },
 
+    get alarmList() {
+      return this._findElement('alarmList');
+    },
+
     get form() {
       return this._findElement('form');
     },
@@ -167,7 +257,7 @@ Calendar.ns('Views').ModifyEvent = (function() {
     },
 
     /**
-     * Ask the provider to an event:
+     * Ask the provider to persist an event:
      *
      *  1. update the model with form data
      *
@@ -199,23 +289,42 @@ Calendar.ns('Views').ModifyEvent = (function() {
       if (!data.calendarId)
         return;
 
-      // now that the model has a calendar id we can find the model
-      var provider = this.store.providerFor(this.event);
-      var eventCaps = provider.eventCapabilities(this.event.data);
+      var self = this;
+      var provider;
 
-      // safe-guard but should not ever happen.
-      if (eventCaps[capability]) {
-        var list = this.element.classList;
-        var self = this;
+      this.store.providerFor(this.event, fetchProvider);
+
+      function fetchProvider(err, result) {
+        provider = result;
+        provider.eventCapabilities(
+          self.event.data,
+          verifyCaps
+        );
+      }
+
+      function verifyCaps(err, caps) {
+        if (err) {
+          console.log('Error fetching capabilities for', self.event);
+          return;
+        }
+
+        // safe-guard but should not ever happen.
+        if (caps[capability]) {
+          persistEvent();
+        }
+      }
+
+      function persistEvent() {
+        var list = self.element.classList;
         var redirectTo;
 
         // mark view as 'in progress' so we can style
         // it via css during that time period
-        list.add(this.PROGRESS);
+        list.add(self.PROGRESS);
 
-        var moveDate = this.event.startDate;
+        var moveDate = self.event.startDate;
 
-        provider[method](this.event.data, function(err) {
+        provider[method](self.event.data, function(err) {
           list.remove(self.PROGRESS);
 
           if (err) {
@@ -229,10 +338,16 @@ Calendar.ns('Views').ModifyEvent = (function() {
           // of the dom elements so selectedDay must come after.
           self.app.timeController.selectedDay = moveDate;
 
-          // If we are updating an event, return to the event view
-          if (method == 'updateEvent') {
-            var busytimeId = self.store.busytimeIdFor(self.event);
-            self._returnTo = '/event/show/' + busytimeId + '/';
+          if (method === 'updateEvent') {
+            // If we edit a view our history stack looks like:
+            //   /week -> /event/view -> /event/save -> /event/view
+            // We need to return all the way to the top of the stack
+            // We can remove this once we have a history stack
+            self.app.view('ViewEvent', function(view) {
+              self.app.go(view.returnTop());
+            });
+
+            return;
           }
 
           self.app.go(self.returnTo());
@@ -248,15 +363,10 @@ Calendar.ns('Views').ModifyEvent = (function() {
         event.preventDefault();
       }
 
-      if (this.provider) {
-        var caps = this.provider.eventCapabilities(this.event.data);
-        // XXX: unlike the save we don't wait for the transaction
-        // to complete before moving on. Providers (should) take
-        // action to remove the event from the display instantly
-        // then queue a async action to actually remove the whole event.
-        if (caps.canDelete) {
-          var self = this;
-          this.provider.deleteEvent(this.event.data, function(err) {
+      if (this.isSaved()) {
+        var self = this;
+        function handleDelete() {
+          self.provider.deleteEvent(self.event.data, function(err) {
             if (err) {
               self.showErrors(err);
               return;
@@ -271,6 +381,17 @@ Calendar.ns('Views').ModifyEvent = (function() {
             });
           });
         }
+
+        this.provider.eventCapabilities(this.event.data, function(err, caps) {
+          if (err) {
+            console.log('Error fetching event capabilities', this.event);
+            return;
+          }
+
+          if (caps.canDelete) {
+            handleDelete();
+          }
+        });
       }
     },
 
@@ -283,9 +404,9 @@ Calendar.ns('Views').ModifyEvent = (function() {
       }
 
       // Disable the button on primary event to avoid race conditions
-      this.primaryButton.setAttribute('aria-disabled', 'true');
+      this.disablePrimary();
 
-      if (this.provider) {
+      if (this.isSaved()) {
         this._persistEvent('updateEvent', 'canUpdate');
       } else {
         this._persistEvent('createEvent', 'canCreate');
@@ -296,7 +417,7 @@ Calendar.ns('Views').ModifyEvent = (function() {
      * Enlarges focus areas for .button controls
      */
     focusHandler: function(e) {
-      var input = e.target.querySelector('input');
+      var input = e.target.querySelector('input, select');
       if (input && e.target.classList.contains('button')) {
         input.focus();
       }
@@ -349,15 +470,74 @@ Calendar.ns('Views').ModifyEvent = (function() {
         );
       }
 
+      var alarms = this.element.querySelectorAll('[name="alarm[]"]');
+      fields.alarms = [];
+      for (var i = 0, alarm; alarm = alarms[i]; i++) {
+        if (alarm.value == 'none') { continue; }
+
+        fields.alarms.push({
+          action: 'DISPLAY',
+          trigger: parseInt(alarm.value, 10)
+        });
+
+      }
+
       return fields;
+    },
+
+    enablePrimary: function() {
+      this.primaryButton.removeAttribute('aria-disabled');
+    },
+
+    disablePrimary: function() {
+      this.primaryButton.setAttribute('aria-disabled', 'true');
     },
 
     /**
      * Re-enable the primary button when we show errors
      */
     showErrors: function() {
-      this.primaryButton.removeAttribute('aria-disabled');
+      this.enablePrimary();
       Calendar.Views.EventBase.prototype.showErrors.apply(this, arguments);
+    },
+
+    /**
+     * Read the urlparams and override stuff on our event model.
+     * @param {string} search Optional string of the form ?foo=bar&cat=dog.
+     * @private
+     */
+    _overrideEvent: function(search) {
+      search = search || window.location.search;
+      if (!search || search.length === 0) {
+        return;
+      }
+
+      // Remove the question mark that begins the search.
+      if (search.substr(0, 1) === '?') {
+        search = search.substr(1, search.length - 1);
+      }
+
+      // Parse the urlparams.
+      var params = Calendar.QueryString.parse(search);
+      for (var field in params) {
+        var value = params[field];
+        switch (field) {
+          case ModifyEvent.OverrideableField.START_DATE:
+          case ModifyEvent.OverrideableField.END_DATE:
+            params[field] = new Date(value);
+            break;
+          default:
+            params[field] = value;
+            break;
+        }
+      }
+
+      // Override fields on our event.
+      var model = this.event;
+      for (var field in ModifyEvent.OverrideableField) {
+        var value = ModifyEvent.OverrideableField[field];
+        model[value] = params[value] || model[value];
+      }
     },
 
     /**
@@ -370,14 +550,12 @@ Calendar.ns('Views').ModifyEvent = (function() {
      * Resets any value on the current form.
      */
     _updateUI: function() {
-      var model = this.event;
-
+      this._overrideEvent();
       this.form.reset();
 
+      var model = this.event;
       this.getEl('title').value = model.title;
-
       this.getEl('location').value = model.location;
-
       var dateSrc = model;
       if (model.remote.isRecurring && this.busytime) {
         dateSrc = this.busytime;
@@ -390,21 +568,28 @@ Calendar.ns('Views').ModifyEvent = (function() {
       var allday = this.getEl('allday');
       if (allday && (allday.checked = model.isAllDay)) {
         this._toggleAllDay();
-
         endDate = this.formatEndDate(endDate);
       }
 
       this.getEl('startDate').value =
         InputParser.exportDate(startDate);
+      this._updateDateTimeLocale(
+        'date', 'startDate', 'start-date-locale', startDate);
 
       this.getEl('endDate').value =
         InputParser.exportDate(endDate);
+      this._updateDateTimeLocale(
+        'date', 'endDate', 'end-date-locale', endDate);
 
       this.getEl('startTime').value =
         InputParser.exportTime(startDate);
+      this._updateDateTimeLocale(
+        'time', 'startTime', 'start-time-locale', startDate);
 
       this.getEl('endTime').value =
         InputParser.exportTime(endDate);
+      this._updateDateTimeLocale(
+        'time', 'endTime', 'end-time-locale', endDate);
 
       this.getEl('description').textContent =
         model.description;
@@ -416,10 +601,99 @@ Calendar.ns('Views').ModifyEvent = (function() {
       // calendar display
       var currentCalendar = this.getEl('currentCalendar');
 
-      var calendar = this.store.calendarFor(model);
-      if (calendar) {
-        currentCalendar.value = calendar.name;
+      if (this.originalCalendar) {
+        currentCalendar.value =
+          this.originalCalendar.remote.name;
+
         currentCalendar.readOnly = true;
+      }
+
+      this.updateAlarms(model.isAllDay);
+    },
+
+    /**
+     * Handling a layer over <input> to have localized
+     * date/time
+     */
+    _updateDateTimeLocale: function(type, date, target, value) {
+      var _ = navigator.mozL10n.get;
+      var localeFormat = Calendar.App.dateFormat.localeFormat;
+
+      var _formats = {
+        date: _('dateTimeFormat_%x'),
+        time: _('shortTimeFormat')
+      };
+
+      var targetElement = document.getElementById(target);
+      if (!targetElement)
+        return;
+
+      targetElement.textContent = localeFormat(
+        value, _formats[type]);
+
+      this.getEl(date).addEventListener('input', function(e) {
+        var selected;
+        var newDate = new Date();
+
+        if (type == 'date') {
+          selected = InputParser.importDate(e.target.value);
+          newDate.setFullYear(selected.year);
+          newDate.setMonth(selected.month);
+          newDate.setDate(selected.date);
+        }
+        if (type == 'time') {
+          selected = InputParser.importTime(e.target.value);
+          newDate.setHours(selected.hours);
+          newDate.setMinutes(selected.minutes);
+          newDate.setSeconds(0);
+        }
+
+        targetElement.textContent = localeFormat(
+          newDate, _formats[type]);
+      });
+    },
+
+    /**
+     * Called on render or when toggling an all-day event
+     */
+    updateAlarms: function(isAllDay, callback) {
+      var template = Calendar.Templates.Alarm;
+      var alarms = [];
+
+      // Used to make sure we don't duplicate alarms
+      var alarmMap = {};
+
+      if (this.event.alarms) {
+        for (var i = 0, alarm; alarm = this.event.alarms[i]; i++) {
+          alarmMap[alarm.trigger] = true;
+          alarm.layout = isAllDay ? 'allday' : 'standard';
+          alarms.push(alarm);
+        }
+      }
+
+      var settings = this.app.store('Setting');
+      var layout = isAllDay ? 'allday' : 'standard';
+      settings.getValue(layout + 'AlarmDefault', next.bind(this));
+
+      function next(err, value) {
+        if (!this.isSaved() && !alarmMap[value] && !this.event.alarms.length) {
+          alarms.push({
+            layout: layout,
+            trigger: value
+          });
+        }
+
+        if (value !== 'none') {
+          alarms.push({
+            layout: layout
+          });
+        }
+
+        this.alarmList.innerHTML = template.picker.renderEach(alarms).join('');
+
+        if (callback) {
+          callback();
+        }
       }
     },
 
@@ -443,18 +717,30 @@ Calendar.ns('Views').ModifyEvent = (function() {
       this.event = null;
       this.busytime = null;
 
+      this.alarmList.innerHTML = '';
+
       this.form.reset();
     },
 
     oninactive: function() {
       Calendar.Views.EventBase.prototype.oninactive.apply(this, arguments);
       this.reset();
-    },
-
-    onfirstseen: function() {
-      this._buildCalendarIds();
     }
 
+  };
+
+  /**
+   * The fields on our event model which urlparams may override.
+   * @enum {string}
+   */
+  ModifyEvent.OverrideableField = {
+    CALENDAR_ID: 'calendarId',
+    DESCRIPTION: 'description',
+    END_DATE: 'endDate',
+    IS_ALL_DAY: 'isAllDay',
+    LOCATION: 'location',
+    START_DATE: 'startDate',
+    TITLE: 'title'
   };
 
   return ModifyEvent;

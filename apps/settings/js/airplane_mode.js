@@ -57,7 +57,7 @@ var AirplaneMode = {
 
   init: function apm_init() {
     var mobileConnection = getMobileConnection();
-    var wifiManager = getWifiManager();
+    var wifiManager = WifiHelper.getWifiManager();
 
     var settings = Settings.mozSettings;
     if (!settings)
@@ -113,16 +113,12 @@ var AirplaneMode = {
     var restoreWifi = false;
     var restoreGeolocation = false;
 
-    settings.addObserver('ril.radio.disabled', function(value) {
-
-      self.status = value;
-
+    settings.addObserver('ril.radio.disabled', function(e) {
       // Reset notification params
       self._ops = 0;
       self._doNotify = true;
 
-      if (value) {
-
+      if (e.settingValue) {
         if (mobileConnection) {
           restoreMobileData = mobileDataEnabled;
           if (mobileDataEnabled)

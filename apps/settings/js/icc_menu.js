@@ -8,19 +8,24 @@
     if (!iccCommand)
       return;
 
+    // Clear cache
+    var reqIccData = window.navigator.mozSettings.createLock().set({
+      'icc.data': null
+    });
+    reqIccData.onsuccess = function icc_getIccData() {
+      debug('ICC Cache cleared');
+    };
+
     // Open ICC section
     debug('ICC command to execute: ', iccCommand);
-    var page = document.location.protocol + '//' +
-      document.location.host + '/index.html#icc';
-    debug('page: ', page);
-    window.location.replace(page);
+    Settings.currentPanel = '#icc';
 
     setTimeout(function() {
       var event = new CustomEvent('stkasynccommand', {
         detail: { 'command': iccCommand }
       });
       window.dispatchEvent(event);
-    });
+    }, 2000);
   }
 
   setTimeout(function updateStkMenu() {

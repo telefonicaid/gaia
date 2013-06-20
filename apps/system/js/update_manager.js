@@ -19,7 +19,8 @@ var UpdateManager = {
   _errorTimeout: null,
   _wifiLock: null,
   _systemUpdateDisplayed: false,
-  _isDataConnectionWarningDialogEnabled: true,
+  _dataConnectionWarningEnabled: true,
+  _startedDownloadUsingDataConnection: false,
   _settings: null,
   NOTIFICATION_BUFFERING_TIMEOUT: 30 * 1000,
   TOASTER_TIMEOUT: 1200,
@@ -102,29 +103,23 @@ var UpdateManager = {
     this.updateWifiStatus();
     this.updateOnlineStatus();
 
-    window.asyncStorage.
-      getItem('gaia.system.isDataConnectionWarningDialogEnabled',
-      (function(value) {
-        value = value || true;
-        this._isDataConnectionWarningDialogEnabled = true;
-        this.downloadDialog.dataset.dataConnectionInlineWarning = !value;
-    }).bind(this));
+    // Always display the warning after users reboot the phone.
+    this._dataConnectionWarningEnabled = true;
+    this.downloadDialog.dataset.dataConnectionInlineWarning = false;
   },
 
   requestDownloads: function um_requestDownloads(evt) {
     evt.preventDefault();
 
     if (evt.target == this.downloadViaDataConnectionButton) {
-      window.asyncStorage.
-        setItem('gaia.system.isDataConnectionWarningDialogEnabled', false);
-      this._isDataConnectionWarningDialogEnabled = false;
-      this.downloadDialog.dataset.dataConnectionInlineWarning = true;
+      this._startedDownloadUsingDataConnection = true;
       this.startDownloads();
     } else {
-      if (this._isDataConnectionWarningDialogEnabled &&
+      if (this._dataConnectionWarningEnabled &&
           this.downloadDialog.dataset.nowifi === 'true') {
         this.downloadViaDataConnectionDialog.classList.add('visible');
       } else {
+        this._startedDownloadUsingDataConnection = false;
         this.startDownloads();
       }
     }
@@ -267,6 +262,7 @@ var UpdateManager = {
     }, this);
 
     this.downloadDialog.classList.add('visible');
+    this.updateDownloadButton();
   },
 
   updateDownloadButton: function() {
@@ -304,6 +300,14 @@ var UpdateManager = {
     if (bytes > 0) {
       this._downloadedBytes += bytes;
       this.render();
+    }
+  },
+
+  downloaded: function um_downloaded(udatable) {
+    if (this._startedDownloadUsingDataConnection) {
+      this._startedDownloadUsingDataConnection = false;
+      this._dataConnectionWarningEnabled = false;
+      this.downloadDialog.dataset.dataConnectionInlineWarning = true;
     }
   },
 
@@ -382,7 +386,8 @@ var UpdateManager = {
     this.updatesQueue.push(updatable);
 
     if (this._notificationTimeout === null) {
-      this._notificationTimeout = setTimeout(this.displayNotificationAndToaster.bind(this),
+      this._notificationTimeout = setTimeout(
+        this.displayNotificationAndToaster.bind(this),
         this.NOTIFICATION_BUFFERING_TIMEOUT);
     }
     this.render();

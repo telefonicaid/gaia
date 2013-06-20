@@ -13,7 +13,10 @@
     "settings":{ "access": "readwrite" },
     "device-storage:pictures":{ "access": "readonly" },
     "open-remote-window":{},
-    "geolocation": {}
+    "storage":{},
+    "geolocation": {},
+    "alarms": {},
+    "power":{}
   },
   "locales": {
     "ar": {
@@ -34,6 +37,9 @@
     }
   },
   "default_locale": "en-US",
+  "icons": {
+    "30": "/style/icons/HomeScreen.png"
+  },
   "orientation": "portrait-primary",
   "activities": {
     "save-bookmark": {
@@ -45,5 +51,8 @@
       "href": "/save-bookmark.html",
       "returnValue": true
     }
-  }
+  },
+  "messages": [
+    { "alarm": "/index.html" }
+  ]
 }

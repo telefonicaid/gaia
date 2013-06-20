@@ -1,7 +1,7 @@
 
 'use strict';
 
-const Homescreen = (function() {
+var Homescreen = (function() {
   var mode = 'normal';
   var origin = document.location.protocol + '//homescreen.' +
     document.location.host.replace(/(^[\w\d]+.)?([\w\d]+.[a-z]+)/, '$2');
@@ -13,39 +13,48 @@ const Homescreen = (function() {
   });
 
   var initialized = false, landingPage;
-
-  // Initialize the various components.
-  PaginationBar.init('.paginationScroller');
+  onConnectionChange(navigator.onLine);
 
   function initialize(lPage) {
     if (initialized) {
       return;
     }
 
+    PaginationBar.init('.paginationScroller');
+
     initialized = true;
     landingPage = lPage;
 
-    window.addEventListener('hashchange', function() {
-      if (document.location.hash != '#root')
-        return;
+    var swipeSection = Configurator.getSection('swipe');
+    var options = {
+      gridSelector: '.apps',
+      dockSelector: '.dockWrapper',
+      tapThreshold: Configurator.getSection('tap_threshold'),
+      // It defines the threshold to consider a gesture like a swipe. Number
+      // in the range 0.0 to 1.0, both included, representing the screen width
+      swipeThreshold: swipeSection.threshold,
+      swipeFriction: swipeSection.friction,
+      swipeTransitionDuration: swipeSection.transition_duration
+    };
 
-      if (Homescreen.isInEditMode()) {
-        exitFromEditMode();
-      } else {
-        GridManager.goToPage(landingPage);
-      }
-    });
+    GridManager.init(options, function gm_init() {
+      window.addEventListener('hashchange', function() {
+        if (document.location.hash != '#root')
+          return;
 
-    var tapThreshold = Configurator.getSection('tap_threshold');
-    if (typeof(tapThreshold) === 'undefined') {
-      tapThreshold = 10;
-    }
+        // this happens when the user presses the 'home' button
+        if (Homescreen.isInEditMode()) {
+          exitFromEditMode();
+        } else {
+          GridManager.goToPage(landingPage);
+        }
+        GridManager.ensurePanning();
+      });
 
-    GridManager.init('.apps', '.dockWrapper', tapThreshold, function gm_init() {
       PaginationBar.show();
       if (document.location.hash === '#root') {
-        // Switch to the first page only if the user has not already start to pan
-        // while home is loading
+        // Switch to the first page only if the user has not already
+        // start to pan while home is loading
         GridManager.goToPage(landingPage);
       }
       DragDropManager.init();
@@ -55,9 +64,8 @@ const Homescreen = (function() {
 
   function exitFromEditMode() {
     Homescreen.setMode('normal');
-    GridManager.markDirtyState();
     ConfirmDialog.hide();
-    GridManager.goToPage(GridManager.pageHelper.getCurrentPageNumber());
+    GridManager.exitFromEditMode();
   }
 
   document.addEventListener('mozvisibilitychange', function mozVisChange() {
@@ -90,6 +98,19 @@ const Homescreen = (function() {
     document.documentElement.lang = navigator.mozL10n.language.code;
     document.documentElement.dir = navigator.mozL10n.language.direction;
   }
+
+  function onConnectionChange(isOnline) {
+    var mode = isOnline ? 'online' : 'offline';
+    document.body.dataset.online = mode;
+  }
+
+  window.addEventListener('online', function onOnline(evt) {
+    onConnectionChange(true);
+  });
+
+  window.addEventListener('offline', function onOnline(evt) {
+    onConnectionChange(false);
+  });
 
   return {
     /*

@@ -13,12 +13,13 @@
       "description": "Gaia Bluetooth Transfer"
     }
   },
+  "icons": {
+    "30": "/style/icons/icon30.png",
+    "60": "/style/icons/icon60.png"
+  },
   "orientation": "portrait-primary",
   "activities": {
     "share": {
-      "filters": {
-      	"number": 1
-       },
       "disposition": "inline",
       "returnValue": true,
       "href": "/transfer.html"

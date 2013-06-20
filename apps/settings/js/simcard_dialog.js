@@ -19,66 +19,34 @@ var SimPinDialog = {
   newPinInput: null,
   confirmPinInput: null,
 
+  triesLeftMsg: document.getElementById('triesLeft'),
+
   errorMsg: document.getElementById('errorMsg'),
   errorMsgHeader: document.getElementById('messageHeader'),
   errorMsgBody: document.getElementById('messageBody'),
 
   mobileConnection: null,
+  icc: null,
 
   lockType: 'pin',
   action: 'unlock',
   origin: null,
 
-  // Now we don't have a number-password type for input field
-  // mimic one by binding one number input and one text input
   getNumberPasswordInputField: function spl_wrapNumberInput(name) {
-    var valueEntered = '';
     var inputField = document.querySelector('input[name="' + name + '"]');
-    var displayField = document.querySelector('input[name="' + name + 'Vis"]');
     var self = this;
 
-    inputField.addEventListener('keypress', function(evt) {
+    inputField.addEventListener('input', function(evt) {
       if (evt.target !== inputField)
         return;
-      evt.preventDefault();
 
-      var code = evt.charCode;
-      if (code !== 0 && (code < 0x30 || code > 0x39))
-        return;
-
-      if (code === 0) { // backspace
-        valueEntered = valueEntered.substr(0, valueEntered.length - 1);
-      } else {
-        if (valueEntered.length >= 8)
-          return;
-        valueEntered += String.fromCharCode(code);
-      }
-      displayField.value = encryption(valueEntered);
-      if (displayField.value.length >= 4)
+      if (inputField.value.length >= 4)
         self.dialogDone.disabled = false;
       else
         self.dialogDone.disabled = true;
     });
 
-    function encryption(str) {
-      return (new Array(str.length + 1)).join('*');
-    }
-
-    function setValue(value) {
-      valueEntered = value;
-      inputField.value = value;
-      displayField.value = encryption(valueEntered);
-    }
-
-    function setFocus() {
-      inputField.focus();
-    }
-
-    return {
-      get value() { return valueEntered; },
-      set value(value) { setValue(value) },
-      focus: setFocus
-    };
+    return inputField;
   },
 
   handleCardState: function spl_handleCardState() {
@@ -95,9 +63,7 @@ var SimPinDialog = {
       case 'pukRequired':
         this.lockType = 'puk';
         this.errorMsgHeader.textContent = _('simCardLockedMsg') || '';
-        this.errorMsgHeader.dataset.l10nId = 'simCardLockedMsg';
         this.errorMsgBody.textContent = _('enterPukMsg') || '';
-        this.errorMsgBody.dataset.l10nId = 'enterPukMsg';
         this.errorMsg.hidden = false;
         this.inputFieldControl(false, true, true);
         this.pukInput.focus();
@@ -107,7 +73,6 @@ var SimPinDialog = {
         break;
     }
     this.dialogTitle.textContent = _(this.lockType + 'Title') || '';
-    this.dialogTitle.dataset.l10nId = this.lockType + 'Title';
   },
 
   handleError: function spl_handleLockError(evt) {
@@ -125,17 +90,13 @@ var SimPinDialog = {
 
   showErrorMsg: function spl_showErrorMsg(retry, type) {
     var _ = navigator.mozL10n.get;
+    var l10nArgs = { n: retry };
 
+    this.triesLeftMsg.textContent = _('inputCodeRetriesLeft', l10nArgs);
     this.errorMsgHeader.textContent = _(type + 'ErrorMsg');
-    this.errorMsgHeader.dataset.l10nId = type + 'ErrorMsg';
-
     if (retry !== 1) {
-      var l10nArgs = { n: retry };
-      this.errorMsgBody.dataset.l10nId = type + 'AttemptMsg2';
-      this.errorMsgBody.dataset.l10nArgs = JSON.stringify(l10nArgs);
-      this.errorMsgBody.textContent = _(type + 'AttemptMsg2', l10nArgs);
+      this.errorMsgBody.textContent = _(type + 'AttemptMsg3', l10nArgs);
     } else {
-      this.errorMsgBody.dataset.l10nId = type + 'LastChanceMsg';
       this.errorMsgBody.textContent = _(type + 'LastChanceMsg');
     }
 
@@ -163,9 +124,10 @@ var SimPinDialog = {
 
     if (newPin !== confirmPin) {
       this.errorMsgHeader.textContent = _('newPinErrorMsg');
-      this.errorMsgHeader.dataset.l10nId = 'newPinErrorMsg';
       this.errorMsgBody.textContent = '';
       this.errorMsg.hidden = false;
+      this.newPinInput.value = '';
+      this.confirmPinInput.value = '';
       return;
     }
     var options = {lockType: 'puk', puk: puk, newPin: newPin };
@@ -175,7 +137,7 @@ var SimPinDialog = {
 
   unlockCardLock: function spl_unlockCardLock(options) {
     var self = this;
-    var req = this.mobileConnection.unlockCardLock(options);
+    var req = this.icc.unlockCardLock(options);
     req.onsuccess = function sp_unlockSuccess() {
       self.close();
       if (self.onsuccess)
@@ -205,9 +167,10 @@ var SimPinDialog = {
 
     if (newPin !== confirmPin) {
       this.errorMsgHeader.textContent = _('newPinErrorMsg');
-      this.errorMsgHeader.dataset.l10nId = 'newPinErrorMsg';
       this.errorMsgBody.textContent = '';
       this.errorMsg.hidden = false;
+      this.newPinInput.value = '';
+      this.confirmPinInput.value = '';
       return;
     }
     var options = {lockType: 'pin', pin: pin, newPin: newPin};
@@ -217,7 +180,7 @@ var SimPinDialog = {
 
   setCardLock: function spl_setCardLock(options) {
     var self = this;
-    var req = this.mobileConnection.setCardLock(options);
+    var req = this.icc.setCardLock(options);
     req.onsuccess = function spl_enableSuccess() {
       self.close();
       if (self.onsuccess)
@@ -264,7 +227,7 @@ var SimPinDialog = {
   // the origin parameter records the dialog caller.
   // when the dialog is closed, we can relocate back to the caller's div.
   show: function spl_show(action, onsuccess, oncancel, origin) {
-    if ('#simpin-dialog' == document.location.hash)
+    if ('#simpin-dialog' == Settings.currentPanel)
       return;
 
     var _ = navigator.mozL10n.get;
@@ -279,13 +242,20 @@ var SimPinDialog = {
       case 'enable':
         this.inputFieldControl(true, false, false);
         this.dialogTitle.textContent = _('pinTitle') || '';
-        this.dialogTitle.dataset.l10nId = 'pinTitle';
         break;
       case 'changePin':
         this.inputFieldControl(true, false, true);
         this.dialogTitle.textContent = _('newpinTitle') || '';
-        this.dialogTitle.dataset.l10nId = 'newpinTitle';
         break;
+    }
+
+    var retryCount = this.mobileConnection.retryCount;
+    if (!retryCount) {
+      this.triesLeftMsg.hidden = true;
+    } else {
+      var l10nArgs = { n: retryCount };
+      this.triesLeftMsg.textContent = _('inputCodeRetriesLeft', l10nArgs);
+      this.triesLeftMsg.hidden = false;
     }
 
     if (onsuccess && typeof onsuccess === 'function')
@@ -294,7 +264,7 @@ var SimPinDialog = {
       this.oncancel = oncancel;
 
     this.origin = origin;
-    document.location.hash = '#simpin-dialog';
+    Settings.currentPanel = '#simpin-dialog';
 
     if (action === 'unlock' && this.lockType === 'puk')
       this.pukInput.focus();
@@ -306,7 +276,7 @@ var SimPinDialog = {
   close: function spl_close() {
     this.clear();
     if (this.origin)
-      document.location.hash = this.origin;
+      Settings.currentPanel = this.origin;
   },
 
   skip: function spl_skip() {
@@ -322,7 +292,11 @@ var SimPinDialog = {
     if (!this.mobileConnection)
       return;
 
-    this.mobileConnection.addEventListener('icccardlockerror',
+    this.icc = window.navigator.mozIccManager;
+    if (!this.icc)
+      return;
+
+    this.icc.addEventListener('icccardlockerror',
       this.handleError.bind(this));
 
     this.dialogDone.onclick = this.verify.bind(this);

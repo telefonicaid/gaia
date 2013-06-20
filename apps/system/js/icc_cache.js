@@ -26,7 +26,15 @@
     return;
   }
 
-  var icc = window.navigator.mozMobileConnection.icc;
+  // See bug 859712
+  // To have the backward compatibility for bug 859220.
+  // If we could not get iccManager from navigator,
+  // try to get it from mozMobileConnection.
+  // 'window.navigator.mozMobileConnection.icc' can be dropped
+  // after bug 859220 is landed.
+  var icc = window.navigator.mozIccManager ||
+            window.navigator.mozMobileConnection.icc;
+
   // Remove previous menu
   var resetApplications = window.navigator.mozSettings.createLock().set({
     'icc.applications': '{}'
@@ -47,7 +55,7 @@
             icc.sendStkResponse(command, {
               resultCode: icc.STK_RESULT_OK
             });
-          }
+          };
         } else {
           // Unsolicited command? -> Open settings
           debug('CMD: ', command);
@@ -63,24 +71,30 @@
               return;   // If settings is opened, we don't manage it
             }
 
-            debug('Locating settings . . .');
-            navigator.mozApps.mgmt.getAll().onsuccess = function gotApps(evt) {
-              var apps = evt.target.result;
-              apps.forEach(function appIterator(app) {
-                if (app.origin != application)
-                  return;
-
-                var reqIccData = window.navigator.mozSettings.createLock().set({
-                  'icc.data': JSON.stringify(command)
-                });
-                reqIccData.onsuccess = function icc_getIccData() {
+            function launchSettings() {
+              debug('Locating settings . . .');
+              navigator.mozApps.mgmt.getAll().onsuccess =
+              function gotApps(evt) {
+                var apps = evt.target.result;
+                apps.forEach(function appIterator(app) {
+                  if (app.origin != application)
+                    return;
                   debug('Launching ', app.origin);
                   app.launch();
-                }
-              }, this);
+                }, this);
+              };
             }
-          }
+            if (FtuLauncher.isFtuRunning()) {
+              // Delay the stk command until FTU is done
+              window.addEventListener('ftudone', function ftudone() {
+                debug('ftu is done!');
+                launchSettings();
+              });
+            } else {
+              launchSettings();
+            }
+          };
         }
       });
-  }
+  };
 })();

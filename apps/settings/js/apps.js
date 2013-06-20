@@ -9,7 +9,7 @@ var ApplicationsList = {
 
   _permissionsTable: null,
 
-  container: document.querySelector('#appPermissions > ul'),
+  container: document.querySelector('#appPermissions > div > ul'),
   detailTitle: document.querySelector('#appPermissions-details > header > h1'),
   developerHeader: document.getElementById('developer-header'),
   developerInfos: document.getElementById('developer-infos'),
@@ -35,18 +35,11 @@ var ApplicationsList = {
     this.container.addEventListener('click', this);
 
     // load the permission table
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', '/resources/permissions_table.json', true);
-    xhr.responseType = 'json';
-    xhr.onreadystatechange = (function() {
-      if (xhr.readyState == 4 && (xhr.status == 200 || xhr.status === 0)) {
-        var table = xhr.response;
-        this._permissionsTable = table;
-
-        this.initExplicitPermissionsTable();
-      }
-    }).bind(this);
-    xhr.send();
+    var self = this;
+    loadJSON('/resources/permissions_table.json', function loadPermTable(data) {
+      self._permissionsTable = data;
+      self.initExplicitPermissionsTable();
+    });
 
     // Implement clear bookmarks apps button and its confirm dialog
     var confirmDialog = this.bookmarksClear.dialog;
@@ -149,7 +142,7 @@ var ApplicationsList = {
 
       self._sortApps();
       self.render();
-    }
+    };
   },
 
   render: function al_render() {
@@ -166,13 +159,16 @@ var ApplicationsList = {
         var key = Object.keys(manifest.icons)[0];
         var iconURL = manifest.icons[key];
 
-        // Adding origin if it's not a data URL
-        if (!(iconURL.slice(0, 4) === 'data')) {
+        // Adding origin if it is a relative URL
+        if (!(/^(http|https|data):/.test(iconURL))) {
           iconURL = app.origin + '/' + iconURL;
         }
 
         icon = document.createElement('img');
         icon.src = iconURL;
+      } else {
+        icon = document.createElement('img');
+        icon.src = '../style/images/default.png';
       }
 
       var item = document.createElement('li');
@@ -222,7 +218,7 @@ var ApplicationsList = {
     if (!app)
       return;
 
-    window.location.hash = '#appPermissions';
+    Settings.currentPanel = '#appPermissions';
 
     this._apps.splice(appIndex, 1);
 
@@ -306,7 +302,9 @@ var ApplicationsList = {
 
     var item = document.createElement('li');
     var content = document.createElement('span');
-    content.textContent = _('perm-' + perm.replace(':', '-'));
+    var contentL10nId = 'perm-' + perm.replace(':', '-');
+    content.textContent = _(contentL10nId);
+    content.dataset.l10nId = contentL10nId;
 
     var select = document.createElement('select');
     select.dataset.perm = perm;

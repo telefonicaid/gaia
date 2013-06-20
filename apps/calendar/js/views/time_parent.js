@@ -1,5 +1,7 @@
 Calendar.ns('Views').TimeParent = (function() {
 
+  var XSWIPE_OFFSET = window.innerWidth / 10;
+
   /**
    * Parent view for busytime-based views
    * (month, week, day) contains basic
@@ -22,11 +24,6 @@ Calendar.ns('Views').TimeParent = (function() {
     __proto__: Calendar.View.prototype,
 
     /**
-     * Threshold between swipes.
-     */
-    swipeThreshold: window.innerWidth / 4,
-
-    /**
      * Maximum number of child elements to keep
      * around until we start removing them.
      */
@@ -45,8 +42,11 @@ Calendar.ns('Views').TimeParent = (function() {
     },
 
     _onswipe: function(data) {
-      if (Math.abs(data.dx) < this.swipeThreshold)
+      if (
+          Math.abs(data.dy) > (Math.abs(data.dx) - XSWIPE_OFFSET)
+      ) {
         return;
+      }
 
       var dir = data.direction;
       var controller = this.app.timeController;
@@ -169,8 +169,11 @@ Calendar.ns('Views').TimeParent = (function() {
      * @param {Date} time center point to activate.
      */
     changeDate: function(time) {
+      var prevScrollTop = 0;
+
       // deactivate previous frame
       if (this.currentFrame) {
+        prevScrollTop = this.currentFrame.getScrollTop();
         this.currentFrame.deactivate();
       }
 
@@ -186,6 +189,7 @@ Calendar.ns('Views').TimeParent = (function() {
       // create & activate current frame
       var cur = this.currentFrame = this.addFrame(time);
       cur.activate();
+      cur.setScrollTop(prevScrollTop);
 
       // add next frame
       this.addFrame(next);

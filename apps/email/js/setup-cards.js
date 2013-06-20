@@ -21,7 +21,8 @@ var SETUP_ERROR_L10N_ID_MAP = {
   'unresponsive-server': 'setup-error-unresponsive-server',
   'server-problem': 'setup-error-server-problem',
   'no-config-info': 'setup-error-no-config-info',
-  'server-maintenance': 'setup-error-server-maintenance'
+  'server-maintenance': 'setup-error-server-maintenance',
+  'user-account-exists': 'setup-error-account-already-exists'
 };
 
 /**
@@ -70,7 +71,7 @@ SetupAccountInfoCard.prototype = {
     // to do initial card pushing.  This would happen if the app was started
     // without any accounts.
     if (Cards._cardStack.length === 1) {
-      Cards.removeCardAndSuccessors(null, 'none');
+      Cards.removeAllCards();
       App.showMessageViewOrSetup();
     }
     // Otherwise we were triggered from the settings UI and we can just pop
@@ -372,7 +373,7 @@ SetupProgressCard.prototype = {
 
   onCreationSuccess: function() {
     // nuke the current card stack, replace them with the done card.
-    Cards.removeCardAndSuccessors(null, 'none');
+    Cards.removeAllCards();
     Cards.pushCard(
       'setup-done', 'default', 'immediate',
       {});
@@ -400,7 +401,7 @@ function SetupDoneCard(domNode, mode, args) {
 SetupDoneCard.prototype = {
   onAddAnother: function() {
     // Nuke all cards
-    Cards.removeCardAndSuccessors(null, 'none');
+    Cards.removeAllCards();
     // Show the first setup card again.
     Cards.pushCard(
       'setup-account-info', 'default', 'immediate',
@@ -410,7 +411,7 @@ SetupDoneCard.prototype = {
   },
   onShowMail: function() {
     // Nuke this card
-    Cards.removeCardAndSuccessors(null, 'none');
+    Cards.removeAllCards();
     // Trigger the startup logic again; this should show the inbox this time.
     App.showMessageViewOrSetup(true);
   },
@@ -537,8 +538,7 @@ console.log('  CONFIG CURRENTLY:', JSON.stringify(MailAPI.config));//HACK
 }
 SettingsMainCard.prototype = {
   onClose: function() {
-    Cards.removeCardAndSuccessors(this.domNode, 'animate', 1,
-                                  ['folder-picker', 'navigation']);
+    Cards.removeCardAndSuccessors(this.domNode, 'animate', 1, 1);
   },
 
   onAccountsSplice: function(index, howMany, addedItems,
@@ -648,6 +648,28 @@ function SettingsAccountCard(domNode, mode, args) {
   domNode.getElementsByClassName('tng-account-delete')[0]
     .addEventListener('click', this.onDelete.bind(this), false);
 
+  // Handle default account checkbox. If already a default, then the checkbox
+  // cannot be unchecked. The default is changed by going to an account that
+  // is not the default and checking that checkbox.
+  var defaultLabelNode = domNode.getElementsByClassName('tng-default-label')[0];
+  var defaultInputNode = domNode.getElementsByClassName('tng-default-input')[0];
+  if (this.account.isDefault) {
+    defaultInputNode.disabled = true;
+    defaultInputNode.checked = true;
+  } else {
+
+    defaultLabelNode.addEventListener('click', function(evt) {
+      evt.stopPropagation();
+      evt.preventBubble();
+
+      if (!defaultInputNode.disabled) {
+        defaultInputNode.disabled = true;
+        defaultInputNode.checked = true;
+        this.account.modifyAccount({ setAsDefault: true });
+      }
+    }.bind(this), false);
+  }
+
   // ActiveSync, IMAP and SMTP are protocol names, no need to be localized
   domNode.getElementsByClassName('tng-account-type')[0].textContent =
     (this.account.type === 'activesync') ? 'ActiveSync' : 'IMAP+SMTP';
@@ -722,7 +744,7 @@ SettingsAccountCard.prototype = {
         id: 'account-delete-ok',
         handler: function() {
           account.deleteAccount();
-          Cards.removeCardAndSuccessors(null, 'none');
+          Cards.removeAllCards();
           App.showMessageViewOrSetup();
         }
       },

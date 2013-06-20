@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 var contacts = window.contacts || {};
 
@@ -35,26 +35,48 @@ contacts.Search = (function() {
       imgLoader,
       searchEnabled = false;
 
-  var init = function load(_conctactsListView, _groupFavorites, _clickHandler, defaultEnabled) {
-    conctactsListView = _conctactsListView;
-
+  var onLoad = function onLoad() {
     searchView = document.getElementById('search-view');
+    searchList = document.getElementById('search-list');
+  };
 
+  onLoad();
+
+  var init = function load(_conctactsListView, _groupFavorites, _clickHandler,
+                           defaultEnabled) {
+    conctactsListView = _conctactsListView;
     favoriteGroup = _groupFavorites;
+
+    if (typeof _clickHandler === 'function') {
+      searchList.addEventListener('click', _clickHandler);
+    }
+
+    if (defaultEnabled)
+      searchEnabled = true;
+  };
+
+  var initialized = false;
+
+  var doInit = function doInit() {
+    if (initialized) {
+      return;
+    }
+
+    initialized = true;
     searchBox = document.getElementById('search-contact');
     var resetButton = searchBox.nextElementSibling;
-    resetButton.addEventListener('mousedown', function() {
+    resetButton.addEventListener('ontouchstart' in window ? 'touchstart' :
+                                 'mousedown', function() {
       searchBox.value = '';
       searchBox.focus();
       resetState();
       window.setTimeout(fillInitialSearchPage, 0);
     });
 
-    searchList = document.getElementById('search-list');
-    if (typeof _clickHandler === 'function') {
-      searchList.addEventListener('click', _clickHandler);
-    }
     searchList.parentNode.addEventListener('touchstart', function() {
+      if (searchableNodes && remainingPending) {
+        addRemainingResults(searchableNodes, SEARCH_PAGE_SIZE);
+      }
       blurList = true;
     });
     searchNoResult = document.getElementById('no-result');
@@ -69,10 +91,10 @@ contacts.Search = (function() {
     });
 
     imgLoader = new ImageLoader('#groups-list-search', 'li');
-
-    if (defaultEnabled)
-      searchEnabled = true;
-  }
+    LazyLoader.load(['/contacts/js/fb_resolver.js'], function() {
+      imgLoader.setResolver(fb.resolver);
+    });
+  };
 
   //Search mode instructions
   var exitSearchMode = function exitSearchMode(evt) {
@@ -85,7 +107,6 @@ contacts.Search = (function() {
       searchBox.value = '';
       // Resetting state
       contactNodes = null;
-      searchList.innerHTML = '';
       searchTextCache = {};
       resetState();
 
@@ -103,12 +124,12 @@ contacts.Search = (function() {
     currentSet = {};
     // We don't know if the user will launch a new search later
     theClones = {};
-    searchList.innerHTML = '';
+    utils.dom.removeChildNodes(searchList);
     emptySearch = true;
     remainingPending = true;
   }
 
-  function addRemainingResults(nodes,from) {
+  function addRemainingResults(nodes, from) {
     if (remainingPending !== true) {
       return;
     }
@@ -208,6 +229,7 @@ contacts.Search = (function() {
     if (!inSearchMode) {
       window.addEventListener('input', onInput);
       searchView.classList.add('insearchmode');
+      doInit();
       fillInitialSearchPage();
       inSearchMode = true;
       emptySearch = true;
@@ -244,8 +266,8 @@ contacts.Search = (function() {
             hideProgressResults();
           }
           // Only an initial page of elements is loaded in the search list
-          if (Object.keys(currentSet).length
-             < SEARCH_PAGE_SIZE && !(contact.dataset.uuid in currentSet)) {
+          if (Object.keys(currentSet).length <
+              SEARCH_PAGE_SIZE && !(contact.dataset.uuid in currentSet)) {
             var clonedNode = getClone(contact);
             currentSet[contact.dataset.uuid] = clonedNode;
             searchList.appendChild(clonedNode);
@@ -295,16 +317,21 @@ contacts.Search = (function() {
     if (searchEnabled) {
       return;
     }
+
     searchEnabled = true;
-    invalidateCache();
-    search();
+    // We perform the search when all the info have been loaded and the
+    // user wrote something in the entry field
+    if (searchBox.value.trim()) {
+      invalidateCache();
+      search();
+    }
   };
 
   var search = function performSearch(searchDoneCb) {
     prevTextToSearch = currentTextToSearch;
 
-    currentTextToSearch = utils.text.normalize(searchBox.value.trim());
-    currentTextToSearch = utils.text.escapeRegExp(currentTextToSearch);
+    currentTextToSearch = Normalizer.toAscii(searchBox.value.trim());
+    currentTextToSearch = Normalizer.escapeRegExp(currentTextToSearch);
     var thisSearchText = new String(currentTextToSearch);
 
     if (thisSearchText.length === 0) {
@@ -358,7 +385,7 @@ contacts.Search = (function() {
       contactNodes = list.querySelectorAll(CONTACTS_SELECTOR);
     }
     return contactNodes;
-  }
+  };
 
   var getContactsToSearch = function getContactsToSearch(newText, prevText) {
     var out;
@@ -366,18 +393,18 @@ contacts.Search = (function() {
         prevText.length > 0 && newText.indexOf(prevText) === 0) {
       out = searchableNodes || getContactsDom();
     } else {
-      searchList.innerHTML = '';
+      utils.dom.removeChildNodes(searchList);
       currentSet = {};
       out = getContactsDom();
       canReuseSearchables = false;
     }
 
     return out;
-  }
+  };
 
   var isInSearchMode = function isInSearchMode() {
     return inSearchMode;
-  }
+  };
 
   var invalidateCache = function s_invalidate() {
     canReuseSearchables = false;
@@ -385,12 +412,12 @@ contacts.Search = (function() {
     contactNodes = null;
     currentSet = {};
     searchTextCache = {};
-  }
+  };
 
   var removeContact = function s_removeContact(id) {
     var contact = searchList.querySelector('li[data-uuid=\"' + id + '\"]');
     searchList.removeChild(contact);
-  }
+  };
 
   function showProgress() {
     searchNoResult.classList.add('hide');
@@ -415,6 +442,8 @@ contacts.Search = (function() {
     'enterSearchMode': enterSearchMode,
     'exitSearchMode': exitSearchMode,
     'isInSearchMode': isInSearchMode,
-    'enableSearch': enableSearch
+    'enableSearch': enableSearch,
+    // The purpose of this method is only for unit tests
+    'load': onLoad
   };
 })();

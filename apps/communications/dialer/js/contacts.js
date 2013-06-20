@@ -90,13 +90,14 @@ var Contacts = {
         filterValue: number
       };
     } else {
-      // get the phone number variants
+      // get the phone number variants (for the Facebook lookup)
       variants = SimplePhoneMatcher.generateVariants(number);
+      var sanitizedNumber = SimplePhoneMatcher.sanitizedNumber(number);
 
       options = {
         filterBy: ['tel'],
-        filterOp: 'contains',
-        filterValue: variants[0] // matching the shortest variant
+        filterOp: 'match',
+        filterValue: sanitizedNumber
       };
     }
 
@@ -163,5 +164,36 @@ var Contacts = {
     request.onerror = function findError() {
       callback(null);
     };
+  },
+
+  findListByNumber: function findListByNumber(number, limit, callback) {
+    if (!navigator.mozContacts) {
+      callback(null);
+      return;
+    }
+
+    var self = this;
+    asyncStorage.getItem('order.lastname', function(value) {
+      var sortKey = value ? 'familyName' : 'givenName';
+
+      var options = {
+        filterBy: ['tel'],
+        filterOp: 'contains',
+        filterValue: number,
+        sortBy: sortKey,
+        sortOrder: 'ascending',
+        filterLimit: limit
+      };
+
+      var req = navigator.mozContacts.find(options);
+      req.onsuccess = function onsuccess() {
+        callback(req.result);
+      };
+
+      req.onerror = function onerror() {
+        var msg = 'Contact finding error. Error: ' + req.errorCode;
+        callback(null);
+      };
+    });
   }
 };
