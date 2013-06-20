@@ -278,6 +278,18 @@ fb.Contact = function(deviceContact, cid) {
     destination.additionalName = source.additionalName;
   }
 
+  /*
+   * Shallow copy from source to target object
+   */
+  function populate(source, target, propertyNames) {
+    propertyNames.forEach(function (property) {
+      var propertyValue = source[property];
+      if (propertyValue) {
+        target[property] = propertyValue;
+      }
+    });
+  }
+
   // Merges mozContact data with Facebook data
   this.merge = function(fbdata) {
     var out = devContact;
@@ -287,15 +299,11 @@ fb.Contact = function(deviceContact, cid) {
       out.updated = devContact.updated;
       out.published = devContact.published;
 
-      Object.keys(devContact).forEach(function(prop) {
-        if (devContact[prop] && Array.isArray(devContact[prop])) {
-          out[prop] = [];
-          out[prop] = out[prop].concat(devContact[prop]);
-        }
-        else if (devContact[prop]) {
-          out[prop] = devContact[prop];
-        }
-      });
+      // The id comes from devContact and the rest of properties like
+      // familyName, propertyName, etc... are defined in the prototype object
+      populate(devContact, out, Object.getOwnPropertyNames(devContact));
+      populate(devContact, out,
+                 Object.getOwnPropertyNames(Object.getPrototypeOf(devContact)));
 
       mergeFbData(out, fbdata);
     }
