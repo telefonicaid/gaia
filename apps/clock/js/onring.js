@@ -2,12 +2,15 @@
 /* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
 'use strict';
 
+var _ = navigator.mozL10n.get;
+
 var RingView = {
 
   _ringtonePlayer: null,
   _vibrateInterval: null,
   _screenLock: null,
   _onFireAlarm: {},
+  _started: false,
 
   get time() {
     delete this.time;
@@ -37,6 +40,7 @@ var RingView = {
   init: function rv_init() {
     document.addEventListener('mozvisibilitychange', this);
     this._onFireAlarm = window.opener.ActiveAlarmController.getOnFireAlarm();
+    var self = this;
     if (!document.mozHidden) {
       this.startAlarmNotification();
     } else {
@@ -44,7 +48,6 @@ var RingView = {
       // https://bugzilla.mozilla.org/show_bug.cgi?id=810431
       // The workaround is used in screen off mode.
       // mozHidden will be true in init() state.
-      var self = this;
       window.setTimeout(function rv_checkMozHidden() {
       // If mozHidden is true in init state,
       // it means that the incoming call happens before the alarm.
@@ -53,11 +56,15 @@ var RingView = {
         if (!document.mozHidden) {
           self.startAlarmNotification();
         }
+        // Our final chance is to rely on visibilitychange event handler.
       }, 0);
     }
 
-    this.setAlarmTime();
-    this.setAlarmLabel();
+    navigator.mozL10n.ready(function rv_waitLocalized() {
+      self.setAlarmTime();
+      self.setAlarmLabel();
+    });
+
     this.snoozeButton.addEventListener('click', this);
     this.closeButton.addEventListener('click', this);
   },
@@ -86,7 +93,8 @@ var RingView = {
   },
 
   setAlarmLabel: function rv_setAlarmLabel() {
-    this.alarmLabel.textContent = this.getAlarmLabel();
+    var label = this.getAlarmLabel();
+    this.alarmLabel.textContent = (label === '') ? _('alarm') : label;
   },
 
   ring: function rv_ring() {
@@ -124,9 +132,18 @@ var RingView = {
   },
 
   startAlarmNotification: function rv_startAlarmNotification() {
+    // Ensure called only once.
+    if (this._started)
+      return;
+
+    this._started = true;
     this.setWakeLockEnabled(true);
-    this.ring();
-    this.vibrate();
+    if (this._onFireAlarm.sound) {
+      this.ring();
+    }
+    if (this._onFireAlarm.vibrate == 1) {
+      this.vibrate();
+    }
   },
 
   stopAlarmNotification: function rv_stopAlarmNotification(action) {
@@ -171,9 +188,11 @@ var RingView = {
   handleEvent: function rv_handleEvent(evt) {
     switch (evt.type) {
     case 'mozvisibilitychange':
-      // https://bugzilla.mozilla.org/show_bug.cgi?id=810431
-      // Since Bug 810431 is not fixed yet,
-      // be carefull to use the event here during alarm goes off.
+      // There's chance to miss the mozHidden state when inited,
+      // before setVisible take effects, there may be a latency.
+      if (!document.mozHidden) {
+        this.startAlarmNotification();
+      }
       break;
     case 'mozinterruptbegin':
       // Only ringer/telephony channel audio could trigger 'mozinterruptbegin'
@@ -205,9 +224,5 @@ var RingView = {
 
 };
 
-window.addEventListener('localized', function showBody() {
-  window.removeEventListener('localized', showBody);
-  RingView.init();
-});
-
+RingView.init();
 

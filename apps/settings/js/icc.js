@@ -29,7 +29,6 @@
   var stkLastSelectedTest = null;
   var displayTextTimeout = 40000;
   var inputTimeout = 40000;
-  var defaultURL = null;
   var goBackTimer = {
     timer: null,
     timeout: 1000
@@ -39,34 +38,17 @@
   init();
 
   /**
-   * Recover application data
-   */
-  function getIccInfo() {
-    var SUPPORT_INFO = 'resources/icc.json';
-    var xhr = new XMLHttpRequest();
-    xhr.onerror = function() {
-      debug('Failed to fetch icc.json: ', xhr.statusText);
-    };
-    xhr.onload = function loadIccInfo() {
-      if (xhr.status === 0 || xhr.status === 200) {
-        defaultURL = xhr.response.defaultURL;
-        debug('default URL: ', defaultURL);
-      }
-    };
-    xhr.open('GET', SUPPORT_INFO, true); // async
-    xhr.responseType = 'json';
-    xhr.send();
-  }
-
-  /**
    * Init STK UI
    */
   function init() {
-    if (!window.navigator.mozMobileConnection) {
-      return;
-    }
-
-    icc = window.navigator.mozMobileConnection.icc;
+    // See bug 859712
+    // To have the backward compatibility for bug 859220.
+    // If we could not get iccManager from navigator,
+    // try to get it from mozMobileConnection.
+    // 'window.navigator.mozMobileConnection.icc' can be dropped
+    // after bug 859220 is landed.
+    icc = window.navigator.mozIccManager ||
+          window.navigator.mozMobileConnection.icc;
 
     icc.onstksessionend = function handleSTKSessionEnd(event) {
       updateMenu();
@@ -85,9 +67,9 @@
       handleSTKCommand(event.command);
     });
     window.addEventListener('stkasynccommand',
-        function do_handleAsyncSTKCmd(event) {
-      handleSTKCommand(event.detail.command);
-    });
+      function do_handleAsyncSTKCmd(event) {
+        handleSTKCommand(event.detail.command);
+      });
 
     /**
      * Open STK main application
@@ -114,8 +96,6 @@
     reqInputTimeout.onsuccess = function icc_getInputTimeout() {
       inputTimeout = reqInputTimeout.result['icc.inputTextTimeout'];
     };
-
-    getIccInfo();
   }
 
   function stkResTerminate() {
@@ -132,10 +112,7 @@
     });
     // We'll return to settings if no STK response received in a grace period
     goBackTimer.timer = setTimeout(function() {
-      var page = document.location.protocol + '//' +
-        document.location.host + '/index.html#root';
-      debug('page: ', page);
-      window.location.replace(page);
+      Settings.currentPanel = '#root';
     }, goBackTimer.timeout);
   };
 
@@ -229,41 +206,6 @@
         iccLastCommandProcessed = true;
         break;
 
-      case icc.STK_CMD_DISPLAY_TEXT:
-        debug(' STK:Show message: ', command);
-        if (options.responseNeeded) {
-          iccLastCommandProcessed = true;
-          responseSTKCommand({
-            resultCode: icc.STK_RESULT_OK
-          });
-          displayText(command, null);
-        } else {
-          displayText(command, function(userCleared) {
-            debug('Display Text, cb: ', command);
-            iccLastCommandProcessed = true;
-            if (command.options.userClear && !userCleared) {
-              debug('No response from user (Timeout)');
-              responseSTKCommand({
-                resultCode: icc.STK_RESULT_NO_RESPONSE_FROM_USER
-              });
-            } else {
-              debug('User closed the alert');
-              responseSTKCommand({
-                resultCode: icc.STK_RESULT_OK
-              });
-            }
-          });
-        }
-        break;
-
-      case icc.STK_CMD_SET_UP_IDLE_MODE_TEXT:
-        iccLastCommandProcessed = true;
-        responseSTKCommand({
-          resultCode: icc.STK_RESULT_OK
-        });
-        displayNotification(command);
-        break;
-
       case icc.STK_CMD_REFRESH:
         iccLastCommandProcessed = true;
         responseSTKCommand({
@@ -290,10 +232,13 @@
 
       case icc.STK_CMD_SET_UP_CALL:
         debug(' STK:Setup Phone Call. Number: ' + options.address);
-        var confirmed = true;
-        if (options.confirmMessage) {
-          confirmed = confirm(options.confirmMessage);
+        if (!options.confirmMessage) {
+          options.confirmMessage = _(
+            'operatorService-confirmCall-defaultmessage', {
+              'number': options.address
+            });
         }
+        var confirmed = confirm(options.confirmMessage);
         iccLastCommandProcessed = true;
         responseSTKCommand({
           hasConfirmed: confirmed,
@@ -302,15 +247,6 @@
         if (options.callMessage) {
           alert(options.callMessage);
         }
-        break;
-
-      case icc.STK_CMD_LAUNCH_BROWSER:
-        debug(' STK:Setup Launch Browser. URL: ' + options.url);
-        iccLastCommandProcessed = true;
-        responseSTKCommand({
-          resultCode: icc.STK_RESULT_OK
-        });
-        showURL(options);
         break;
 
       case icc.STK_CMD_SET_UP_EVENT_LIST:
@@ -624,34 +560,8 @@
 
     document.addEventListener('mozvisibilitychange',
         sendSessionEndTROnFocusLose, true);
-    var li = document.createElement('li');
-    var p = document.createElement('p');
-    p.id = 'stk-item-title';
-    p.classList.add('multiline_title');
-    p.textContent = options.text;
-    li.appendChild(p);
 
-    var input = document.createElement('input');
-    input.id = 'stk-item-input';
-    input.maxLength = options.maxLength;
-    input.placeholder = options.text;
-    if (options.isAlphabet) {
-      input.type = 'text';
-    } else {
-      input.type = 'tel';
-    }
-    if (options.defaultText) {
-      input.value = options.defaultText;
-    }
-    if (options.isYesNoRequired) {
-      input.type = 'checkbox';
-    }
-    if (options.hidden) {
-      input.type = 'hidden';
-    }
-    li.appendChild(input);
-    iccStkList.appendChild(li);
-
+    // AutoClose
     var timeoutInUse = options.duration;
     var inputTimeOutID = setTimeout(function() {
       debug('No response from user (Timeout)');
@@ -660,39 +570,106 @@
       });
     }, timeoutInUse ? calculateDurationInMS(options.duration) : inputTimeout);
 
-    li = document.createElement('li');
-    var label = document.createElement('label');
-    var button = document.createElement('button');
-    button.id = 'stk-item-ok';
-    button.textContent = 'Ok';
-    button.disabled = !checkInputLengthValid(input.value.length,
-                                              options.minLength,
-                                              options.maxLength);
-    button.onclick = function(event) {
+    // Common updateInput methodd
+    function stopSTKInputTimer() {
       if (inputTimeOutID) {
         clearTimeout(inputTimeOutID);
         inputTimeOutID = null;
       }
-      var value = document.getElementById('stk-item-input').value;
+    }
+    function inputSTKResponse(value) {
+      stopSTKInputTimer();
       responseSTKCommand({
         resultCode: icc.STK_RESULT_OK,
         input: value
       });
-    };
+    }
 
-    input.onkeyup = function(event) {
-      if (inputTimeOutID) {
-        clearTimeout(inputTimeOutID);
-        inputTimeOutID = null;
+    // Showing input screen
+    var li = document.createElement('li');
+    var p = document.createElement('p');
+    p.id = 'stk-item-title';
+    p.classList.add('multiline_title');
+    p.textContent = options.text;
+    li.appendChild(p);
+
+    if (!options.isYesNoRequired && !options.isYesNoRequested) {
+      var input = document.createElement('input');
+      input.id = 'stk-item-input';
+      input.maxLength = options.maxLength;
+      input.placeholder = options.text;
+      if (options.isAlphabet) {
+        input.type = 'text';
+      } else {
+        input.type = 'tel';
       }
-      button.disabled = !checkInputLengthValid(input.value.length,
-                                              options.minLength,
-                                              options.maxLength);
-    };
+      if (options.defaultText) {
+        input.value = options.defaultText;
+      }
+      if (options.hideInput) {
+        input.type = 'password';
+      }
+      if (options.hidden) {
+        input.type = 'hidden';
+      }
+      li.appendChild(input);
+      iccStkList.appendChild(li);
 
-    label.appendChild(button);
-    li.appendChild(label);
-    iccStkList.appendChild(li);
+      li = document.createElement('li');
+      var label = document.createElement('label');
+      var button = document.createElement('button');
+      button.id = 'stk-item-ok';
+      button.textContent = _('ok');
+      button.disabled = !checkInputLengthValid(input.value.length,
+                                                options.minLength,
+                                                options.maxLength);
+      button.onclick = function(event) {
+        inputSTKResponse(document.getElementById('stk-item-input').value);
+      };
+
+      input.onkeyup = function(event) {
+        stopSTKInputTimer();
+        if (input.type === 'tel') {
+          // Removing unauthorized characters
+          input.value = input.value.replace(/[()-]/g, '');
+        }
+        button.disabled = !checkInputLengthValid(input.value.length,
+                                                options.minLength,
+                                                options.maxLength);
+      };
+
+      label.appendChild(button);
+      li.appendChild(label);
+      iccStkList.appendChild(li);
+      input.focus();
+    } else {
+      // Include default title
+      iccStkList.appendChild(li);
+
+      li = document.createElement('li');
+      var label = document.createElement('label');
+      var buttonYes = document.createElement('button');
+      buttonYes.id = 'stk-item-yes';
+      buttonYes.textContent = _('yes');
+      buttonYes.onclick = function(event) {
+        inputSTKResponse(1);
+      };
+      label.appendChild(buttonYes);
+      li.appendChild(label);
+      iccStkList.appendChild(li);
+
+      li = document.createElement('li');
+      var label = document.createElement('label');
+      var buttonNo = document.createElement('button');
+      buttonNo.id = 'stk-item-no';
+      buttonNo.textContent = _('no');
+      buttonNo.onclick = function(event) {
+        inputSTKResponse(0);
+      };
+      label.appendChild(buttonNo);
+      li.appendChild(label);
+      iccStkList.appendChild(li);
+    }
 
     // Help
     if (options.isHelpAvailable) {
@@ -701,6 +678,7 @@
       var buttonHelp = document.createElement('button');
       buttonHelp.id = 'stk-item-help';
       buttonHelp.textContent = _('operatorServices-help');
+      buttonHelp.dataset.l10nId = 'operatorServices-help';
       buttonHelp.onclick = function(event) {
         responseSTKCommand({
           resultCode: icc.STK_RESULT_HELP_INFO_REQUIRED
@@ -812,17 +790,20 @@
 
     var timeout = 0;
     if (options.duration &&
-        options.duration.timeUnit &&
-        options.duration.timeInterval) {
+        options.duration.timeUnit != undefined &&
+        options.duration.timeInterval != undefined) {
       timeout = calculateDurationInMS(options.duration.timeUnit,
         options.duration.timeInterval);
-    } else if (options.timeUnit && options.timeInterval) {
+    } else if (options.timeUnit != undefined &&
+        options.timeInterval != undefined) {
       timeout = calculateDurationInMS(options.timUnit, options.timeInterval);
     }
     if (timeout) {
       debug('Tone stop in (ms): ', timeout);
       setTimeout(function() {
-        tonePlayer.pause();
+        closeToneAlert();
+        iccLastCommandProcessed = true;
+        responseSTKCommand({ resultCode: icc.STK_RESULT_OK });
       }, timeout);
     }
 
@@ -856,44 +837,10 @@
   }
 
   /**
-   * Display text on the notifications bar and Idle screen
-   */
-  function displayNotification(command) {
-    var options = command.options;
-    NotificationHelper.send('STK', options.text, '', function() {
-      alert(options.text);
-    });
-  }
-
-  /**
    * Remove text on the notifications bar and Idle screen
    */
   function clearNotification() {
     // TO-DO
-  }
-
-  /**
-   * Open URL
-   */
-  function showURL(options) {
-    var url = options.url;
-    if (url == null || url.length == 0) {
-      url = defaultURL;
-    }
-    debug('Final URL to open: ' + url);
-    if (url !== null && url.length !== 0) {
-      if (!options.confirmMessage || confirm(options.confirmMessage)) {
-        // Sanitise url just in case it doesn't start with http or https
-        // the web activity won't work, so add by default the http protocol
-        if (url.search('^https?://') == -1) {
-          // Our url doesn't contains the protocol
-          url = 'http://' + url;
-        }
-        openLink(url);
-      }
-    } else {
-      alert(_('operatorService-invalid-url'));
-    }
   }
 
   /**
@@ -939,7 +886,7 @@
    * Open settings application with ICC section opened
    */
   function openSTKApplication() {
-    document.location.hash = 'icc';
+    Settings.currentPanel = '#icc';
     window.navigator.mozApps.getSelf().onsuccess = function getSelfCB(evt) {
       var app = evt.target.result;
       app.launch('settings');

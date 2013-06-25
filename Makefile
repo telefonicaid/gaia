@@ -29,8 +29,27 @@ GAIA_DOMAIN?=gaiamobile.org
 DEBUG?=0
 PRODUCTION?=0
 GAIA_OPTIMIZE?=0
-HIDPI?=*
+GAIA_DEV_PIXELS_PER_PX?=1
 DOGFOOD?=0
+TEST_AGENT_PORT?=8789
+
+# Enable compatibility to run in Firefox Desktop
+DESKTOP?=$(DEBUG)
+# Disable first time experience screen
+NOFTU?=0
+# Automatically enable remote debugger
+REMOTE_DEBUGGER?=0
+
+# We also disable FTU when running in Firefox or in debug mode
+ifeq ($(DEBUG),1)
+NOFTU=1
+PROFILE_FOLDER?=profile-debug
+else ifeq ($(DESKTOP),1)
+NOFTU=1
+PROFILE_FOLDER?=profile-debug
+endif
+
+PROFILE_FOLDER?=profile
 
 LOCAL_DOMAINS?=1
 
@@ -62,23 +81,24 @@ GAIA_DOMAIN=thisdomaindoesnotexist.org
 GAIA_APP_SRCDIRS=apps showcase_apps
 else ifeq ($(MAKECMDGOALS), dogfood)
 DOGFOOD=1
-PRODUCTION=1
-GAIA_OPTIMIZE=1
-B2G_SYSTEM_APPS=1
 else ifeq ($(MAKECMDGOALS), production)
 PRODUCTION=1
-GAIA_OPTIMIZE=1
-B2G_SYSTEM_APPS=1
+endif
+
+ifeq ($(DOGFOOD), 1)
+PRODUCTION=1
 endif
 
 # PRODUCTION is also set for user and userdebug B2G builds
 ifeq ($(PRODUCTION), 1)
+GAIA_OPTIMIZE=1
+B2G_SYSTEM_APPS=1
 GAIA_APP_SRCDIRS=apps
 ADB_REMOUNT=1
 endif
 
-ifeq ($(MAKECMDGOALS), dogfood)
-GAIA_APP_SRCDIRS=apps dogfood_apps
+ifeq ($(DOGFOOD), 1)
+GAIA_APP_SRCDIRS+=dogfood_apps
 endif
 
 ifeq ($(B2G_SYSTEM_APPS), 1)
@@ -147,13 +167,36 @@ SEP=\\
 MSYS_FIX=/
 endif
 
+ifndef GAIA_DISTRIBUTION_DIR
+  GAIA_DISTRIBUTION_DIR := $(CURDIR)$(SEP)distribution
+else
+	ifneq (,$(findstring MINGW32_,$(SYS)))
+		GAIA_DISTRIBUTION_DIR := $(join \
+			$(filter %:,$(subst :,: ,$GAIA_DISTRIBUTION_DIR)),\
+			$(realpath $(filter-out %:,$(subst :,: ,$GAIA_DISTRIBUTION_DIR))))
+	else
+		GAIA_DISTRIBUTION_DIR := $(realpath $(GAIA_DISTRIBUTION_DIR))
+	endif
+endif
 
 SETTINGS_PATH := build/custom-settings.json
-ifdef CUSTOMIZE
-	CUSTOMIZE_SETTINGS := $(realpath $(CUSTOMIZE))$(SEP)settings.json
-	ifneq ($(wildcard $(CUSTOMIZE_SETTINGS)),)
-		SETTINGS_PATH := $(CUSTOMIZE_SETTINGS)
+ifdef GAIA_DISTRIBUTION_DIR
+	DISTRIBUTION_SETTINGS := $(realpath $(GAIA_DISTRIBUTION_DIR))$(SEP)settings.json
+	DISTRIBUTION_CONTACTS := $(realpath $(GAIA_DISTRIBUTION_DIR))$(SEP)contacts.json
+	ifneq ($(wildcard $(DISTRIBUTION_SETTINGS)),)
+		SETTINGS_PATH := $(DISTRIBUTION_SETTINGS)
 	endif
+	ifneq ($(wildcard $(DISTRIBUTION_CONTACTS)),)
+		CONTACTS_PATH := $(DISTRIBUTION_CONTACTS)
+	endif
+endif
+
+# Add apps from customization package
+ifdef GAIA_DISTRIBUTION_DIR
+  DISTRIBUTION_APPS := $(realpath $(GAIA_DISTRIBUTION_DIR))$(SEP)apps
+  ifneq ($(wildcard $(DISTRIBUTION_APPS)),)
+      GAIA_APP_SRCDIRS += $(DISTRIBUTION_APPS)
+  endif
 endif
 
 ifeq ($(SYS),Darwin)
@@ -193,8 +236,8 @@ TEST_DIRS ?= $(CURDIR)/tests
 
 # Generate profile/
 
-profile: multilocale applications-data preferences app-makefiles test-agent-config offline contacts extensions install-xulrunner-sdk profile/settings.json
-	@echo "Profile Ready: please run [b2g|firefox] -profile $(CURDIR)$(SEP)profile"
+$(PROFILE_FOLDER): multilocale applications-data preferences app-makefiles test-agent-config offline contacts extensions install-xulrunner-sdk install-git-hook $(PROFILE_FOLDER)/settings.json create-default-data $(PROFILE_FOLDER)/installed-extensions.json
+	@echo "Profile Ready: please run [b2g|firefox] -profile $(CURDIR)$(SEP)$(PROFILE_FOLDER)"
 
 LANG=POSIX # Avoiding sort order differences between OSes
 
@@ -208,12 +251,12 @@ ifneq ($(LOCALE_BASEDIR),)
 		targets="$$targets --target $$appdir"; \
 	done; \
 	python $(CURDIR)/build/multilocale.py \
-		--config $(LOCALES_FILE) \
-		--source $(LOCALE_BASEDIR) \
+		--config '$(LOCALES_FILE)' \
+		--source '$(LOCALE_BASEDIR)' \
 		$$targets;
 	@echo "Done"
 ifneq ($(LOCALES_FILE),shared/resources/languages.json)
-	cp $(LOCALES_FILE) shared/resources/languages.json
+	cp '$(LOCALES_FILE)' shared/resources/languages.json
 endif
 endif
 
@@ -244,21 +287,18 @@ app-makefiles:
 		done; \
 	done;
 
-# Generate profile/webapps/
+# Generate $(PROFILE_FOLDER)/webapps/
 # We duplicate manifest.webapp to manifest.webapp and manifest.json
 # to accommodate Gecko builds without bug 757613. Should be removed someday.
 webapp-manifests: install-xulrunner-sdk
-	@mkdir -p profile/webapps
+	@mkdir -p $(PROFILE_FOLDER)/webapps
 	@$(call run-js-command, webapp-manifests)
-	@#cat profile/webapps/webapps.json
+	@#cat $(PROFILE_FOLDER)/webapps/webapps.json
 
-# Generate profile/webapps/APP/application.zip
-webapp-zip: stamp-commit-hash install-xulrunner-sdk
+# Generate $(PROFILE_FOLDER)/webapps/APP/application.zip
+webapp-zip: install-xulrunner-sdk
 ifneq ($(DEBUG),1)
-	@rm -rf apps/system/camera
-	@cp -r apps/camera apps/system/camera
-	@rm apps/system/camera/manifest.webapp
-	@mkdir -p profile/webapps
+	@mkdir -p $(PROFILE_FOLDER)/webapps
 	@$(call run-js-command, webapp-zip)
 endif
 
@@ -276,60 +316,55 @@ offline-cache: webapp-manifests install-xulrunner-sdk
 	@$(call run-js-command, offline-cache)
 	@echo "Done"
 
-# Create contacts DB
-contacts: install-xulrunner-sdk
-	@echo "Generate contacts database"
-	@rm -rf profile/indexedDB
-	@$(call run-js-command, contacts)
-	@echo "Done"
+# Get additional extensions
+$(PROFILE_FOLDER)/installed-extensions.json: build/additional-extensions.json $(wildcard .build/custom-extensions.json)
+ifeq ($(DESKTOP),1)
+	python build/additional-extensions.py --gaia-dir="$(CURDIR)" --profile-dir="$(PROFILE_FOLDER)"
+else ifeq ($(DEBUG),1)
+	touch $(PROFILE_FOLDER)/installed-extensions.json
+endif
+
+# Copy preload contacts to profile
+contacts:
+ifdef CONTACTS_PATH
+	@echo "Copying preload contacts to profile"
+	@cp $(CONTACTS_PATH) $(PROFILE_FOLDER)
+else
+	@rm -f $(PROFILE_FOLDER)/contacts.json
+endif
 
 # Create webapps
 offline: webapp-manifests webapp-optimize webapp-zip optimize-clean
 
+# Create an empty reference workload
+.PHONY: reference-workload-empty
+reference-workload-empty:
+	test_media/reference-workload/makeReferenceWorkload.sh empty
+
 # Create a light reference workload
 .PHONY: reference-workload-light
 reference-workload-light:
-	@echo "Populate Databases - Light Workload"
-	$(ADB) shell stop b2g
-	$(ADB) push  test_media/reference-workload/contactsDb-200.sqlite /data/local/indexedDB/chrome/3406066227csotncta.sqlite
-	$(ADB) push  test_media/reference-workload/smsDb-200.sqlite /data/local/indexedDB/chrome/226660312ssm.sqlite
-	$(ADB) shell start b2g
-	@echo "Done"
+	test_media/reference-workload/makeReferenceWorkload.sh light
 
 # Create a medium reference workload
 .PHONY: reference-workload-medium
 reference-workload-medium:
-	@echo "Populate Databases - Medium Workload"
-	$(ADB) shell stop b2g
-	$(ADB) push  test_media/reference-workload/contactsDb-500.sqlite /data/local/indexedDB/chrome/3406066227csotncta.sqlite
-	$(ADB) push  test_media/reference-workload/smsDb-500.sqlite /data/local/indexedDB/chrome/226660312ssm.sqlite
-	$(ADB) shell start b2g
-	@echo "Done"
+	test_media/reference-workload/makeReferenceWorkload.sh medium
 
 # Create a heavy reference workload
 .PHONY: reference-workload-heavy
 reference-workload-heavy:
-	@echo "Populate Databases - Heavy Workload"
-	$(ADB) shell stop b2g
-	$(ADB) push  test_media/reference-workload/contactsDb-1000.sqlite /data/local/indexedDB/chrome/3406066227csotncta.sqlite
-	$(ADB) push  test_media/reference-workload/smsDb-1000.sqlite /data/local/indexedDB/chrome/226660312ssm.sqlite
-	$(ADB) shell start b2g
-	@echo "Done"
+	test_media/reference-workload/makeReferenceWorkload.sh heavy
 
 # Create an extra heavy reference workload
 .PHONY: reference-workload-x-heavy
 reference-workload-x-heavy:
-	@echo "Populate Databases - Extra Heavy Workload"
-	$(ADB) shell stop b2g
-	$(ADB) push  test_media/reference-workload/contactsDb-2000.sqlite /data/local/indexedDB/chrome/3406066227csotncta.sqlite
-	$(ADB) push  test_media/reference-workload/smsDb-2000.sqlite /data/local/indexedDB/chrome/226660312ssm.sqlite
-	$(ADB) shell start b2g
-	@echo "Done"
+	test_media/reference-workload/makeReferenceWorkload.sh x-heavy
 
 
 # The install-xulrunner target arranges to get xulrunner downloaded and sets up
 # some commands for invoking it. But it is platform dependent
-XULRUNNER_SDK_URL=http://ftp.mozilla.org/pub/mozilla.org/xulrunner/nightly/2012/09/2012-09-20-03-05-43-mozilla-central/xulrunner-18.0a1.en-US.
+XULRUNNER_SDK_URL=http://ftp.mozilla.org/pub/mozilla.org/xulrunner/nightly/2013/06/2013-06-11-03-11-40-mozilla-central/xulrunner-24.0a1.en-US.
 
 ifeq ($(SYS),Darwin)
 # For mac we have the xulrunner-sdk so check for this directory
@@ -342,8 +377,8 @@ else
 # 64-bit
 XULRUNNER_SDK_DOWNLOAD=$(XULRUNNER_MAC_SDK_URL)x86_64.sdk.tar.bz2
 endif
-XULRUNNERSDK=./xulrunner-sdk/bin/run-mozilla.sh
-XPCSHELLSDK=./xulrunner-sdk/bin/xpcshell
+XULRUNNERSDK=./xulrunner-sdk/bin/XUL.framework/Versions/Current/run-mozilla.sh
+XPCSHELLSDK=./xulrunner-sdk/bin/XUL.framework/Versions/Current/xpcshell
 
 else ifeq ($(findstring MINGW32,$(SYS)), MINGW32)
 # For windows we only have one binary
@@ -383,23 +418,26 @@ endif # USE_LOCAL_XULRUNNER_SDK
 define run-js-command
 	echo "run-js-command $1";                                                   \
 	JS_CONSTS='                                                                 \
-	const GAIA_DIR = "$(CURDIR)"; const PROFILE_DIR = "$(CURDIR)$(SEP)profile"; \
+	const GAIA_DIR = "$(CURDIR)";                                               \
+	const PROFILE_DIR = "$(CURDIR)$(SEP)$(PROFILE_FOLDER)";                     \
+	const PROFILE_FOLDER = "$(PROFILE_FOLDER)";                                 \
 	const GAIA_SCHEME = "$(SCHEME)"; const GAIA_DOMAIN = "$(GAIA_DOMAIN)";      \
 	const DEBUG = $(DEBUG); const LOCAL_DOMAINS = $(LOCAL_DOMAINS);             \
+	const DESKTOP = $(DESKTOP);                                                 \
 	const HOMESCREEN = "$(HOMESCREEN)"; const GAIA_PORT = "$(GAIA_PORT)";       \
 	const GAIA_APP_SRCDIRS = "$(GAIA_APP_SRCDIRS)";                             \
 	const GAIA_LOCALES_PATH = "$(GAIA_LOCALES_PATH)";                           \
-	const LOCALES_FILE = "$(LOCALES_FILE)";                                     \
+	const LOCALES_FILE = "$(subst \,\\,$(LOCALES_FILE))";                       \
 	const BUILD_APP_NAME = "$(BUILD_APP_NAME)";                                 \
 	const PRODUCTION = "$(PRODUCTION)";                                         \
 	const GAIA_OPTIMIZE = "$(GAIA_OPTIMIZE)";                                   \
-	const HIDPI = "$(HIDPI)";                                     \
+	const GAIA_DEV_PIXELS_PER_PX = "$(GAIA_DEV_PIXELS_PER_PX)";                 \
 	const DOGFOOD = "$(DOGFOOD)";                                               \
 	const OFFICIAL = "$(MOZILLA_OFFICIAL)";                                     \
 	const GAIA_DEFAULT_LOCALE = "$(GAIA_DEFAULT_LOCALE)";                       \
 	const GAIA_INLINE_LOCALES = "$(GAIA_INLINE_LOCALES)";                       \
 	const GAIA_ENGINE = "xpcshell";                                             \
-	const CUSTOMIZE = "$(realpath $(CUSTOMIZE))";      													\
+	const GAIA_DISTRIBUTION_DIR = "$(GAIA_DISTRIBUTION_DIR)";                   \
 	';                                                                          \
 	$(XULRUNNERSDK) $(XPCSHELLSDK) -e "$$JS_CONSTS" -f build/utils.js "build/$(strip $1).js"
 endef
@@ -409,6 +447,7 @@ endef
 # conflict, the result is undefined.
 EXTENDED_PREF_FILES = \
   custom-prefs.js \
+  gps-prefs.js \
   payment-prefs.js \
   ua-override-prefs.js \
 
@@ -416,28 +455,44 @@ ifeq ($(DOGFOOD),1)
 EXTENDED_PREF_FILES += dogfood-prefs.js
 endif
 
+# Optional partner provided preference files. They will be added
+# after the ones on the EXTENDED_PREF_FILES and they will be read
+# from the GAIA_DISTRIBUTION_DIR directory
+PARTNER_PREF_FILES = \
+  partner-prefs.js\
+
 # Generate profile/prefs.js
 preferences: install-xulrunner-sdk
-	@test -d profile || mkdir -p profile
+	@test -d $(PROFILE_FOLDER) || mkdir -p $(PROFILE_FOLDER)
 	@$(call run-js-command, preferences)
 	@$(foreach prefs_file,$(addprefix build/,$(EXTENDED_PREF_FILES)),\
 	  if [ -f $(prefs_file) ]; then \
-	    cat $(prefs_file) >> profile/user.js; \
+	    cat $(prefs_file) >> $(PROFILE_FOLDER)/user.js; \
+	  fi; \
+	)
+	@echo "" >> $(PROFILE_FOLDER)/user.js
+	@$(foreach prefs_file,$(addprefix $(GAIA_DISTRIBUTION_DIR)/,$(PARTNER_PREF_FILES)),\
+	  if [ -f $(prefs_file) ]; then \
+	    cat $(prefs_file) >> $(PROFILE_FOLDER)/user.js; \
 	  fi; \
 	)
 
-# Generate profile/
+
+# Generate $(PROFILE_FOLDER)/
 applications-data: install-xulrunner-sdk
-	test -d profile || mkdir -p profile
+	test -d $(PROFILE_FOLDER) || mkdir -p $(PROFILE_FOLDER)
 	@$(call run-js-command, applications-data)
 
-# Generate profile/extensions
-EXT_DIR=profile/extensions
+# Generate $(PROFILE_FOLDER)/extensions
+EXT_DIR=$(PROFILE_FOLDER)/extensions
 extensions:
-	@mkdir -p profile
 	@rm -rf $(EXT_DIR)
-ifeq ($(DEBUG),1)
-	cp -r tools/extensions $(EXT_DIR)
+	@mkdir -p $(EXT_DIR)
+ifeq ($(DESKTOP),1)
+	cp -r tools/extensions/* $(EXT_DIR)/
+else ifeq ($(DEBUG),1)
+	cp tools/extensions/httpd@gaiamobile.org $(EXT_DIR)/
+	cp -r tools/extensions/httpd $(EXT_DIR)/
 endif
 	@echo "Finished: Generating extensions"
 
@@ -456,7 +511,7 @@ ifndef APPS
 	ifdef APP
 		APPS=$(APP)
 	else
-		APPS=$(shell find apps -type d -name 'test' | sed -e 's|^apps/||' -e 's|/test$$||' )
+		APPS=template $(shell find apps -type d -name 'test' | sed -e 's|^apps/||' -e 's|/test$$||' )
 	endif
 endif
 
@@ -493,12 +548,12 @@ tests: webapp-manifests offline
 	test -d $(MOZ_TESTS) || (echo "Please ensure you don't have |ac_add_options --disable-tests| in your mozconfig." && exit 1)
 	echo "Checking the injected Gaia..."
 	test -L $(INJECTED_GAIA) || ln -s $(CURDIR) $(INJECTED_GAIA)
-	TEST_PATH=$(TEST_PATH) make -C $(MOZ_OBJDIR) mochitest-browser-chrome EXTRA_TEST_ARGS="--browser-arg=\"\" --extra-profile-file=$(CURDIR)/profile/webapps --extra-profile-file=$(CURDIR)/profile/user.js"
+	TEST_PATH=$(TEST_PATH) make -C $(MOZ_OBJDIR) mochitest-browser-chrome EXTRA_TEST_ARGS="--browser-arg=\"\" --extra-profile-file=$(CURDIR)/$(PROFILE_FOLDER)/webapps --extra-profile-file=$(CURDIR)/$(PROFILE_FOLDER)/user.js"
 
 .PHONY: common-install
 common-install:
-	@test -x $(NODEJS) || (echo "Please Install NodeJS -- (use aptitude on linux or homebrew on osx)" && exit 1 )
-	@test -x $(NPM) || (echo "Please install NPM (node package manager) -- http://npmjs.org/" && exit 1 )
+	@test -x "$(NODEJS)" || (echo "Please Install NodeJS -- (use aptitude on linux or homebrew on osx)" && exit 1 )
+	@test -x "$(NPM)" || (echo "Please install NPM (node package manager) -- http://npmjs.org/" && exit 1 )
 
 	cd $(TEST_AGENT_DIR) && npm install .
 
@@ -560,20 +615,20 @@ endif
 test-agent-test:
 ifneq ($(strip $(APP)),)
 	@echo 'Running tests for $(APP)';
-	@$(TEST_AGENT_DIR)/node_modules/test-agent/bin/js-test-agent test --reporter $(REPORTER) $(APP_TEST_LIST)
+	@$(TEST_AGENT_DIR)/node_modules/test-agent/bin/js-test-agent test --server ws://localhost:$(TEST_AGENT_PORT) --reporter $(REPORTER) $(APP_TEST_LIST)
 else
 	@echo 'Running all tests';
-	@$(TEST_AGENT_DIR)/node_modules/test-agent/bin/js-test-agent test --reporter $(REPORTER)
+	@$(TEST_AGENT_DIR)/node_modules/test-agent/bin/js-test-agent test --server ws://localhost:$(TEST_AGENT_PORT) --reporter $(REPORTER)
 endif
 
 .PHONY: test-agent-server
 test-agent-server: common-install
-	$(TEST_AGENT_DIR)/node_modules/test-agent/bin/js-test-agent server -c ./$(TEST_AGENT_DIR)/test-agent-server.js --http-path . --growl
+	$(TEST_AGENT_DIR)/node_modules/test-agent/bin/js-test-agent server --port $(TEST_AGENT_PORT) -c ./$(TEST_AGENT_DIR)/test-agent-server.js --http-path . --growl
 
 .PHONY: marionette
 marionette:
 #need the profile
-	test -d $(GAIA)/profile || $(MAKE) profile
+	test -d $(GAIA)/$(PROFILE_FOLDER) || $(MAKE) $(PROFILE_FOLDER)
 ifneq ($(PYTHON_MAJOR), 2)
 	@echo "Python 2.7.x is needed for the marionette client. You can set the PYTHON_27 variable to your python2.7 path." && exit 1
 endif
@@ -598,26 +653,9 @@ endif
 
 # Lint apps
 lint:
-	@# ignore lint on:
-	@# cubevid
-	@# crystalskull
-	@# towerjelly
-	@gjslint --nojsdoc -r apps -e 'homescreen/everything.me,sms/js/ext,pdfjs/content,pdfjs/test,email/js/ext,music/js/ext,calendar/js/ext'
-	@gjslint --nojsdoc -r shared/js
-
-# Generate a text file containing the current changeset of Gaia
-# XXX I wonder if this should be a replace-in-file hack. This would let us
-#     let us remove the update-offline-manifests target dependancy of the
-#     default target.
-stamp-commit-hash:
-	@(if [ -e gaia_commit_override.txt ]; then \
-		cp gaia_commit_override.txt apps/settings/resources/gaia_commit.txt; \
-	elif [ -d ./.git ]; then \
-		git log -1 --format="%H%n%at" HEAD > apps/settings/resources/gaia_commit.txt; \
-	else \
-		echo 'Unknown Git commit; build date shown here.' > apps/settings/resources/gaia_commit.txt; \
-		date +%s >> apps/settings/resources/gaia_commit.txt; \
-	fi)
+	# --disable 210,217,220,225 replaces --nojsdoc because it's broken in closure-linter 2.3.10
+	# http://code.google.com/p/closure-linter/issues/detail?id=64
+	gjslint --disable 210,217,220,225 -r apps -r shared -e '$(shell cat ./build/lint-excluded-dirs.list)' -x '$(shell cat ./build/lint-excluded-files.list)'
 
 # Erase all the indexedDB databases on the phone, so apps have to rebuild them.
 delete-databases:
@@ -641,38 +679,18 @@ forward:
 	$(ADB) shell killall rilproxy
 	$(ADB) forward tcp:6200 localreserved:rilproxyd
 
-
-# update the manifest.appcache files to match what's actually there
-update-offline-manifests:
-	for d in `find -L ${GAIA_APP_SRCDIRS} -mindepth 1 -maxdepth 1 -type d` ;\
-	do \
-		rm -rf $$d/manifest.appcache ;\
-		if [ -f $$d/manifest.webapp ] ;\
-		then \
-			echo \\t$$d ;  \
-			( cd $$d ; \
-			echo "CACHE MANIFEST" > manifest.appcache ;\
-			cat `find * -type f | sort -nfs` | $(MD5SUM) | cut -f 1 -d ' ' | sed 's/^/\#\ Version\ /' >> manifest.appcache ;\
-			find * -type f | grep -v tools | sort >> manifest.appcache ;\
-			$(SED_INPLACE_NO_SUFFIX) -e 's|manifest.appcache||g' manifest.appcache ;\
-			echo "http://$(GAIA_DOMAIN)$(GAIA_PORT)/webapi.js" >> manifest.appcache ;\
-			echo "NETWORK:" >> manifest.appcache ;\
-			echo "http://*" >> manifest.appcache ;\
-			echo "https://*" >> manifest.appcache ;\
-			) ;\
-		fi \
-	done
-
-
 # If your gaia/ directory is a sub-directory of the B2G directory, then
-# you should use the install-gaia target of the B2G Makefile. But if you're
-# working on just gaia itself, and you already have B2G firmware on your
-# phone, and you have adb in your path, then you can use the install-gaia
-# target to update the gaia files and reboot b2g
+# you should use:
+#
+#  BUILD_APP_NAME=app-name ./flash.sh gaia
+#
+# But if you're working on just gaia itself, and you already have B2G firmware
+# on your phone, and you have adb in your path, then you can use the
+# install-gaia target to update the gaia files and reboot b2g
 TARGET_FOLDER = webapps/$(BUILD_APP_NAME).$(GAIA_DOMAIN)
-APP_NAME = $(shell cat apps/${BUILD_APP_NAME}/manifest.webapp | grep name | head -1 | cut -d '"' -f 4)
+APP_NAME = $(shell cat *apps/${BUILD_APP_NAME}/manifest.webapp | grep name | head -1 | cut -d '"' -f 4 | cut -b 1-15)
 APP_PID = $(shell adb shell b2g-ps | grep '^${APP_NAME}' | sed 's/^${APP_NAME}\s*//' | awk '{ print $$2 }')
-install-gaia: profile
+install-gaia: $(PROFILE_FOLDER)
 	$(ADB) start-server
 	@echo 'Stopping b2g'
 ifeq ($(BUILD_APP_NAME),*)
@@ -689,12 +707,12 @@ ifeq ($(ADB_REMOUNT),1)
 endif
 
 ifeq ($(BUILD_APP_NAME),*)
-	python build/install-gaia.py "$(ADB)" "$(MSYS_FIX)$(GAIA_INSTALL_PARENT)"
+	python build/install-gaia.py "$(ADB)" "$(MSYS_FIX)$(GAIA_INSTALL_PARENT)" "$(PROFILE_FOLDER)"
 else
-	$(ADB) push profile/$(TARGET_FOLDER)/manifest.webapp $(MSYS_FIX)$(GAIA_INSTALL_PARENT)/$(TARGET_FOLDER)/manifest.webapp
-	$(ADB) push profile/$(TARGET_FOLDER)/application.zip $(MSYS_FIX)$(GAIA_INSTALL_PARENT)/$(TARGET_FOLDER)/application.zip
+	$(ADB) push $(PROFILE_FOLDER)/$(TARGET_FOLDER)/manifest.webapp $(MSYS_FIX)$(GAIA_INSTALL_PARENT)/$(TARGET_FOLDER)/manifest.webapp
+	$(ADB) push $(PROFILE_FOLDER)/$(TARGET_FOLDER)/application.zip $(MSYS_FIX)$(GAIA_INSTALL_PARENT)/$(TARGET_FOLDER)/application.zip
 endif
-	@echo "Installed gaia into profile/."
+	@echo "Installed gaia into $(PROFILE_FOLDER)/."
 	@echo 'Starting b2g'
 	$(ADB) shell start b2g
 
@@ -727,18 +745,20 @@ production: reset-gaia
 dogfood: reset-gaia
 
 # Remove everything and install a clean profile
-reset-gaia: purge install-gaia install-settings-defaults
+reset-gaia: purge install-gaia install-default-data
 
 # remove the memories and apps on the phone
 purge:
 	$(ADB) shell stop b2g
 	@(for FILE in `$(ADB) shell ls $(MSYS_FIX)/data/local | tr -d '\r'`; \
 	do \
-		[ $$FILE != 'tmp' ] && $(ADB) shell rm -r $(MSYS_FIX)/data/local/$$FILE; \
+		[ $$FILE = 'tmp' ] || $(ADB) shell rm -r $(MSYS_FIX)/data/local/$$FILE; \
 	done);
 	$(ADB) shell rm -r $(MSYS_FIX)/cache/*
 	$(ADB) shell rm -r $(MSYS_FIX)/data/b2g/*
-	$(ADB) shell rm -r $(MSYS_FIX)$(GAIA_INSTALL_PARENT)/webapps
+	$(ADB) shell rm -r $(MSYS_FIX)/data/local/webapps
+	$(ADB) remount
+	$(ADB) shell rm -r $(MSYS_FIX)/system/b2g/webapps
 
 # Build the settings.json file from settings.py
 ifeq ($(NOFTU), 1)
@@ -749,32 +769,53 @@ ifeq ($(REMOTE_DEBUGGER), 1)
 SETTINGS_ARG += --enable-debugger
 endif
 
+ifeq ($(DEBUG),1)
+SETTINGS_ARG += --homescreen=http://homescreen.$(GAIA_DOMAIN)$(GAIA_PORT)/manifest.webapp
+endif
+
 # We want the console to be disabled for device builds using the user variant.
 ifneq ($(TARGET_BUILD_VARIANT),user)
 SETTINGS_ARG += --console
 endif
 
-profile/settings.json:
-ifneq ($(HIDPI),*)
-	python build/settings.py --hidpi build/wallpaper@2x.jpg
-	python build/settings.py $(SETTINGS_ARG) --locale $(GAIA_DEFAULT_LOCALE) --hidpi --homescreen $(SCHEME)homescreen.$(GAIA_DOMAIN)$(GAIA_PORT)/manifest.webapp --ftu $(SCHEME)communications.$(GAIA_DOMAIN)$(GAIA_PORT)/manifest.webapp --wallpaper build/wallpaper@2x.jpg --override $(SETTINGS_PATH) --output $@
+$(PROFILE_FOLDER)/settings.json:
+ifneq ($(GAIA_DEV_PIXELS_PER_PX),1)
+	python build/settings.py $(SETTINGS_ARG) --profile-folder $(PROFILE_FOLDER) --locale $(GAIA_DEFAULT_LOCALE) --homescreen $(SCHEME)homescreen.$(GAIA_DOMAIN)$(GAIA_PORT)/manifest.webapp --ftu $(SCHEME)communications.$(GAIA_DOMAIN)$(GAIA_PORT)/manifest.webapp --wallpaper build/wallpaper@$(GAIA_DEV_PIXELS_PER_PX)x.jpg --override $(SETTINGS_PATH) --output $(PROFILE_FOLDER)/settings.json
 else
-	python build/settings.py build/wallpaper.jpg
-	python build/settings.py $(SETTINGS_ARG) --locale $(GAIA_DEFAULT_LOCALE) --homescreen $(SCHEME)homescreen.$(GAIA_DOMAIN)$(GAIA_PORT)/manifest.webapp --ftu $(SCHEME)communications.$(GAIA_DOMAIN)$(GAIA_PORT)/manifest.webapp --wallpaper build/wallpaper.jpg --override $(SETTINGS_PATH) --output $@
+	python build/settings.py $(SETTINGS_ARG) --profile-folder $(PROFILE_FOLDER) --locale $(GAIA_DEFAULT_LOCALE) --homescreen $(SCHEME)homescreen.$(GAIA_DOMAIN)$(GAIA_PORT)/manifest.webapp --ftu $(SCHEME)communications.$(GAIA_DOMAIN)$(GAIA_PORT)/manifest.webapp --wallpaper build/wallpaper.jpg --override $(SETTINGS_PATH) --output $(PROFILE_FOLDER)/settings.json
 endif
 
-# push profile/settings.json to the phone
-install-settings-defaults: profile/settings.json
+# push $(PROFILE_FOLDER)/settings.json and $(PROFILE_FOLDER)/contacts.json (if CONTACTS_PATH defined) to the phone
+install-default-data: $(PROFILE_FOLDER)/settings.json contacts
 	$(ADB) shell stop b2g
 	$(ADB) remount
-	$(ADB) push profile/settings.json /system/b2g/defaults/settings.json
+	$(ADB) push $(PROFILE_FOLDER)/settings.json /system/b2g/defaults/settings.json
+ifdef CONTACTS_PATH
+	$(ADB) push $(PROFILE_FOLDER)/contacts.json /system/b2g/defaults/contacts.json
+else
+	$(ADB) shell rm /system/b2g/defaults/contacts.json
+endif
 	$(ADB) shell start b2g
+
+# create default data, gonk-misc will copy this folder during B2G build time
+create-default-data: preferences $(PROFILE_FOLDER)/settings.json contacts
+	# create a clean folder to store data for B2G, this folder will copy to b2g output folder.
+	rm -rf $(PROFILE_FOLDER)/defaults
+	mkdir -p $(PROFILE_FOLDER)/defaults/pref
+	# rename user_pref() to pref() in user.js
+	sed s/user_pref\(/pref\(/ $(PROFILE_FOLDER)/user.js > $(PROFILE_FOLDER)/defaults/pref/user.js
+	cp $(PROFILE_FOLDER)/settings.json $(PROFILE_FOLDER)/defaults/settings.json
+ifdef CONTACTS_PATH
+	cp $(PROFILE_FOLDER)/contacts.json $(PROFILE_FOLDER)/defaults/contacts.json
+endif
 
 # clean out build products
 clean:
-	rm -rf profile
+	rm -rf profile profile-debug $(PROFILE_FOLDER)
 
 # clean out build products
 really-clean: clean
 	rm -rf xulrunner-sdk .xulrunner-url
 
+install-git-hook:
+	test -d .git && cp tools/pre-commit .git/hooks/pre-commit || true

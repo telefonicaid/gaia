@@ -30,7 +30,8 @@ var ActivityHandler = {
     this._currentActivity = activity;
     var hash = action;
     var param, params = [];
-    if (activity.source && activity.source.data && activity.source.data.params) {
+    if (activity.source &&
+        activity.source.data && activity.source.data.params) {
       var originalParams = activity.source.data.params;
       for (var i in originalParams) {
         param = originalParams[i];
@@ -45,7 +46,9 @@ var ActivityHandler = {
       case 'new':
         this.launch_activity(activity, 'view-contact-form');
         break;
-
+      case 'open':
+        this.launch_activity(activity, 'view-contact-details');
+        break;
       case 'update':
         this.launch_activity(activity, 'add-parameters');
         break;
@@ -61,7 +64,13 @@ var ActivityHandler = {
   },
 
   postNewSuccess: function ah_postNewSuccess(contact) {
-    this._currentActivity.postResult({contact: contact});
+    // XXX: the contact cannot be passed if we don't duplicate it
+    var dupContact = {};
+    for (var attr in contact) {
+      dupContact[attr] = contact[attr];
+    }
+
+    this._currentActivity.postResult({ contact: dupContact });
     this._currentActivity = null;
   },
 

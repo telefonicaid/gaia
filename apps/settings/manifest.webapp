@@ -8,7 +8,9 @@
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
+    "storage":{},
     "mobileconnection":{},
+    "voicemail":{},
     "bluetooth":{},
     "device-storage:pictures":{ "access": "readonly" },
     "device-storage:music":{ "access": "readonly" },
@@ -35,9 +37,7 @@
       "disposition": "window"
     }
   },
-  "messages": ["bluetooth-requestconfirmation",
-               "bluetooth-requestpasskey",
-               "bluetooth-requestpincode",
+  "messages": ["bluetooth-pairing-request",
                "bluetooth-authorize",
                "bluetooth-cancel",
                "bluetooth-pairedstatuschanged",
@@ -66,8 +66,9 @@
   },
   "default_locale": "en-US",
   "icons": {
+    "60": "/style/icons/60/Settings.png",
     "120": "/style/icons/Settings.png",
-    "60": "/style/icons/60/Settings.png"
+    "320": "/style/icons/320/Settings.png"
   },
   "orientation": "portrait-primary"
 }

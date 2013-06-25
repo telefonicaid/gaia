@@ -5,20 +5,25 @@
 function parseAudioMetadata(blob, metadataCallback, errorCallback) {
   var filename = blob.name;
 
-  // If the file is in the DCIM/ directory and has a .3gp extension
-  // then it is a video, not a music file and we ignore it
-  if (filename.slice(0, 5) === 'DCIM/' &&
-      filename.slice(-4).toLowerCase() === '.3gp') {
-    errorCallback('skipping 3gp video file');
-    return;
-  }
+  // If blob.name exists, it should be an audio file from system
+  // otherwise it should be an audio blob that probably from network/process
+  // we can still parse it but we don't need to care about the filename
+  if (filename) {
+    // If the file is in the DCIM/ directory and has a .3gp extension
+    // then it is a video, not a music file and we ignore it
+    if (filename.slice(0, 5) === 'DCIM/' &&
+        filename.slice(-4).toLowerCase() === '.3gp') {
+      errorCallback('skipping 3gp video file');
+      return;
+    }
 
-  // If the file has a .m4v extension then it is almost certainly a video.
-  // Device Storage should not even return these files to us:
-  // see https://bugzilla.mozilla.org/show_bug.cgi?id=826024
-  if (filename.slice(-4).toLowerCase() === '.m4v') {
-    errorCallback('skipping m4v video file');
-    return;
+    // If the file has a .m4v extension then it is almost certainly a video.
+    // Device Storage should not even return these files to us:
+    // see https://bugzilla.mozilla.org/show_bug.cgi?id=826024
+    if (filename.slice(-4).toLowerCase() === '.m4v') {
+      errorCallback('skipping m4v video file');
+      return;
+    }
   }
 
   // If the file is too small to be a music file then ignore it
@@ -413,6 +418,7 @@ function parseAudioMetadata(blob, metadataCallback, errorCallback) {
   //   http://xiph.org/vorbis/doc/Vorbis_I_spec.html
   //   http://www.xiph.org/vorbis/doc/v-comment.html
   //   http://wiki.xiph.org/VorbisComment
+  //   http://tools.ietf.org/html/draft-ietf-codec-oggopus-00
   //
   function parseOggMetadata(header) {
     function sum(x, y) { return x + y; } // for Array.reduce() below
@@ -437,7 +443,18 @@ function parseAudioMetadata(blob, metadataCallback, errorCallback) {
         return;
       }
 
-      if (page.readByte() !== 3 || page.readASCIIText(6) !== 'vorbis') {
+      // Look for a comment packet from a supported codec
+      var first_byte = page.readByte();
+      var valid = false;
+      switch (first_byte) {
+        case 3:
+          valid = page.readASCIIText(6) === 'vorbis';
+          break;
+        case 79:
+          valid = page.readASCIIText(7) === 'pusTags';
+          break;
+      }
+      if (!valid) {
         errorCallback('malformed ogg comment packet');
       }
 
@@ -586,10 +603,11 @@ function parseAudioMetadata(blob, metadataCallback, errorCallback) {
     }
 
     function findChildAtom(data, atom) {
+      var start = data.index;
       var length = data.readUnsignedInt();
       data.advance(4);
 
-      while (data.index < length) {
+      while (data.index < start + length) {
         var size = data.readUnsignedInt();
         var type = data.readASCIIText(4);
         if (type === atom) {
@@ -813,7 +831,7 @@ function getThumbnailURL(fileinfo, callback) {
         // Return a default one instead
         console.warn('Album cover art failed to load', file.name);
         callback(null);
-      }
+      };
       offscreenImage.onload = function() {
         // We've loaded the image, now copy it to a canvas
         var canvas = document.createElement('canvas');

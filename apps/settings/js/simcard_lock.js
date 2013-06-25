@@ -10,23 +10,35 @@ var SimPinLock = {
   changeSimPinButton: document.querySelector('#simpin-change button'),
 
   mobileConnection: null,
+  icc: null,
 
   updateSimCardStatus: function spl_updateSimStatus() {
     var _ = navigator.mozL10n.get;
 
-    if (this.mobileConnection.cardState === 'absent') {
-      this.simSecurityDesc.textContent = _('noSimCard');
+    var cardState = this.mobileConnection.cardState;
+    var cardStateMapping = {
+      'null': 'simCardNotReady',
+      'unknown': 'unknownSimCardState',
+      'absent': 'noSimCard'
+    };
+    var textContent = cardStateMapping[cardState ? cardState : 'null'];
+    if (textContent) {
+      this.simSecurityDesc.textContent = _(textContent);
+      this.simSecurityDesc.dataset.l10nId = textContent;
       this.simPinCheckBox.disabled = true;
       this.changeSimPinItem.hidden = true;
       return;
     }
+
     // with SIM card, query its status
     var self = this;
-    var req = this.mobileConnection.getCardLock('pin');
+    var req = this.icc.getCardLock('pin');
     req.onsuccess = function spl_checkSuccess() {
       var enabled = req.result.enabled;
       self.simSecurityDesc.textContent = (enabled) ?
         _('enabled') : _('disabled');
+      self.simSecurityDesc.dataset.l10nId = (enabled) ?
+        'enabled' : 'disabled';
       self.simPinCheckBox.disabled = false;
       self.simPinCheckBox.checked = enabled;
       self.changeSimPinItem.hidden = !enabled;
@@ -36,6 +48,10 @@ var SimPinLock = {
   init: function spl_init() {
     this.mobileConnection = window.navigator.mozMobileConnection;
     if (!this.mobileConnection)
+      return;
+
+    this.icc = window.navigator.mozIccManager;
+    if (!this.icc)
       return;
 
     this.mobileConnection.addEventListener('cardstatechange',
@@ -56,7 +72,7 @@ var SimPinLock = {
               self.simPinCheckBox.checked = !enabled;
               self.updateSimCardStatus();
             },
-            document.location.hash
+            Settings.currentPanel
           );
           break;
         default:
@@ -69,13 +85,13 @@ var SimPinLock = {
               self.simPinCheckBox.checked = !enabled;
               self.updateSimCardStatus();
             },
-            document.location.hash
+            Settings.currentPanel
           );
           break;
       }
     };
     this.changeSimPinButton.onclick = function spl_changePin() {
-      SimPinDialog.show('changePin', null, null, document.location.hash);
+      SimPinDialog.show('changePin', null, null, Settings.currentPanel);
     };
 
     this.updateSimCardStatus();

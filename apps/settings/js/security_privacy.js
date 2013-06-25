@@ -30,18 +30,37 @@ var Security = {
     if (!mobileConnection)
       return;
 
-    var simSecurityDesc = document.getElementById('simCardLock-desc');
-
-    if (mobileConnection.cardState === 'absent') {
-      simSecurityDesc.textContent = _('noSimCard');
+    var icc = navigator.mozIccManager;
+    if (!icc)
       return;
+
+    var simSecurityDesc = document.getElementById('simCardLock-desc');
+    simSecurityDesc.style.fontStyle = 'italic';
+
+    switch (mobileConnection.cardState) {
+      case null:
+        simSecurityDesc.textContent = _('simCardNotReady');
+        simSecurityDesc.dataset.l10nId = 'simCardNotReady';
+        return;
+      case 'unknown':
+        simSecurityDesc.textContent = _('unknownSimCardState');
+        simSecurityDesc.dataset.l10nId = 'unknownSimCardState';
+        return;
+      case 'absent':
+        simSecurityDesc.textContent = _('noSimCard');
+        simSecurityDesc.dataset.l10nId = 'noSimCard';
+        return;
     }
+
+    simSecurityDesc.style.fontStyle = 'normal';
     // with SIM card, query its status
-    var req = mobileConnection.getCardLock('pin');
+    var req = icc.getCardLock('pin');
     req.onsuccess = function spl_checkSuccess() {
       var enabled = req.result.enabled;
       simSecurityDesc.textContent = (enabled) ?
         _('enabled') : _('disabled');
+      simSecurityDesc.dataset.l10nId = (enabled) ?
+        'enabled' : 'disabled';
     };
   }
 };

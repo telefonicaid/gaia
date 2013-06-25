@@ -1,11 +1,25 @@
 (function(window) {
 
   const NEXT_TICK = 'calendar-next-tick';
+  var NUMERIC = /^([0-9]+)$/;
   var nextTickStack = [];
+
+  var hasOwnProperty = Object.prototype.hasOwnProperty;
 
   window.Calendar = {
 
+    ERROR: 'error',
     DEBUG: false,
+
+    extend: function(target, input) {
+      for (var key in input) {
+        if (hasOwnProperty.call(input, key)) {
+          target[key] = input[key];
+        }
+      }
+
+      return target;
+    },
 
     /**
      * Very similar to node's nextTick.
@@ -23,9 +37,10 @@
      *    Calendar.ns('Views').Month = Month;
      *
      * @param {String} namespace like "Views".
+     * @param {Boolean} checkOnly will not create new namespaces when true.
      * @return {Object} namespace ref.
      */
-    ns: function(path) {
+    ns: function(path, checkOnly) {
       var parts = path.split('.');
       var lastPart = this;
       var i = 0;
@@ -34,10 +49,16 @@
       for (; i < len; i++) {
         var part = parts[i];
         if (!(part in lastPart)) {
+          if (checkOnly)
+            return false;
+
           lastPart[part] = {};
         }
         lastPart = lastPart[part];
       }
+
+      if (checkOnly)
+        return true;
 
       return lastPart;
     },
@@ -74,6 +95,22 @@
       }
 
       return 0;
+    },
+
+    /**
+     * Ermahgerd!
+     *
+     * @param {number|string} id Some id.
+     */
+    probablyParseInt: function(id) {
+      // by an unfortunate decision we have both
+      // string ids and number ids.. based on the
+      // input we run parseInt
+      if (id.match && id.match(NUMERIC)) {
+        return parseInt(id, 10);
+      }
+
+      return id;
     },
 
     /**

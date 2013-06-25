@@ -1,8 +1,5 @@
 'use strict';
 
-// We will use a wake lock later to prevent Music from sleeping
-var cpuLock = null;
-
 // We have three types of the playing sources
 // These are for player to know which source type is playing
 var TYPE_MIX = 'mix';
@@ -28,6 +25,14 @@ if (acm) {
     }
   });
 }
+
+window.addEventListener('mozvisibilitychange', function() {
+  if (document.mozHidden) {
+    PlayerView.audio.removeEventListener('timeupdate', PlayerView);
+  } else {
+    PlayerView.audio.addEventListener('timeupdate', PlayerView);
+  }
+});
 
 // View of Player
 var PlayerView = {
@@ -91,6 +96,7 @@ var PlayerView = {
     this.isPlaying = false;
     this.isSeeking = false;
     this.dataSource = [];
+    this.playingBlob = null;
     this.currentIndex = 0;
     this.backgroundIndex = 0;
     this.setSeekBar(0, 0, 0); // Set 0 to default seek position
@@ -122,6 +128,7 @@ var PlayerView = {
       musicdb.cancelEnumeration(playerHandle);
 
     this.dataSource = [];
+    this.playingBlob = null;
   },
 
   setSourceType: function pv_setSourceType(type) {
@@ -264,12 +271,14 @@ var PlayerView = {
   },
 
   getMetadata: function pv_getMetadata(blob, callback) {
-    parseAudioMetadata(blob, pv_gotMetadata, pv_metadataError);
+    parseAudioMetadata(blob, pv_gotMetadata, pv_metadataError.bind(this));
 
     function pv_gotMetadata(metadata) {
       callback(metadata);
     }
     function pv_metadataError(e) {
+      if (this.onerror)
+        this.onerror(e);
       console.warn('parseAudioMetadata: error parsing metadata - ', e);
     }
   },
@@ -290,6 +299,10 @@ var PlayerView = {
     // An object URL must be released by calling URL.revokeObjectURL()
     // when we no longer need them
     this.audio.onloadeddata = function(evt) { URL.revokeObjectURL(url); };
+    this.audio.onerror = (function(evt) {
+      if (this.onerror)
+        this.onerror(evt);
+    }).bind(this);
     // when play a new song, reset the seekBar first
     // this can prevent showing wrong duration
     // due to b2g cannot get some mp3's duration
@@ -305,20 +318,19 @@ var PlayerView = {
   play: function pv_play(targetIndex, backgroundIndex) {
     this.isPlaying = true;
 
-    // Hold a wake lock to prevent from sleeping
-    if (!cpuLock)
-      cpuLock = navigator.requestWakeLock('cpu');
-
-
     this.showInfo();
 
     if (arguments.length > 0) {
       var songData = this.dataSource[targetIndex];
 
-      playerTitle = songData.metadata.title || unknownTitle;
-      TitleBar.changeTitleText(playerTitle);
+      ModeManager.playerTitle = songData.metadata.title;
+      ModeManager.updateTitle();
       this.artist.textContent = songData.metadata.artist || unknownArtist;
+      this.artist.dataset.l10nId =
+        songData.metadata.artist ? '' : unknownArtistL10nId;
       this.album.textContent = songData.metadata.album || unknownAlbum;
+      this.album.dataset.l10nId =
+        songData.metadata.album ? '' : unknownAlbumL10nId;
       this.currentIndex = targetIndex;
 
       // backgroundIndex is from the index of sublistView
@@ -343,6 +355,7 @@ var PlayerView = {
 
       musicdb.getFile(songData.name, function(file) {
         this.setAudioSrc(file, true);
+        this.playingBlob = file;
       }.bind(this));
     } else if (this.sourceType === TYPE_BLOB && !this.audio.src) {
       // if we reach here, that means we want to a blob
@@ -351,8 +364,11 @@ var PlayerView = {
         var titleBar = document.getElementById('title-text');
 
         titleBar.textContent = metadata.title || unknownTitle;
+        titleBar.dataset.l10nId = metadata.title ? '' : unknownTitleL10nId;
         this.artist.textContent = metadata.artist || unknownArtist;
+        this.artist.dataset.l10nId = metadata.artist ? '' : unknownArtistL10nId;
         this.album.textContent = metadata.album || unknownAlbum;
+        this.album.dataset.l10nId = metadata.album ? '' : unknownAlbumL10nId;
 
         // Add the blob from the dataSource to the fileinfo
         // because we want use the cover image which embedded in that blob
@@ -371,13 +387,6 @@ var PlayerView = {
 
   pause: function pv_pause() {
     this.isPlaying = false;
-
-    // We can go to sleep if music pauses
-    if (cpuLock) {
-      cpuLock.unlock();
-      cpuLock = null;
-    }
-
     this.audio.pause();
   },
 
@@ -419,12 +428,15 @@ var PlayerView = {
         // When reaches the end, stop and back to the previous mode
         this.stop();
         this.clean();
-        playerTitle = null;
+        ModeManager.playerTitle = null;
 
         // To leave player mode and set the correct title to the TitleBar
         // we have to decide which mode we should back to when the player stops
-        var stopToMode = (currentMode != MODE_PLAYER) ? currentMode : fromMode;
-        changeMode(stopToMode);
+        if (ModeManager.currentMode === MODE_PLAYER) {
+          ModeManager.pop();
+        } else {
+          ModeManager.updateTitle();
+        }
         return;
       }
     } else {
@@ -488,22 +500,12 @@ var PlayerView = {
     if (seekTime !== undefined)
       this.audio.currentTime = seekTime;
 
-    // mp3 returns in microseconds
-    // ogg returns in seconds
-    // note this may be a bug cause mp3 shows wrong duration in
-    // gecko's native audio player
-    // A related Bug 740124 in Bugzilla
     var startTime = this.audio.startTime;
 
-    var originalEndTime =
+    var endTime =
       (this.audio.duration && this.audio.duration != 'Infinity') ?
       this.audio.duration :
       this.audio.buffered.end(this.audio.buffered.length - 1);
-
-    // now mp3 returns in seconds, but keep this checking to prevent bugs
-    var endTime = (originalEndTime > 1000000) ?
-      Math.floor(originalEndTime / 1000000) :
-      Math.floor(originalEndTime);
 
     var currentTime = this.audio.currentTime;
 
@@ -524,7 +526,11 @@ var PlayerView = {
     this.seekIndicator.style.transform = 'translateX(' + x + ')';
 
     this.seekElapsed.textContent = formatTime(currentTime);
-    this.seekRemaining.textContent = '-' + formatTime(endTime - currentTime);
+    var remainingTime = endTime - currentTime;
+    // Check if there is remaining time to show, avoiding to display "-00:00"
+    // while song is loading (Bug 833710)
+    this.seekRemaining.textContent =
+        (remainingTime > 0) ? '-' + formatTime(remainingTime) : '---:--';
   },
 
   handleEvent: function pv_handleEvent(evt) {
@@ -593,10 +599,14 @@ var PlayerView = {
           this.showInfo();
 
           var songData = this.dataSource[this.currentIndex];
-          songData.metadata.rated = parseInt(target.dataset.rating);
+          var targetRating = parseInt(target.dataset.rating);
+          var newRating = (targetRating === songData.metadata.rated) ?
+            targetRating - 1 : targetRating;
 
-          musicdb.updateMetadata(songData.name, songData.metadata,
-            this.setRatings.bind(this, parseInt(target.dataset.rating)));
+          songData.metadata.rated = newRating;
+
+          musicdb.updateMetadata(songData.name, songData.metadata);
+          this.setRatings(newRating);
         }
 
         break;

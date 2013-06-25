@@ -17,6 +17,9 @@
     if (!Applications.ready)
       return;
 
+    if (!Applications.getByManifestURL(origin + '/manifest.webapp'))
+      return;
+
     // Check widget is there
     widgetFrame = widgetContainer.querySelector('iframe');
     if (widgetFrame && !widgetFrame.dataset.killed)
@@ -90,6 +93,9 @@
   }
 
   function _adjustWidgetPosition() {
+    if (!widgetFrame)
+      return;
+
     // TODO: Remove this when weird bug #809031 (Bugzilla) is solved
     // See cost_control.css as well to remove the last rule
     var offsetY = document.getElementById('notification-bar').clientHeight;

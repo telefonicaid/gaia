@@ -1,6 +1,4 @@
 'use strict';
-// Ignore leak, otherwise an error would occur when using MockMozActivity.
-mocha.setup({ignoreLeaks: true});
 
 requireApp('system/test/unit/mock_settings_listener.js');
 requireApp('system/test/unit/mock_l10n.js');
@@ -15,7 +13,7 @@ requireApp('system/js/lockscreen.js');
 var mocksForStatusBar = ['SettingsListener', 'MobileOperator'];
 
 mocksForStatusBar.forEach(function(mockName) {
-  if (window[mockName]) {
+  if (!window[mockName]) {
     window[mockName] = null;
   }
 });
@@ -38,8 +36,6 @@ suite('system/Statusbar', function() {
     navigator.mozMobileConnection = MockNavigatorMozMobileConnection;
     realMozTelephony = navigator.mozTelephony;
     navigator.mozTelephony = MockNavigatorMozTelephony;
-    realMobileOperator = window.MobileOperator;
-    window.MobileOperator = MockMobileOperator;
   });
 
   suiteTeardown(function() {
@@ -47,8 +43,6 @@ suite('system/Statusbar', function() {
     navigator.mozL10n = realMozL10n;
     navigator.mozMobileConnection = realMozMobileConnection;
     navigator.mozTelephony = realMozTelephony;
-    window.SettingsListener = realSettingsListener;
-    window.MobileOperator = realMobileOperator;
   });
 
   setup(function() {
@@ -59,7 +53,8 @@ suite('system/Statusbar', function() {
 
     StatusBar.ELEMENTS.forEach(function testAddElement(elementName) {
       var elt;
-      if (elementName == 'system-downloads' || elementName == 'network-activity') {
+      if (elementName == 'system-downloads' ||
+          elementName == 'network-activity') {
         elt = document.createElement('canvas');
       } else {
         elt = document.createElement('div');
@@ -397,6 +392,34 @@ suite('system/Statusbar', function() {
       assert.equal(dataset.emergency, 'true');
       assert.notEqual(dataset.searching, 'true');
     });
+
+    test('emergency calls, avoid infinite callback loop', function() {
+      MockNavigatorMozMobileConnection.voice = {
+        connected: false,
+        relSignalStrength: 80,
+        emergencyCallsOnly: true,
+        state: 'notSearching',
+        roaming: false,
+        network: {}
+      };
+
+      MockNavigatorMozMobileConnection.cardState = 'pinRequired';
+      MockNavigatorMozMobileConnection.iccInfo = {};
+
+      var mockTel = MockNavigatorMozTelephony;
+
+      StatusBar.update.signal.call(StatusBar);
+      assert.equal(mockTel.mCountEventListener('callschanged', StatusBar), 1);
+
+      // Bug 880390: On B2G18 adding a 'callschanged' listener can trigger
+      // another event immediately.  To avoid an infinite loop, the listener
+      // must only be added once.  Simulate this immediate event here and then
+      // check that we still only have one listener.
+
+      var evt = new CustomEvent('callschanged');
+      mockTel.mTriggerEvent(evt);
+      assert.equal(mockTel.mCountEventListener('callschanged', StatusBar), 1);
+    });
   }),
 
   suite('operator name', function() {
@@ -406,17 +429,17 @@ suite('system/Statusbar', function() {
         network: {
           shortName: 'Fake short',
           longName: 'Fake long',
-          mnc: 10 // VIVO
+          mnc: '10' // VIVO
         },
         cell: {
           gsmLocationAreaCode: 71 // BA
         }
-      }
+      };
 
       MockNavigatorMozMobileConnection.iccInfo = {
         isDisplaySpnRequired: false,
         spn: 'Fake SPN'
-      }
+      };
     });
 
     test('Connection without region', function() {
@@ -436,5 +459,3 @@ suite('system/Statusbar', function() {
     });
   });
 });
-
-mocha.setup({ignoreLeaks: false});

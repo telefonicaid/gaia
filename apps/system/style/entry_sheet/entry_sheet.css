@@ -26,8 +26,9 @@
 }
 
 .entrySheet .throbber[data-loading="true"] {
-  height: 4px;
+  height: 0.3rem;
   background-image: url('../shared/progress.gif');
+  background-size: auto 0.3rem;
 }
 
 .entrySheet.active .content,

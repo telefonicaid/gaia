@@ -21,6 +21,7 @@
     "device-storage:pictures":{ "access": "readwrite" },
     "device-storage:videos":{ "access": "readwrite" },
     "device-storage:music":{ "access": "readcreate" },
+    "device-storage:apps":{ "access": "readonly" },
     "settings":{ "access": "readwrite" },
     "storage":{},
     "camera":{},
@@ -56,6 +57,9 @@
     }
   },
   "default_locale": "en-US",
+  "icons": {
+    "30": "/style/icons/System.png"
+  },
   "messages": [
      { "alarm": "/index.html" },
      { "bluetooth-opp-transfer-complete": "/index.html" },

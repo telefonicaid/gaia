@@ -3,6 +3,18 @@ Calendar.ns('Store').Busytime = (function() {
   var binsearch = Calendar.binsearch.find;
   var bsearchForInsert = Calendar.binsearch.insert;
 
+  /**
+   * Objects saved in the busytime store:
+   *
+   *    {
+   *      _id: (uuid),
+   *      start: Calendar.Calc.dateToTransport(x),
+   *      end: Calendar.Calc.dateToTransport(x),
+   *      eventId: eventId,
+   *      calendarId: calendarId
+   *    }
+   *
+   */
   function Busytime() {
     Calendar.Store.Abstract.apply(this, arguments);
     this._setupCache();
@@ -14,10 +26,6 @@ Calendar.ns('Store').Busytime = (function() {
     _store: 'busytimes',
 
     _dependentStores: ['alarms', 'busytimes'],
-
-    _parseId: function(id) {
-      return id;
-    },
 
     _setupCache: function() {
       // reset time observers
@@ -90,36 +98,6 @@ Calendar.ns('Store').Busytime = (function() {
       var b = bObj.start.utc;
 
       return Calendar.compare(a, b);
-    },
-
-    /**
-     * Creates a new busytime record
-     * from an event and start/end times.
-     *
-     * @param {ICAL.Event|Object} event related event.
-     * @param {Object} [start] optional start time uses event by default.
-     * @param {Object} [end] optional end time uses event by default.
-     */
-    factory: function(event, start, end) {
-      if (!start)
-        start = event.remote.start;
-
-      if (!end)
-        end = event.remote.end;
-
-      var id = this.db.getStore('Event').busytimeIdFor(
-        event,
-        start,
-        end
-      );
-
-      return {
-        _id: id,
-        start: start,
-        end: end,
-        eventId: event._id,
-        calendarId: event.calendarId
-      };
     },
 
     /**

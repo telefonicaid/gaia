@@ -139,7 +139,7 @@ function optimize_aggregateJsResources(doc, webapp, htmlFile) {
     // and to make parser's life better.
     try {
       content = JSMin(content).code;
-    } catch(e) {
+    } catch (e) {
       debug('Failed to minify content: ' + e);
     }
 
@@ -169,7 +169,7 @@ function optimize_aggregateJsResources(doc, webapp, htmlFile) {
 
   // find the absolute root of the app's html file.
   let rootUrl = htmlFile.parent.path;
-  rootUrl = rootUrl.replace(webapp.manifestFile.parent.path, '');
+  rootUrl = rootUrl.replace(webapp.manifestFile.parent.path, '') || '.';
   // the above will yield something like: '', '/facebook/', '/contacts/', etc...
 
   function writeAggregatedScript(config) {
@@ -342,8 +342,11 @@ function optimize_compile(webapp, file) {
       parseFromString(getFileContent(file), 'text/html');
 
   // if this HTML document uses l10n.js, pre-localize it --
+  // A document can use l10n.js either by including l10n.js or
+  // application/l10n resource link elements
   // selecting a language triggers `XMLHttpRequest' and `dispatchEvent' above
-  if (win.document.querySelector('script[src$="l10n.js"]')) {
+  if (win.document.querySelector('script[src$="l10n.js"]') ||
+      win.document.querySelector('link[type$="application/l10n"]')) {
     debug('localizing: ' + file.path);
     mozL10n.language.code = l10nLocales[processedLocales];
   }
@@ -362,8 +365,7 @@ if (GAIA_INLINE_LOCALES === '1') {
 
   // LOCALES_FILE is a relative path by default: shared/resources/languages.json
   // -- but it can be an absolute path when doing a multilocale build.
-  // LOCALES_FILE is using unix separator, ensure working fine on win32
-  let abs_path_chunks = [GAIA_DIR].concat(LOCALES_FILE.split('/'));
+  let abs_path_chunks = [GAIA_DIR].concat(LOCALES_FILE.split(/\/|\\/));
   let file = getFile.apply(null, abs_path_chunks);
   if (!file.exists()) {
     file = getFile(LOCALES_FILE);

@@ -26,6 +26,9 @@ var FixedHeader = (function FixedHeader() {
 
   var refresh = function refresh() {
     headings = view.querySelectorAll(selector);
+    // after setting up a new headings selection, check the scroll again
+    // in case we removed the header we have currently fixed.
+    scrolling();
   };
 
   var scrolling = function scrolling() {
@@ -74,7 +77,7 @@ var FixedHeader = (function FixedHeader() {
     if (header) {
       fixedContainer.textContent = header.textContent;
     }
-  }
+  };
 
   return {
     'init': init,

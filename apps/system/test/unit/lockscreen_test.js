@@ -1,122 +1,104 @@
 'use strict';
-
-requireApp('system/test/unit/mock_settings_listener.js');
-requireApp('system/test/unit/mocks_helper.js');
-requireApp('system/test/unit/mock_l10n.js');
-
+requireApp('system/test/unit/mock_clock.js', function() {
+  window.realClock = window.Clock;
+  window.Clock = MockClock;
 requireApp('system/js/lockscreen.js');
-
-var mocksForStatusBar = ['SettingsListener'];
-
-mocksForStatusBar.forEach(function(mockName) {
-  if (! window[mockName]) {
-    window[mockName] = null;
-  }
 });
 
-suite('lockscreen', function() {
-  var mocksHelper;
+requireApp('system/test/unit/mock_l10n.js');
+requireApp('system/test/unit/mock_mobile_connection.js');
+requireApp('system/test/unit/mock_mobile_operator.js');
+requireApp('system/test/unit/mock_ftu_launcher.js');
 
-  var realSettingsListener, realMozL10n;
 
-  var fakeLockscreenPanel;
+if (!this.MobileOperator) {
+  this.MobileOperator = null;
+}
 
-  var red_png, green_png;
+if (!this.FtuLauncher) {
+  this.FtuLauncher = null;
+}
 
-  suiteSetup(function() {
-    mocksHelper = new MocksHelper(mocksForStatusBar);
-    mocksHelper.suiteSetup();
-    realMozL10n = navigator.mozL10n;
-    navigator.mozL10n = MockL10n;
 
-    red_png =
-      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAAHgAQMAAADuQiYHAAAAA1BMVEX/AAAZ4gk3AAAAKUlEQVR4Xu3AMQEAAADCIPuntsROWAQAAAAAAAAAAAAAAAAAAAAAAADgTOAAAZXle7kAAAAASUVORK5CYII=';
-    green_png =
-      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAHgAQMAAAAlmcL5AAAAA1BMVEUAgACc+aWRAAAAKUlEQVR4Xu3BMQEAAADCoPVPbQ0PoAAAAAAAAAAAAAAAAAAAAAAAAL4MSSAAAZTTyRkAAAAASUVORK5CYII=';
-  });
-
-  suiteTeardown(function() {
-    mocksHelper.suiteTeardown();
-    navigator.mozL10n = realMozL10n;
-  });
+suite('system/LockScreen >', function() {
+  var subject;
+  var realL10n;
+  var realMobileOperator;
+  var realMobileConnection;
+  var realClock;
+  var realFtuLauncher;
+  var domConnstate;
+  var domConnstateL1;
+  var domConnstateL2;
+  var DUMMYTEXT1 = 'foo';
 
   setup(function() {
-    fakeLockscreenPanel = document.createElement('div');
-    fakeLockscreenPanel.classList.add('lockscreen-panel');
-    fakeLockscreenPanel.setAttribute('data-wallpaper', '');
-    document.body.appendChild(fakeLockscreenPanel);
+    subject = window.LockScreen;
 
-    mocksHelper.setup();
+    realL10n = navigator.mozL10n;
+    navigator.mozL10n = window.MockL10n;
+
+    realMobileOperator = window.MobileOperator;
+    window.MobileOperator = MockMobileOperator;
+
+    realClock = window.Clock;
+    window.Clock = MockClock;
+
+    realFtuLauncher = window.FtuLauncher;
+    window.FtuLauncher = MockFtuLauncher;
+
+    realMobileConnection = window.navigator.mozMobileConnection;
+
+    domConnstate = document.createElement('div');
+    domConnstate.id = 'lockscreen-connstate';
+    domConnstateL1 = document.createElement('div');
+    domConnstateL2 = document.createElement('div');
+    domConnstate.appendChild(domConnstateL1);
+    domConnstate.appendChild(domConnstateL2);
+    document.body.appendChild(domConnstate);
+
+    subject.connstate = domConnstate;
+
+  });
+
+  test('2G Mode: should update cell broadcast info on connstate Line 2',
+  function() {
+    window.navigator.mozMobileConnection = {
+      voice: {
+        connected: 'true',
+        type: 'gsm'
+      }
+    };
+    subject.cellbroadcastLabel = DUMMYTEXT1;
+    subject.updateConnState();
+    assert.equal(domConnstateL2.textContent, DUMMYTEXT1);
+  });
+
+  test('3G Mode: should update carrier and region info on connstate Line 2',
+  function() {
+    window.navigator.mozMobileConnection = {
+      voice: {
+        connected: 'true',
+        type: 'wcdma'
+      }
+    };
+    var carrier = 'TIM';
+    var region = 'SP';
+    var exceptedText = 'TIM SP';
+    MobileOperator.mCarrier = carrier;
+    MobileOperator.mRegion = region;
+    subject.cellbroadcastLabel = DUMMYTEXT1;
+    subject.updateConnState();
+    assert.equal(domConnstateL2.textContent, exceptedText);
   });
 
   teardown(function() {
-    fakeLockscreenPanel.parentNode.removeChild(fakeLockscreenPanel);
-    mocksHelper.teardown();
-  });
+    navigator.mozL10n = realL10n;
+    window.MobileOperator = realMobileOperator;
+    window.navigator.mozMobileConnection = realMobileConnection;
+    window.Clock = window.realClock;
+    window.FtuLauncher = realFtuLauncher;
 
-  test('wallpaper has vignette effect', function(done) {
-    LockScreen.updateBackground(red_png);
-
-    (function checkCanvas() {
-      var canvas = fakeLockscreenPanel.getElementsByTagName('canvas')[0];
-      if (!canvas) {
-        setTimeout(checkCanvas, 10);
-        return;
-      }
-      var ctx = canvas.getContext('2d');
-      var top_pixel = ctx.getImageData(0, 0, 1, 1).data;
-
-      assert.equal(top_pixel[0], 77);
-      assert.equal(top_pixel[1], 0);
-      assert.equal(top_pixel[2], 0);
-
-      var center_width = Math.floor(canvas.width / 2);
-      var center_height = Math.floor(canvas.height / 2);
-      var center_pixel = ctx.getImageData(center_width, center_height,
-                                          1 , 1).data;
-      assert.equal(center_pixel[0], 251);
-      assert.equal(center_pixel[1], 0);
-      assert.equal(center_pixel[2], 0);
-
-      done();
-    })();
-
-  });
-
-  test('multiple wallpaper updates only keep one canvas', function(done) {
-    function waitFirstUpdate(callback) {
-      var first_canvas = fakeLockscreenPanel.getElementsByTagName('canvas')[0];
-      if (!first_canvas) {
-        setTimeout(waitFirstUpdate, 10, callback);
-        return;
-      }
-
-      setTimeout(callback, 10);
-    }
-
-    function waitSecondUpdate(callback) {
-      var second_canvas = fakeLockscreenPanel.getElementsByTagName('canvas')[0];
-
-      var ctx = second_canvas.getContext('2d');
-      var top_pixel = ctx.getImageData(0, 0, 1, 1).data;
-      // Canvas is not green yet
-      if (top_pixel[1] == 0) {
-        setTimeout(waitSecondUpdate, 10, callback);
-        return;
-      }
-
-      setTimeout(callback, 10);
-    }
-
-    LockScreen.updateBackground(red_png);
-    setTimeout(waitFirstUpdate, 10, function then() {
-      LockScreen.updateBackground(green_png);
-
-      setTimeout(waitSecondUpdate, 10, function then2() {
-        assert.equal(fakeLockscreenPanel.getElementsByTagName('canvas').length, 1);
-        done();
-      });
-    });
-
+    document.body.removeChild(domConnstate);
   });
 });

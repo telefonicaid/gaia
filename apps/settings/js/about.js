@@ -86,7 +86,8 @@ var About = {
 
     var info = mobileConnection.iccInfo;
     document.getElementById('deviceInfo-iccid').textContent = info.iccid;
-    document.getElementById('deviceInfo-msisdn').textContent = info.msisdn;
+    document.getElementById('deviceInfo-msisdn').textContent = info.msisdn ||
+      navigator.mozL10n.get('unknown-phoneNumber');
 
     var req = mobileConnection.sendMMI('*#06#');
     req.onsuccess = function getIMEI() {
@@ -127,7 +128,7 @@ var About = {
        */
 
       if (value !== 'check-complete') {
-        systemStatus.textContent = _(value, null, _('check-error'));
+        systemStatus.textContent = _(value) || _('check-error');
         console.error('Error checking for system update:', value);
       }
 
@@ -215,8 +216,8 @@ var About = {
         } else {
           alert(navigator.mozL10n.get('no-ftu'));
         }
-      }
-    }
+      };
+    };
   }
 };
 

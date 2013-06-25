@@ -12,8 +12,9 @@
       "launch_path": "/dialer/index.html#keyboard-view",
       "name": "Phone",
       "icons": {
+        "60": "/dialer/style/icons/60/Dialer.png",
         "120": "/dialer/style/icons/Dialer.png",
-        "60": "/dialer/style/icons/60/Dialer.png"
+        "320": "/dialer/style/icons/320/Dialer.png"
       },
       "locales": {
         "ar": {
@@ -38,8 +39,9 @@
       "launch_path": "/contacts/index.html",
       "name": "Contacts",
       "icons": {
+        "60": "/contacts/style/icons/60/Contacts.png",
         "120": "/contacts/style/icons/Contacts.png",
-        "60": "/contacts/style/icons/60/Contacts.png"
+        "320": "/contacts/style/icons/320/Contacts.png"
       },
       "locales": {
         "ar": {
@@ -80,7 +82,10 @@
     "time": {},
     "audio-channel-telephony":{},
     "audio-channel-ringer":{},
-    "browser":{}
+    "browser":{},
+    "idle":{},
+    "storage": {},
+    "device-storage:sdcard": { "access": "readonly" }
   },
   "orientation": "portrait-primary",
   "activities": {
@@ -90,6 +95,14 @@
        },
       "disposition": "inline",
       "href": "/contacts/index.html?pick",
+      "returnValue": true
+    },
+    "open": {
+      "filters": {
+        "type": "webcontacts/contact"
+      },
+      "disposition": "inline",
+      "href": "/contacts/index.html?open",
       "returnValue": true
     },
     "new": {
@@ -110,7 +123,8 @@
     },
     "dial": {
       "filters": {
-        "type": "webtelephony/number"
+        "type": "webtelephony/number",
+        "number": { "regexp":"/^[\\d\\s+#*().-]{0,50}$/" }
       },
       "href": "/dialer/index.html#keyboard-view",
       "disposition": "window"
@@ -123,5 +137,17 @@
      { "notification": "/dialer/index.html#keyboard-view" },
      { "telephony-new-call": "/dialer/index.html#keyboard-view" },
      { "ussd-received": "/dialer/index.html#keyboard-view" }
+  ],
+  "redirects": [
+    {"from": "facebook",
+    "to": "/redirects/redirect.html"},
+    {"from": "facebook_dialogs",
+    "to": "/redirects/dialogs_end.html"},
+    {"from": "facebook_logout",
+    "to": "/redirects/logout.json"},
+    {"from": "live",
+    "to": "/redirects/redirect.html"},
+    {"from": "gmail",
+    "to": "/redirects/redirect.html"}
   ]
 }
