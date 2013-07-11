@@ -8,7 +8,7 @@ var BatteryManager = {
   TRANSITION_SPEED: 1.8,
   TRANSITION_FRACTION: 0.30,
 
-  AUTO_SHUTDOWN_LEVEL: 0.02,
+  AUTO_SHUTDOWN_LEVEL: 0.00,
   EMPTY_BATTERY_LEVEL: 0.1,
 
   _battery: window.navigator.battery,
@@ -25,7 +25,7 @@ var BatteryManager = {
     if (!battery)
       return;
 
-    if (battery.level <= this.AUTO_SHUTDOWN_LEVEL)
+    if (battery.level <= this.AUTO_SHUTDOWN_LEVEL && !battery.charging)
       SleepMenu.startPowerOff(false);
   },
 
@@ -35,7 +35,8 @@ var BatteryManager = {
     if (battery) {
       // When the device is booted, check if the battery is drained.
       // If so, SleepMenu.startPowerOff() would be called.
-      this.checkBatteryDrainage();
+      window.addEventListener('homescreen-ready',
+                              this.checkBatteryDrainage.bind(this));
 
       battery.addEventListener('levelchange', this);
       battery.addEventListener('chargingchange', this);
@@ -178,6 +179,8 @@ var PowerSaveHandler = (function PowerSaveHandler() {
     'geolocation.enabled' : false
   };
 
+  var _powerSaveEnabledLock = false;
+
   function init() {
     SettingsListener.observe('powersave.enabled', false,
       function sl_getPowerSave(value) {
@@ -228,6 +231,8 @@ var PowerSaveHandler = (function PowerSaveHandler() {
     };
 
     setMozSettings(settingsToSet);
+
+    _powerSaveEnabledLock = false;
   }
 
   function disablePowerSave() {
@@ -240,6 +245,25 @@ var PowerSaveHandler = (function PowerSaveHandler() {
     }
 
     setMozSettings(settingsToSet);
+  }
+
+  function showPowerSavingNotification() {
+    var _ = navigator.mozL10n.get;
+
+    var clickCB = function() {
+      var activityRequest = new MozActivity({
+        name: 'configure',
+        data: {
+          target: 'device',
+          section: 'battery'
+        }
+      });
+    };
+
+    NotificationHelper.send(_('notification-powersaving-mode-on-title'),
+                            _('notification-powersaving-mode-on-description'),
+                            'style/icons/System.png',
+                            clickCB);
   }
 
   function onBatteryChange() {
@@ -256,10 +280,14 @@ var PowerSaveHandler = (function PowerSaveHandler() {
       function getThreshold(value) {
         if (battery.level <= value && !_powerSaveEnabled) {
           setMozSettings({'powersave.enabled' : true});
+          if (!_powerSaveEnabledLock) {
+            showPowerSavingNotification();
+            _powerSaveEnabledLock = true;
+          }
           return;
         }
 
-        if (value != 0 && battery.level > value && _powerSaveEnabled) {
+        if (value != -1 && battery.level > value && _powerSaveEnabled) {
           setMozSettings({'powersave.enabled' : false});
           return;
         }

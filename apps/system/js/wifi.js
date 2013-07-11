@@ -10,9 +10,10 @@ var Wifi = {
 
   wifiDisabledByWakelock: false,
 
-  // Without wake lock, wait for kOffTime milliseconds and turn wifi off
-  // after the conditions are met.
-  kOffTime: 60 * 1000,
+  // Without an wifi wake lock, wait for screenOffTimeout milliseconds
+  // to turn wifi off after the conditions are met.
+  // If it's set to 0, wifi will never be turn off.
+  screenOffTimeout: 0,
 
   // if Wifi is enabled but disconnected, try to scan for networks every
   // kScanInterval ms.
@@ -21,13 +22,17 @@ var Wifi = {
   _scanTimer: null,
 
   init: function wf_init() {
+    if (!window.navigator.mozSettings)
+      return;
+
+    if (!window.navigator.mozWifiManager)
+      return;
+
     window.addEventListener('screenchange', this);
 
     var battery = window.navigator.battery;
     battery.addEventListener('chargingchange', this);
 
-    if (!window.navigator.mozSettings)
-      return;
 
     // If wifi is turned off by us and phone got rebooted,
     // bring wifi back.
@@ -71,6 +76,11 @@ var Wifi = {
         /* canBubble */ true, /* cancelable */ false, null);
       window.dispatchEvent(evt);
     };
+
+    SettingsListener.observe(
+      'wifi.screen_off_timeout', 600000, function(value) {
+        self.screenOffTimeout = value;
+      });
 
     // Track the wifi.enabled mozSettings value
     SettingsListener.observe('wifi.enabled', true, function(value) {
@@ -122,6 +132,10 @@ var Wifi = {
   // Check the status of screen, wifi wake lock and power source
   // and turn on/off wifi accordingly
   maybeToggleWifi: function wifi_maybeToggleWifi() {
+    // Do nothing if we are being disabled.
+    if (!this.screenOffTimeout)
+      return;
+
     var battery = window.navigator.battery;
     var wifiManager = window.navigator.mozWifiManager;
     if (!battery || !wifiManager ||
@@ -150,7 +164,7 @@ var Wifi = {
       this.setSystemMessageHandler();
 
       // Start with a timer, only turn off wifi till timeout.
-      var date = new Date(Date.now() + this.kOffTime);
+      var date = new Date(Date.now() + this.screenOffTimeout);
       var self = this;
       var req = navigator.mozAlarms.add(date, 'ignoreTimezone', 'wifi-off');
       req.onsuccess = function wifi_offAlarmSet() {
@@ -192,15 +206,39 @@ var Wifi = {
   // so we will turn it back on.
   sleep: function wifi_sleep() {
     var lock = SettingsListener.getSettingsLock();
+
     // Actually turn off the wifi
+
+    // The |sleep| might be triggered when an alarm comes.
+    // If the CPU is in suspend mode at this moment, alarm servcie would wake
+    // up the CPU to run the handler and turn it back to suspend immediately
+    // |sleep| is finished. In this case, we acquire a CPU wake lock to prevent
+    // the CPU goes to suspend mode before the switching is done.
+    var wakeLockForWifi = navigator.requestWakeLock('cpu');
     lock.set({ 'wifi.enabled': false });
+    window.addEventListener('wifi-disabled', function() {
+      if (wakeLockForWifi) {
+        wakeLockForWifi.unlock();
+        wakeLockForWifi = null;
+      }
+    });
+    window.setTimeout(function() {
+      if (wakeLockForWifi) {
+        wakeLockForWifi.unlock();
+        wakeLockForWifi = null;
+      }
+     }, 30000); //To prevent the CPU awake forever (if wifi cannot be disabled)
 
-    // Remember that it was turned off by us.
-    this.wifiDisabledByWakelock = true;
+     // Remember that it was turned off by us.
+     this.wifiDisabledByWakelock = true;
 
-    // Keep this value in disk so if the phone reboots we'll
-    // be able to turn the wifi back on.
-    lock.set({ 'wifi.disabled_by_wakelock': true });
+     // Keep this value in disk so if the phone reboots we'll
+     // be able to turn the wifi back on.
+     var wakeLockForSettings = navigator.requestWakeLock('cpu');
+     var request = lock.set({ 'wifi.disabled_by_wakelock': true });
+     request.onsuccess = function() { wakeLockForSettings.unlock() };
+     request.onerror = request.onsuccess;
+
   },
 
   // Register for handling system message,

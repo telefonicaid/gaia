@@ -84,6 +84,7 @@ AppUpdatable.prototype.successCallBack = function() {
     });
   }
 
+  UpdateManager.downloaded(this);
   UpdateManager.removeFromDownloadsQueue(this);
   UpdateManager.removeFromUpdatesQueue(this);
 };
@@ -98,10 +99,14 @@ AppUpdatable.prototype.appliedCallBack = function() {
 };
 
 AppUpdatable.prototype.errorCallBack = function(e) {
-  var errorName = e.application.downloadError.name;
+  var app = e.application;
+  var errorName = app.downloadError.name;
   console.info('downloadError event, error code is', errorName);
   UpdateManager.requestErrorBanner();
   UpdateManager.removeFromDownloadsQueue(this);
+  if (!app.downloadAvailable) {
+    UpdateManager.removeFromUpdatesQueue(this);
+  }
   this.progress = null;
 };
 
@@ -192,6 +197,7 @@ SystemUpdatable.prototype.handleEvent = function(evt) {
       break;
     case 'update-downloaded':
       this.downloading = false;
+      UpdateManager.downloaded(this);
       this.showApplyPrompt();
       break;
     case 'update-prompt-apply':

@@ -5,10 +5,11 @@
  * Settings have three drawing areas with views for current values of balance,
  * data usage and telephony.
  */
- 
+
  // Import global objects from parent window
  var ConfigManager = window.parent.ConfigManager;
  var CostControl = window.parent.CostControl;
+ var Formatting = window.parent.Formatting;
 
  // Import global functions from parent window
  var updateNextReset = window.parent.updateNextReset;
@@ -32,6 +33,7 @@ var Settings = (function() {
   var costcontrol, vmanager, autosettings, initialized;
   var plantypeSelector, phoneActivityTitle, phoneActivitySettings;
   var balanceTitle, balanceSettings, reportsTitle;
+  var balanceView;
 
   function configureUI() {
     CostControl.getInstance(function _onCostControl(instance) {
@@ -51,6 +53,14 @@ var Settings = (function() {
       balanceSettings =
         document.querySelector('#balance-settings + .settings');
       reportsTitle = document.getElementById('phone-internet-settings');
+
+      // Subviews
+      var balanceConfig = ConfigManager.configuration.balance;
+      balanceView = new BalanceView(
+        document.getElementById('balance'),
+        document.querySelector('#balance + .meta'),
+        balanceConfig ? balanceConfig.minimum_delay : undefined
+      );
 
       // Autosettings
       vmanager = new ViewManager();
@@ -116,6 +126,8 @@ var Settings = (function() {
 
     if (xhr.status === 200) {
       var src = document.createElement('DIV');
+      // XXX: We use innerHTML precisely because we need parse the content
+      // without introducing the overhead of DOM methods.
       src.innerHTML = xhr.responseText;
       var reference = document.getElementById('plantype-settings');
       var parent = reference.parentNode;
@@ -201,7 +213,7 @@ var Settings = (function() {
       localizeWeekdaySelector(document.getElementById('select-weekday'));
 
       // Layout
-      var mode = costcontrol.getApplicationMode(settings);
+      var mode = ConfigManager.getApplicationMode();
       if (currentMode !== mode) {
         currentMode = mode;
         var hidePlantypeSelector = (mode === 'DATA_USAGE_ONLY');
@@ -244,52 +256,42 @@ var Settings = (function() {
   function updateDataUsage(datausage, lastDataReset) {
     var mobileUsage = document.querySelector('#mobile-data-usage > span');
     var data = roundData(datausage.mobile.total);
-    mobileUsage.innerHTML = formatData(data);
+    mobileUsage.textContent = formatData(data);
 
     var wifiUsage = document.querySelector('#wifi-data-usage > span');
     data = roundData(datausage.wifi.total);
-    wifiUsage.innerHTML = formatData(data);
+    wifiUsage.textContent = formatData(data);
 
     var timestamp = document.querySelector('#wifi-data-usage + .meta');
-    timestamp.innerHTML = formatTimeHTML(lastDataReset, datausage.timestamp);
+    timestamp.innerHTML = '';
+    timestamp.appendChild(formatTimeHTML(lastDataReset, datausage.timestamp));
   }
 
   // Update balance view on settings
   function updateBalance(lastBalance, currency) {
     var limitCurrency = document.getElementById('settings-low-limit-currency');
-    limitCurrency.innerHTML = currency;
-
-    var balance = document.getElementById('balance');
-    if (!lastBalance) {
-      balance.innerHTML = _('not-available');
-      return;
-    }
-
-    var timestamp = document.querySelector('#wifi-data-usage + .meta');
-    balance.innerHTML = _('currency', {
-      value: lastBalance.balance,
-      currency: lastBalance.currency
-    });
-    timestamp.innerHTML = formatTimeHTML(lastBalance.timestamp);
+    limitCurrency.textContent = currency;
+    balanceView.update(lastBalance);
   }
 
   // Update telephony counters on settings
   function updateTelephony(activity, lastTelephonyReset) {
     var calltimeSpan = document.getElementById('calltime');
     var smscountSpan = document.getElementById('smscount');
-    calltimeSpan.innerHTML = _('magnitude', {
+    calltimeSpan.textContent = _('magnitude', {
       value: computeTelephonyMinutes(activity),
       unit: 'min.'
     });
-    smscountSpan.innerHTML = _('magnitude', {
+    smscountSpan.textContent = _('magnitude', {
       value: activity.smscount,
       unit: 'SMS'
     });
     var timestamp = document.getElementById('telephony-timestamp');
-    timestamp.innerHTML = formatTimeHTML(
+    timestamp.innerHTML = '';
+    timestamp.appendChild(formatTimeHTML(
       lastTelephonyReset,
       activity.timestamp
-    );
+    ));
   }
 
   return {

@@ -2,6 +2,7 @@
   "name": "Wallpaper",
   "description": "Gaia Wallpaper Picker",
   "type": "certified",
+  "orientation": "portrait-primary",
   "developer": {
     "name": "The Gaia Team",
     "url": "https://github.com/mozilla-b2g/gaia"
@@ -12,7 +13,7 @@
   "activities": {
     "pick": {
       "filters": {
-        "type": ["image/jpeg", "image/png"],
+        "type": ["image/*", "image/jpeg"],
         "width": 320,
         "height": 480
        },

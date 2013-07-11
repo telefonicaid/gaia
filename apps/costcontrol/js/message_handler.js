@@ -22,7 +22,7 @@
   // inside an iframe (no standalone mode), all the messages should be attended
   // so we can conclude **there is nothing to do**.
   if (inStandAloneMode() && window.history.length > 1) {
-    debug('Nothing to do, closing...');
+    debug('Nothing to do in message handler, returning to app...');
     window.history.back();
   }
 
@@ -33,12 +33,9 @@
   // Close if in standalone mode
   var closing;
   function closeIfProceeds() {
-    debug('Trying to close...');
+    debug('Checking for closing...');
     if (inStandAloneMode()) {
-      closing = setTimeout(function _close() {
-        window.close();
-        debug('Closing message handler');
-      }, 1000);
+      closing = Common.closeApplication();
     }
   }
 
@@ -74,7 +71,7 @@
       // If the alarm is in the past, fake it was launched
       if (when.getTime() < Date.now()) {
         debug('Faking a past reset alarm');
-        _onAlarm({ data: { type:'nextReset' } });
+        _onAlarm({ data: { type: 'nextReset' } });
         if (callback) {
           setTimeout(callback);
         }
@@ -95,7 +92,7 @@
   function getTopUpTimeout(callback) {
     ConfigManager.requestSettings(function _onSettings(settings) {
       var request = navigator.mozAlarms.getAll();
-      request.onsuccess = function (e) {
+      request.onsuccess = function(e) {
         var alarms = e.target.result;
         var length = alarms.length;
         if (!length) {
@@ -153,7 +150,7 @@
 
       iconURL += '?topUpError';
       NotificationHelper.send(_('topup-incorrectcode-title2'),
-                              _('topup-incorrectcode-message2'), iconURL,
+                              _('topup-incorrectcode-message3'), iconURL,
                               goToTopUpCode);
 
       if (callback) {
@@ -195,6 +192,9 @@
 
       // No need for notification
       } else {
+        if (typeof callback === 'function') {
+          setTimeout(callback);
+        }
         return;
       }
       debug('Notification type:', type);
@@ -291,8 +291,8 @@
       if (settings.dataLimit) {
         if (usage >= limit && !settings.dataUsageNotified) {
           var limitText = formatData(smartRound(limit));
-          var title = _('data-limit-notification-title', { limit: limitText });
-          var message = _('data-limit-notification-text');
+          var title = _('data-limit-notification-title2', { limit: limitText });
+          var message = _('data-limit-notification-text2');
           NotificationHelper.send(title, message, iconURL, goToDataUsage);
           ConfigManager.setOption({ 'dataUsageNotified': true }, callback);
           return true;
@@ -323,9 +323,17 @@
       navigator.mozSetMessageHandler('sms-received', function _onSMS(sms) {
         clearTimeout(closing);
         ConfigManager.requestAll(function _onInfo(configuration, settings) {
+
+          var isBalanceResponse = configuration.balance &&
+                                  configuration.balance.senders
+                                    .indexOf(sms.sender) > -1;
+
+          var isTopupResponse = configuration.topup &&
+                                configuration.topup.senders
+                                  .indexOf(sms.sender) > -1;
+
           // Non expected SMS
-          if (configuration.balance.senders.indexOf(sms.sender) === -1 &&
-              configuration.topup.senders.indexOf(sms.sender) === -1) {
+          if (!isBalanceResponse && !isTopupResponse) {
             closeIfProceeds();
             return;
           }
@@ -360,6 +368,7 @@
           }
 
           if (!isBalance && !isConfirmation && !isError) {
+            closeIfProceeds();
             return;
           }
 
@@ -367,7 +376,7 @@
 
           if (isBalance) {
             // Compose new balance
-            var integer = balanceData[1];
+            var integer = balanceData[1].replace(/[^0-9]/g, '');
             var decimal = balanceData[2] || '0';
             var newBalance = {
               balance: parseFloat(integer + '.' + decimal),
@@ -439,14 +448,14 @@
         debug('SMS sent!');
 
         ConfigManager.requestAll(function _onInfo(configuration, settings) {
-          var mode = costcontrol.getApplicationMode(settings);
+          var mode = ConfigManager.getApplicationMode();
           if (mode === 'PREPAID' &&
               !costcontrol.isBalanceRequestSMS(sms, configuration)) {
             costcontrol.request({ type: 'balance' });
           }
 
-          var manager = window.navigator.mozSms;
-          var smsInfo = manager.getSegmentInfoForText(sms.body);
+          var mobileMessageManager = window.navigator.mozMobileMessage;
+          var smsInfo = mobileMessageManager.getSegmentInfoForText(sms.body);
           var realCount = smsInfo.segments;
           settings.lastTelephonyActivity.timestamp = new Date();
           settings.lastTelephonyActivity.smscount += realCount;
@@ -469,7 +478,7 @@
           debug('Outgoing call finished!');
 
           ConfigManager.requestSettings(function _onSettings(settings) {
-            var mode = costcontrol.getApplicationMode(settings);
+            var mode = ConfigManager.getApplicationMode();
             if (mode === 'PREPAID') {
               costcontrol.request({ type: 'balance' });
             }

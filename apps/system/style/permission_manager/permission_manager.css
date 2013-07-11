@@ -1,9 +1,9 @@
 #permission-screen {
   position: absolute;
-  top: 20px;
+  top: 2rem;
   left: 0;
   width: 100%;
-  height: -moz-calc(100% - 20px);
+  height: calc(100% - 2rem);
   background-color: rgba(0,0,0,0.4);
   -moz-transition: opacity 0.5s ease;
   pointer-events: none;
@@ -17,8 +17,8 @@
 }
 
 #screen.attention #permission-screen {
-  top: 40px;
-  height: -moz-calc(100% - 40px);
+  top: 4rem;
+  height: calc(100% - 4rem);
 }
 
 #permission-screen.visible {
@@ -26,39 +26,73 @@
   display: inline-block;
 }
 
-#permission-remember-section {
-  height: 6rem;
-  border-top: 0.1rem solid #686868;
-  width: 100%;
-  position: relative;
+@media not all and (-moz-physical-home-button) {
+  #screen:not(.software-button-disabled) #permission-screen {
+    height: calc(100% - 2rem - 5rem);
+  }
+
+  #screen.attention:not(.software-button-disabled) #permission-screen {
+    height: calc(100% - 4rem - 5rem);
+  }
+
+  #screen.fullscreen-app:not(.software-button-disabled) #permission-screen {
+    height: calc(100% - 5rem);
+  }
+}
+
+#screen.software-button-enabled #permission-screen {
+  height: calc(100% - 2rem - 5rem);
+}
+
+#screen.software-button-enabled.attention #permission-screen {
+  height: calc(100% - 4rem - 5rem);
+}
+
+
+#screen.software-button-enabled.fullscreen-app #permission-screen {
+  height: calc(100% - 7rem);
 }
 
 #permission-remember-section {
+  border-top: 0.1rem solid #686868;
+  font-size: 1.6rem;
   display: none;
+  padding: 1.5rem;
 }
 
 #permission-message {
-  background-image: none;
-  background-repeat: no-repeat no-repeat;
-  min-height: 64px;
+  margin: 0;
+  padding-top: 1.2rem;
+  padding-bottom: 0.8rem;
+  min-height: 4.4rem;
+  font-size: 1.6rem;
+  background-repeat: no-repeat;
+  background-size: 6.4rem;
+  background-position: 0 50%;
 }
 
-#permission-screen[data-type] #permission-remember-section,
+#permission-screen[data-type] #permission-remember-section {
+  display: block;
+}
+
 #permission-screen[data-type] #permission-icon {
   display: inherit;
 }
 
 #permission-screen[data-type] #permission-message {
-  padding-left: 64px;
+  padding-left: 7rem;
 }
 
 #permission-remember-section label {
-  position: absolute;
-  right: 1rem;
+  float: right;
+  width: 5.8rem;
+  height: 2rem;
 }
 
 #permission-remember-label {
-  line-height: 5rem;
+  float: left;
+  width: calc(100% - 6rem);
+  line-height: 2.4rem;
 }
 
 #permission-screen[data-type="geolocation"] #permission-message {

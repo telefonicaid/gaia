@@ -17,8 +17,10 @@
     <link href="/contacts/style/search.css" rel="stylesheet">
 
     <script defer src="/contacts/js/activities.js"></script>
+    <script defer src="/shared/js/lazy_loader.js"></script>
 
     <script defer type="text/javascript" src="/shared/js/async_storage.js"></script>
+    <script defer src="/contacts/js/utilities/config.js"></script>
 
     <!-- For initializing FB integration -->
     <script defer src="/contacts/js/fb/fb_init.js"></script>
@@ -29,22 +31,27 @@
     <script defer type="text/javascript" src="/contacts/js/utilities/image_loader.js"></script>
 
     <!-- for perf-measurement related utilities -->
-    <script defer src='/shared/js/performance_helper.js'></script>
+    <script defer src='/shared/js/performance_testing_helper.js'></script>
 
     <link rel="resource" type="application/l10n" href="/contacts/locales/locales.ini"/>
     <link rel="resource" type="application/l10n" href="/shared/locales/date.ini"/>
     <script type="text/javascript" src="/shared/js/l10n.js"></script>
     <script type="text/javascript" src="/shared/js/l10n_date.js"></script>
     <script defer type="text/javascript" src="/contacts/js/fb_loader.js"></script>
-    <script defer type="text/javascript" src="/shared/js/mouse_event_shim.js"></script>
 
     <!-- Loading FB indexedDB related stuff -->
-    <script defer src="/contacts/js/utilities/config.js"></script>
     <script defer type="text/javascript" src="/contacts/js/fixed_header.js"></script>
+
+    <!-- IccHelper -->
+    <script defer type="text/javascript" src="/shared/js/icc_helper.js"></script>
+
+    <!-- For the build system to include in zip:
+    <link href="/shared/js/tag_visibility_monitor.js">
+    -->
 
   </head>
 
-  <body role="application" class="hide app-contacts">
+  <body role="application" class="app-contacts">
 
       <!-- Contacts List Section -->
       <section id='view-contacts-list' role="region" data-state="active" class="view view-noscroll view-contacts-list">
@@ -61,15 +68,15 @@
 
         <article class="view-body">
           <div id="no-contacts" class="hide">
-            <div class="arrow small">
-              <p class="small" data-l10n-id="create-new">Create a new contact</p>
-            </div>
-            <div class="arrow big">
-              <p class="small" data-l10n-id="import-now">Import your contacts from your SIM card or from Facebook</p>
-            </div>
             <div class="info">
               <p data-l10n-id="no-contacts">no contacts</p>
               <p data-l10n-id="start-adding">start adding them now </p>
+              <div class="icon create">
+                <p class="small" data-l10n-id="create-new">Create a new contact</p>
+              </div>
+              <div class="icon import">
+                <p class="small" data-l10n-id="import-now">Import your contacts from your SIM card or from Facebook</p>
+              </div>
             </div>
           </div>
           <nav data-type="scrollbar">
@@ -86,17 +93,19 @@
               </li>
             </ol>
           </nav>
-          <div id="groups-container" class="view-body-inner">
-            <form id="search-container" class="search" role="search">
-              <p>
-                <label for="search" id="search-start">
-                  <input type="search" name="search" class="textfield" placeholder="Search" data-l10n-id="search-contact">
-                </label>
-              </p>
-            </form>
-            <section id="groups-list" data-type="list">
-              <!-- Group template here -->
-            </section>
+          <div id="groups-container-box">
+            <div id="groups-container" class="view-body-inner">
+              <form id="search-container" class="search" role="search">
+                <p>
+                  <label for="search" id="search-start">
+                    <input type="search" name="search" class="textfield" placeholder="Search" data-l10n-id="search-contact">
+                  </label>
+                </p>
+              </form>
+              <section id="groups-list" data-type="list">
+                <!-- Group template here -->
+              </section>
+            </div>
           </div>
         </article>
         <div id='fixed-container' class='fixed-title'></div>
@@ -119,7 +128,7 @@
           </ol>
         </section>
 
-        <section>
+        <section id="search-process">
           <p id="no-result" class="hide" data-l10n-id="noResults">No contacts found</p>
           <p id="search-progress" class="hidden" role="status">
             <progress  class="small"></progress>
@@ -127,6 +136,21 @@
         </section>
 
       </section>    <!-- Search view -->
+
+      <section id='view-screenshot' role="region" class="view hide">
+        <header>
+          <a href="#" class="hide">
+            <span class="icon icon-close" data-l10n-id="exit">Exit</span>
+          </a>
+          <menu type="toolbar">
+            <button role="menuitem"><span class="icon icon-add" data-l10n-id="add">add</span></button>
+            <button role="menuitem"><span class="icon icon-settings" data-l10n-id="settings">settings</span></button>
+          </menu>
+          <h1 data-l10n-id="contacts">Contacts</h1>
+        </header>
+        <article id="view-screenshot-body">
+        </article>
+      </section>
 
       <!-- Contact Details Section -->
       <section id='view-contact-details' role="region" class="view view-right view-contact-profile">
@@ -145,7 +169,7 @@
             <section id="contact-detail" class="view-body-inner">
               <!-- Phone Template -->
               <li data-phone id='phone-details-template-#i#' data-template>
-                <h2>#type#</h2>
+                <h2 data-l10n-id="#type_l10n_id#">#type#</h2>
                 <div class="item">
                   <div class="item-media pull-right">
                     <button id="send-sms-button-#i#" class="activity send-sms icon icon-message"></button>
@@ -168,7 +192,7 @@
 
               <!-- Email Template -->
               <li data-mail id='email-details-template-#i#' data-template>
-                <h2>#type#</h2>
+                <h2 data-l10n-id="#type_l10n_id#">#type#</h2>
                 <div class="item">
                   <div class="item-body-exp">
                     <button id="email-or-pick-#i#" class="activity icon icon-email">
@@ -201,7 +225,7 @@
 
               <!-- Address Template -->
               <li data-address id='address-details-template-#i#' data-template>
-                <h2>#type#</h2>
+                <h2 data-l10n-id="#type_l10n_id#">#type#</h2>
                 <div class="item">
                   <div class="item-body-exp">
                     <a href="#" class="action action-block">
@@ -242,16 +266,16 @@
         <header>
           <button id='cancel-edit' class="negative"><span class="icon icon-close"data-l10n-id="exit">Exit</span></button>
           <menu type="toolbar" id='contact-form-actions'>
-            <button id="save-button" role="menuitem"></button>
+            <button id="save-button" role="menuitem" data-l10n-id="done">Done</button>
           </menu>
-          <h1 id='contact-form-title'></h1>
+          <h1 id='contact-form-title' data-l10n-id="addContact">Add contact</h1>
         </header>
 
         <!-- PHONE TEMPLATE -->
         <div id='add-phone-#i#' data-template class='phone-template' data-index="#i#">
           <fieldset class="fillflow-row">
             <legend class="action">
-              <span data-taglist="phone-type" name="tel" value="#type#" id="tel_type_#i#" data-field="type">#type#</span>
+              <span data-taglist="phone-type" name="tel" data-value="#type_value#" id="tel_type_#i#" data-field="type" data-l10n-id=#type_l10n_id#>#type#</span>
             </legend>
             <section>
               <p class="setbox-item">
@@ -270,7 +294,7 @@
         <div id='add-email-#i#' data-template class='email-template' data-index="#i#">
           <fieldset class="fillflow-row">
             <legend class="action">
-              <span data-taglist="email-type" name="email[#i#][type]" value="#type#" id="email_type_#i#" data-field="type">#type#</span>
+              <span data-taglist="email-type" name="email[#i#][type]" data-value="#type_value#" id="email_type_#i#" data-field="type" data-l10n-id="#type_l10n_id#">#type#</span>
             </legend>
             <section>
               <p class="setbox-item">
@@ -285,7 +309,7 @@
         <div id='add-address-#i#' data-template class='address-template' data-index="#i#">
           <fieldset class="fillflow-row">
             <legend class="action">
-              <span data-taglist="address-type" name="adr[#i#][type]" value="#type#" id="address_type_#i#" data-field="type">#type#</span>
+              <span data-taglist="address-type" name="adr[#i#][type]" data-value="#type_value#" id="address_type_#i#" data-field="type" data-l10n-id="#type_l10n_id#">#type#</span>
             </legend>
             <section>
               <p class="setbox-item">
@@ -456,19 +480,39 @@
               </li>
             </ul>
             <header>
-              <h2>SIM</h2>
+              <h2 data-l10n-id="importContactsTitle">Import Contacts</h2>
             </header>
-            <ul data-type="list">
-              <li id="settingsSIM">
-                <button class="icon icon-sim" data-l10n-id="importSim">
-                  Import from SIM
+            <ul data-type="list" id="importSources">
+              <li id="settingsSIM" data-source="sim">
+                <button class="icon icon-sim" data-l10n-id="importSim2">
+                  SIM card
+                  <p><span></span><time></time></p>
                 </button>
                 <p id="no-sim" data-l10n-id="noSimMsg"></p>
+              </li>
+              <li id="settingsStorage" data-source="sd">
+                <button class="icon icon-sd" data-l10n-id="importMemoryCard">
+                  Memory card
+                  <p><span></span><time></time></p>
+                </button>
+                <p id="no-memorycard" data-l10n-id="noMemoryCardMsg"></p>
+              </li>
+              <li class="importService" data-source="gmail">
+                <button class="icon icon-gmail" data-l10n-id="importGmail">
+                  Gmail
+                  <p><span></span><time></time></p>
+                </button>
+              </li>
+              <li class="importService" data-source="live">
+                <button class="icon icon-live" data-l10n-id="importOutlook">
+                  Outlook
+                  <p><span></span><time></time></p>
+                </button>
               </li>
             </ul>
 
             <header id="fb-header">
-              <h2 data-l10n-id="otherAccount">Other accounts</h2>
+              <h2 data-l10n-id="facebook">Facebook</h2>
             </header>
             <ul id="settingsFb" data-type="list" data-state="logged-out">
               <li class="fb-item">
@@ -478,7 +522,7 @@
                       <span id="span-check-fb"></span>
                   </label>
                 </aside>
-                <p data-l10n-id="facebook">Facebook</p>
+                <p data-l10n-id="facebookSwitchMsg">Sync friends</p>
                 <p id="fb-totals"></p>
               </li>
               <li id="fb-update-option">
@@ -487,14 +531,14 @@
                   Update imported friends
                 </button>
                 <p id="renew-pwd-msg" data-l10n-id="renewPwdMsg" class="fb-error"></p>
-                <p id="no-connection" data-l10n-id="noConnection"></p>
+                <p id="no-connection" data-l10n-id="noConnection11"></p>
               </li>
             </ul>
           </section>
         </article>
       </section>
 
-    <form data-type="confirm" id="loading-overlay" role="dialog">
+    <form data-type="confirm" id="loading-overlay" class="hide no-opacity" role="dialog">
       <section id="progress-activity" class="hide">
         <h1 id="progress-title"></h1>
         <p role="status">

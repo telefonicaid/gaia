@@ -47,6 +47,7 @@ function VideoPlayer(container) {
   this.poster = poster;
   this.player = player;
   this.controls = controls;
+  this.playing = false;
 
   player.preload = 'metadata';
   player.mozAudioChannelType = 'content';
@@ -55,11 +56,11 @@ function VideoPlayer(container) {
   var controlsHidden = false;
   var dragging = false;
   var pausedBeforeDragging = false;
-  var screenLock; // keep the screen on when playing
   var endedTimer;
   var videourl;   // the url of the video to play
   var posterurl;  // the url of the poster image to display
   var rotation;   // Do we have to rotate the video? Set by load()
+  var orientation = 0; // current player orientation
 
   // These are the raw (unrotated) size of the poster image, which
   // must have the same size as the video.
@@ -82,14 +83,14 @@ function VideoPlayer(container) {
   this.reset = function() {
     hidePlayer();
     hidePoster();
-  }
+  };
 
   this.init = function() {
     playbackTime = 0;
     hidePlayer();
     showPoster();
     this.pause();
-  }
+  };
 
   function hidePlayer() {
     player.style.display = 'none';
@@ -111,7 +112,7 @@ function VideoPlayer(container) {
         player.currentTime = playbackTime;
       }
       self.play();
-    }
+    };
   }
 
   function hidePoster() {
@@ -134,10 +135,15 @@ function VideoPlayer(container) {
   // Call this when the container size changes
   this.setPlayerSize = setPlayerSize;
 
+  // Call this when phone orientation changes
+  this.setPlayerOrientation = setPlayerOrientation;
+
   this.pause = function pause() {
     // Pause video playback
-    if (self.playerShowing)
+    if (self.playerShowing) {
+      this.playing = false;
       player.pause();
+    }
 
     // Hide the pause button and slider
     footer.classList.add('hidden');
@@ -145,12 +151,6 @@ function VideoPlayer(container) {
 
     // Show the big central play button
     playbutton.classList.remove('hidden');
-
-    // Unlock the screen so it can sleep on idle
-    if (screenLock) {
-      screenLock.unlock();
-      screenLock = null;
-    }
 
     if (this.onpaused)
       this.onpaused();
@@ -167,6 +167,8 @@ function VideoPlayer(container) {
       return;
     }
 
+    this.playing = true;
+
     // Start playing the video
     player.play();
 
@@ -176,10 +178,6 @@ function VideoPlayer(container) {
     // Show the controls
     footer.classList.remove('hidden');
     controlsHidden = false;
-
-    // Don't let the screen go to sleep
-    if (!screenLock)
-      screenLock = navigator.requestWakeLock('screen');
 
     if (this.onplaying)
       this.onplaying();
@@ -276,10 +274,10 @@ function VideoPlayer(container) {
 
   // Pause and unload the video if we're hidden so that other apps
   // can use the video decoder hardware.
-  window.addEventListener('mozvisibilitychange', visibilityChanged);
+  window.addEventListener('visibilitychange', visibilityChanged);
 
   function visibilityChanged() {
-    if (document.mozHidden) {
+    if (document.hidden) {
       // If we're just showing the poster image when we're hidden
       // then we don't have to do anything special
       if (!self.playerShowing)
@@ -377,6 +375,31 @@ function VideoPlayer(container) {
     player.style.transform = transform;
   }
 
+  // Update current player orientation
+  function setPlayerOrientation(newOrientation) {
+    orientation = newOrientation;
+  }
+
+  // Compute position based on player orientation
+  function computePosition(panPosition, rect) {
+    var position;
+    switch (orientation) {
+      case 0:
+        position = (panPosition.clientX - rect.left) / rect.width;
+        break;
+      case 90:
+        position = (rect.bottom - panPosition.clientY) / rect.height;
+        break;
+      case 180:
+        position = (rect.right - panPosition.clientX) / rect.width;
+        break;
+      case 270:
+        position = (panPosition.clientY - rect.top) / rect.height;
+        break;
+    }
+    return position;
+  }
+
   // handle drags on the time slider
   slider.addEventListener('pan', function pan(e) {
     e.stopPropagation();
@@ -393,7 +416,7 @@ function VideoPlayer(container) {
     }
 
     var rect = backgroundBar.getBoundingClientRect();
-    var position = (e.detail.position.clientX - rect.left) / rect.width;
+    var position = computePosition(e.detail.position, rect);
     var pos = Math.min(Math.max(position, 0), 1);
     player.currentTime = player.duration * pos;
     updateTime();
@@ -423,8 +446,22 @@ function VideoPlayer(container) {
     var seconds = time % 60;
     if (minutes < 60) {
       return padLeft(minutes, 2) + ':' + padLeft(seconds, 2);
+    } else {
+      var hours = Math.floor(minutes / 60);
+      minutes = Math.round(minutes % 60);
+      return hours + ':' + padLeft(minutes, 2) + ':' + padLeft(seconds, 2);
     }
     return '';
+  }
+
+  // pause the video player if user unplugs headphone
+  var acm = navigator.mozAudioChannelManager;
+  if (acm) {
+    acm.addEventListener('headphoneschange', function onheadphoneschange() {
+      if (!acm.headphones && self.playing) {
+        self.pause();
+      }
+    });
   }
 }
 

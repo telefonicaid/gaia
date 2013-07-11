@@ -4,10 +4,12 @@
 'use strict';
 
 var SimLock = {
+  _duringCall: false,
+  _showPrevented: false,
+
   init: function sl_init() {
-    // Do not do anything if we can't have access to MobileConnection API
-    var conn = window.navigator.mozMobileConnection;
-    if (!conn)
+    // Do not do anything if we can't have access to IccHelper API
+    if (!IccHelper.enabled)
       return;
 
     this.onClose = this.onClose.bind(this);
@@ -20,17 +22,42 @@ var SimLock = {
     window.addEventListener('unlock', this);
 
     // always monitor card state change
-    conn.addEventListener('cardstatechange', this.showIfLocked.bind(this));
+    IccHelper.addEventListener('cardstatechange', this.showIfLocked.bind(this));
+
+    // Listen to callscreenwillopen and callscreenwillclose event
+    // to discard the cardstatechange event.
+    window.addEventListener('callscreenwillopen', this);
+    window.addEventListener('callscreenwillclose', this);
   },
 
   handleEvent: function sl_handleEvent(evt) {
     switch (evt.type) {
+      case 'callscreenwillopen':
+        this._duringCall = true;
+        break;
+      case 'callscreenwillclose':
+        this._duringCall = false;
+        if (this._showPrevented) {
+          this._showPrevented = false;
+
+          // We show the SIM dialog right away otherwise the user won't
+          // be able to receive calls.
+          this.showIfLocked();
+        }
+        break;
       case 'unlock':
+        // Check whether the lock screen was unlocked from the camera or not.
+        // If the former is true, the SIM PIN dialog should not displayed after
+        // unlock, because the camera will be opened (Bug 849718)
+        if (evt.detail && evt.detail.areaCamera)
+          return;
+
         this.showIfLocked();
         break;
       case 'appwillopen':
-        // if an app needs telephony or sms permission,
-        // we will launch the unlock screen if needed.
+        // If an app needs 'telephony' or 'sms' permissions (i.e. mobile
+        // connection) and the SIM card is locked, the SIM PIN unlock screen
+        // should be launched
 
         var app = Applications.getByManifestURL(
           evt.target.getAttribute('mozapp'));
@@ -38,16 +65,25 @@ var SimLock = {
         if (!app || !app.manifest.permissions)
           return;
 
-        // Ignore first time usage app which already ask for SIM code
-        if (evt.target.classList.contains('ftu'))
+        // Ignore first time usage (FTU) app which already asks for the PIN code
+        // XXX: We should have a better way to detect this app is FTU or not.
+        if (evt.target.dataset.frameOrigin == FtuLauncher.getFtuOrigin())
           return;
 
+        // Ignore apps that don't require a mobile connection
         if (!('telephony' in app.manifest.permissions ||
               'sms' in app.manifest.permissions))
           return;
 
-        // Ignore second `appwillopen` event when showIfLocked ends up
-        // eventually opening the app on valid pin code
+        // If the Settings app will open, don't prompt for SIM PIN entry
+        // although it has 'telephony' permission (Bug 861206)
+        var settingsManifestURL =
+          'app://settings.gaiamobile.org/manifest.webapp';
+        if (app.manifestURL == settingsManifestURL)
+          return;
+
+        // Ignore second 'appwillopen' event when showIfLocked eventually opens
+        // the app on valid PIN code
         var origin = evt.target.dataset.frameOrigin;
         if (origin == this._lastOrigin) {
           delete this._lastOrigin;
@@ -55,8 +91,8 @@ var SimLock = {
         }
         this._lastOrigin = origin;
 
-        // if sim is locked, cancel app opening in order to display
-        // it after PIN dialog
+        // If SIM is locked, cancel app opening in order to display
+        // it after the SIM PIN dialog is shown
         if (this.showIfLocked())
           evt.preventDefault();
 
@@ -65,34 +101,36 @@ var SimLock = {
   },
 
   showIfLocked: function sl_showIfLocked() {
-    var conn = window.navigator.mozMobileConnection;
-    if (!conn)
+    if (!IccHelper.enabled)
       return false;
 
     if (LockScreen.locked)
       return false;
 
-    switch (conn.cardState) {
-      // do nothing in absent and null card states
+    // FTU has its specific SIM PIN UI
+    if (FtuLauncher.isFtuRunning())
+      return false;
+
+    if (this._duringCall) {
+      this._showPrevented = true;
+      return false;
+    }
+
+    switch (IccHelper.cardState) {
+      // do nothing in either absent, unknown or null card states
       case null:
       case 'absent':
+      case 'unknown':
         break;
       case 'pukRequired':
       case 'pinRequired':
         SimPinDialog.show('unlock', this.onClose);
         return true;
       case 'networkLocked':
-        // XXXX: After unlocking the SIM the cardState is
-        //       'networkLocked' but it changes inmediately to 'ready'
-        //       if the phone is not SIM-locked. If the cardState
-        //       is still 'networkLocked' after 20 seconds we unlock
-        //       the network control key lock (network personalization).
-        setTimeout(function checkState() {
-          if (conn.cardState == 'networkLocked') {
-            SimPinDialog.show('unlock', SimLock.onClose);
-          }
-        }, 20000);
-        break;
+      case 'corporateLocked':
+      case 'serviceProviderLocked':
+        SimPinDialog.show('unlock', SimLock.onClose);
+        return true;
     }
     return false;
   },

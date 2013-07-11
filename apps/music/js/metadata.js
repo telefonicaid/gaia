@@ -5,20 +5,25 @@
 function parseAudioMetadata(blob, metadataCallback, errorCallback) {
   var filename = blob.name;
 
-  // If the file is in the DCIM/ directory and has a .3gp extension
-  // then it is a video, not a music file and we ignore it
-  if (filename.slice(0, 5) === 'DCIM/' &&
-      filename.slice(-4).toLowerCase() === '.3gp') {
-    errorCallback('skipping 3gp video file');
-    return;
-  }
+  // If blob.name exists, it should be an audio file from system
+  // otherwise it should be an audio blob that probably from network/process
+  // we can still parse it but we don't need to care about the filename
+  if (filename) {
+    // If the file is in the DCIM/ directory and has a .3gp extension
+    // then it is a video, not a music file and we ignore it
+    if (filename.slice(0, 5) === 'DCIM/' &&
+        filename.slice(-4).toLowerCase() === '.3gp') {
+      errorCallback('skipping 3gp video file');
+      return;
+    }
 
-  // If the file has a .m4v extension then it is almost certainly a video.
-  // Device Storage should not even return these files to us:
-  // see https://bugzilla.mozilla.org/show_bug.cgi?id=826024
-  if (filename.slice(-4).toLowerCase() === '.m4v') {
-    errorCallback('skipping m4v video file');
-    return;
+    // If the file has a .m4v extension then it is almost certainly a video.
+    // Device Storage should not even return these files to us:
+    // see https://bugzilla.mozilla.org/show_bug.cgi?id=826024
+    if (filename.slice(-4).toLowerCase() === '.m4v') {
+      errorCallback('skipping m4v video file');
+      return;
+    }
   }
 
   // If the file is too small to be a music file then ignore it
@@ -74,10 +79,15 @@ function parseAudioMetadata(blob, metadataCallback, errorCallback) {
 
   // These are 'ftyp' values that we recognize
   // See http://www.mp4ra.org/filetype.html
+  // Also see gecko code in /toolkit/components/mediasniffer/nsMediaSniffer.cpp
+  // Gaia will accept the supported compatible brands in gecko as well
   var MP4Types = {
     'M4A ' : true,  // iTunes audio.  Note space in property name.
     'M4B ' : true,  // iTunes audio book. Note space.
-    'mp42' : true   // MP4 version 2
+    'mp41' : true,  // MP4 version 1
+    'mp42' : true,  // MP4 version 2
+    'isom' : true,  // ISO base media file format, version 1
+    'iso2' : true   // ISO base media file format, version 2
   };
 
   // Start off with some default metadata
@@ -118,7 +128,7 @@ function parseAudioMetadata(blob, metadataCallback, errorCallback) {
       }
       else if (magic.substring(4, 8) === 'ftyp') {
         // This is an MP4 file
-        if (magic.substring(8, 12) in MP4Types) {
+        if (checkMP4Type(header, MP4Types)) {
           // It is a type of MP4 file that we support
           parseMP4Metadata(header);
         }
@@ -413,6 +423,7 @@ function parseAudioMetadata(blob, metadataCallback, errorCallback) {
   //   http://xiph.org/vorbis/doc/Vorbis_I_spec.html
   //   http://www.xiph.org/vorbis/doc/v-comment.html
   //   http://wiki.xiph.org/VorbisComment
+  //   http://tools.ietf.org/html/draft-ietf-codec-oggopus-00
   //
   function parseOggMetadata(header) {
     function sum(x, y) { return x + y; } // for Array.reduce() below
@@ -437,7 +448,18 @@ function parseAudioMetadata(blob, metadataCallback, errorCallback) {
         return;
       }
 
-      if (page.readByte() !== 3 || page.readASCIIText(6) !== 'vorbis') {
+      // Look for a comment packet from a supported codec
+      var first_byte = page.readByte();
+      var valid = false;
+      switch (first_byte) {
+        case 3:
+          valid = page.readASCIIText(6) === 'vorbis';
+          break;
+        case 79:
+          valid = page.readASCIIText(7) === 'pusTags';
+          break;
+      }
+      if (!valid) {
         errorCallback('malformed ogg comment packet');
       }
 
@@ -473,6 +495,34 @@ function parseAudioMetadata(blob, metadataCallback, errorCallback) {
     });
   }
 
+  // MP4 files use 'ftyp' to identify the type of encoding.
+  // 'ftyp' information
+  //   http://www.ftyps.com/what.html
+  function checkMP4Type(header, types) {
+    // The major brand is the four bytes right after 'ftyp'.
+    var majorbrand = header.getASCIIText(8, 4);
+
+    if (majorbrand in types) {
+      return true;
+    }
+    else {
+      // Check the rest part for the compatible brands,
+      // they are every four bytes after the version of major brand.
+      // Usually there are two optional compatible brands,
+      // but arbitrary number of other compatible brands are also acceptable,
+      // so we will check all the compatible brands until the header ends.
+      var index = 16;
+      var size = header.getUint32(0);
+
+      while (index < size) {
+        var compatiblebrand = header.getASCIIText(index, 4);
+        index += 4;
+        if (compatiblebrand in types)
+          return true;
+      }
+      return false;
+    }
+  }
   //
   // XXX: Need a special case for the track number atom?
   //
@@ -586,10 +636,11 @@ function parseAudioMetadata(blob, metadataCallback, errorCallback) {
     }
 
     function findChildAtom(data, atom) {
+      var start = data.index;
       var length = data.readUnsignedInt();
       data.advance(4);
 
-      while (data.index < length) {
+      while (data.index < start + length) {
         var size = data.readUnsignedInt();
         var type = data.readASCIIText(4);
         if (type === atom) {
@@ -813,7 +864,7 @@ function getThumbnailURL(fileinfo, callback) {
         // Return a default one instead
         console.warn('Album cover art failed to load', file.name);
         callback(null);
-      }
+      };
       offscreenImage.onload = function() {
         // We've loaded the image, now copy it to a canvas
         var canvas = document.createElement('canvas');

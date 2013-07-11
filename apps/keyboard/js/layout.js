@@ -54,6 +54,7 @@ const Keyboards = {
   },
   numberLayout: {
     width: 9,
+    keyClassName: 'big-key special-key',
     keys: [
       [{ value: '1', ratio: 3},{ value: '2', ratio: 3},{ value: '3', ratio: 3}],
       [{ value: '4', ratio: 3},{ value: '5', ratio: 3},{ value: '6', ratio: 3}],
@@ -69,8 +70,23 @@ const Keyboards = {
       '0' : '-'
     }
   },
+  pinLayout: {
+    width: 9,
+    keyClassName: 'big-key special-key',
+    keys: [
+      [{ value: '1', ratio: 3},{ value: '2', ratio: 3},{ value: '3', ratio: 3}],
+      [{ value: '4', ratio: 3},{ value: '5', ratio: 3},{ value: '6', ratio: 3}],
+      [{ value: '7', ratio: 3},{ value: '8', ratio: 3},{ value: '9', ratio: 3}],
+      [
+        { value: '', ratio: 3},
+        { value: '0', ratio: 3},
+        { value: '⌫', ratio: 3, keyCode: KeyEvent.DOM_VK_BACK_SPACE }
+      ]
+    ]
+  },
   telLayout: {
     width: 9,
+    keyClassName: 'big-key special-key',
     keys: [
       [{ value: '1', ratio: 3},{ value: '2', ratio: 3},{ value: '3', ratio: 3}],
       [{ value: '4', ratio: 3},{ value: '5', ratio: 3},{ value: '6', ratio: 3}],
@@ -92,7 +108,7 @@ const Keyboards = {
   en: {
     label: 'English',
     imEngine: 'latin',
-    needsCandidatePanel: 'true',
+    autoCorrectLanguage: 'en_us',
     menuLabel: 'English',
     alt: {
       a: 'áàâäåãāæ',
@@ -102,7 +118,7 @@ const Keyboards = {
       o: 'öóòôōœøɵ',
       u: 'üúùûū',
       s: 'ßśš$',
-      S: 'ŚŠŞ',
+      S: 'ŚŠ$',
       n: 'ñń',
       l: 'ł£',
       y: 'ÿ¥',
@@ -118,7 +134,7 @@ const Keyboards = {
       ], [
         { value: 'a' }, { value: 's' }, { value: 'd' }, { value: 'f' },
         { value: 'g' } , { value: 'h' }, { value: 'j' }, { value: 'k' },
-        { value: 'l' }, { value: "'", keyCode: 39, hidden: ['email', 'url'] },
+        { value: 'l' },
         { value: ':', visible: ['url']}, { value: '_', visible: ['email']}
       ], [
         { value: '⇪', ratio: 1.5, keyCode: KeyEvent.DOM_VK_CAPS_LOCK },
@@ -152,9 +168,10 @@ const Keyboards = {
           { value: '5' } , { value: '6' }, { value: '7' } , { value: '8' },
           { value: '9' }, { value: '0' }
         ], [
-          { value: '@', hidden: ['email'] }, { value: '#' }, { value: '$' }, { value: '%' },
-          { value: '&' } , { value: '*' }, { value: '-' }, { value: '+' },
-          { value: '(' }, { value: ')' }, { value: '_', visible: ['email'] }
+          { value: '@', hidden: ['email'] }, { value: '#' }, { value: '$' },
+          { value: '%' }, { value: '&' } , { value: '*' }, { value: '-' },
+          { value: '+' }, { value: '(' }, { value: ')' },
+          { value: '_', visible: ['email'] }
         ], [
           { value: 'ALT', ratio: 1.5, keyCode: KeyEvent.DOM_VK_ALT },
           { value: '!' }, { value: '\"' }, { value: "'" }, { value: ':' },
@@ -171,7 +188,7 @@ const Keyboards = {
     label: 'Spanish',
     menuLabel: 'Español',
     imEngine: 'latin',
-    needsCandidatePanel: 'true',
+    autoCorrectLanguage: 'es',
     alt: {
       a: 'áªàâäåãāæ',
       c: 'ç',
@@ -180,11 +197,11 @@ const Keyboards = {
       o: 'óºöòôōœøɵ',
       u: 'üúùûū',
       s: '$ßš',
-      l: '£',
+      l: '£ l·l',
       n: 'ń',
       y: '¥',
       r: 'R$ ',
-      '.': ',¿?¡!;:',
+      '.': ',¿?¡!;:·',
       ':)': ':) :D :( ;D :* :/'
 //      '.com': '.es .org .eu' XXX: commented to avoid overflows for the demo
     },
@@ -221,7 +238,8 @@ const Keyboards = {
         '6': '6º 6ª',
         '7': '7º 7ª',
         '8': '8º 8ª',
-        '9': '9º 9ª'
+        '9': '9º 9ª',
+        '.': '·'
       },
       keys: [
         [
@@ -269,7 +287,7 @@ const Keyboards = {
     label: 'Portuguese',
     menuLabel: 'Português',
     imEngine: 'latin',
-    needsCandidatePanel: 'true',
+    autoCorrectLanguage: 'pt_br',
     alt: {
       a: 'áãàâäåæª',
       e: 'éêèęėēëɛ',
@@ -365,6 +383,7 @@ const Keyboards = {
   cz: {
     label: 'Czech',
     menuLabel: 'Česká',
+    imEngine: 'latin',
     alt: {
       a: 'á',
       c: 'č',
@@ -402,9 +421,9 @@ const Keyboards = {
   },
   fr: {
     label: 'French',
-    menuLabel: 'français',
+    menuLabel: 'Français',
     imEngine: 'latin',
-    needsCandidatePanel: 'true',
+    autoCorrectLanguage: 'fr',
     alt: {
       a: 'àâæáãäåā',
       c: 'çćč',
@@ -414,7 +433,8 @@ const Keyboards = {
       u: 'ùûüúū',
       s: 'śšşß',
       S: 'ŚŠŞ',
-      n: 'ńñň'
+      n: 'ńñň',
+      '.': ',?!-;:'
     },
     keys: [
       [
@@ -440,7 +460,7 @@ const Keyboards = {
     label: 'German',
     menuLabel: 'Deutsch',
     imEngine: 'latin',
-    needsCandidatePanel: 'true',
+    autoCorrectLanguage: 'de',
     alt: {
       a: 'äàáâãåāæ',
       c: 'çćč',
@@ -481,7 +501,7 @@ const Keyboards = {
     keys: [
       [
         { value: 'ק' }, { value: 'ר' }, { value: 'א' }, { value: 'ט' },
-        { value: 'ו' }, { value: 'ו' }, { value: 'ם' }, { value: 'פ' },
+        { value: 'ו' }, { value: 'ן' }, { value: 'ם' }, { value: 'פ' },
         { value: '⌫', ratio: 2, keyCode: KeyEvent.DOM_VK_BACK_SPACE }
       ], [
         { value: 'ש' }, { value: 'ד' }, { value: 'ג' }, { value: 'כ' },
@@ -500,6 +520,7 @@ const Keyboards = {
   nb: {
     label: 'Norwegian Bokmal',
     menuLabel: 'Norsk',
+    imEngine: 'latin',
     alt: {
       a: 'äáàâąã',
       e: 'éèêëę€',
@@ -541,7 +562,8 @@ const Keyboards = {
   },
   ru: {
     label: 'Russian',
-    menuLabel: 'русский',
+    menuLabel: 'Pусский',
+    imEngine: 'latin',
     alt: {
       // incomplete
     },
@@ -568,7 +590,8 @@ const Keyboards = {
   },
   'sr-Cyrl': {
     label: 'Serbian (Cyrillic)',
-    menuLabel: 'српска ћирилица',
+    menuLabel: 'Српски (ћирилица)',
+    imEngine: 'latin',
     alt: {
       // incomplete
     },
@@ -593,8 +616,69 @@ const Keyboards = {
       ]
     ]
   },
+  'sr-Latn': {
+    label: 'Serbian (Latin)',
+    menuLabel: 'Srpski',
+    imEngine: 'latin',
+    alt: {
+      c: 'čć',
+      d: 'đ',
+      s: 'š',
+      z: 'ž',
+      '.': ',?!;:'
+    },
+    keys: [
+      [
+        { value: 'q' }, { value: 'w' }, { value: 'e' } , { value: 'r' },
+        { value: 't' } , { value: 'y' }, { value: 'u' } , { value: 'i' },
+        { value: 'o' }, { value: 'p' }
+      ], [
+        { value: 'a' }, { value: 's' }, { value: 'd' }, { value: 'f' },
+        { value: 'g' } , { value: 'h' }, { value: 'j' }, { value: 'k' },
+        { value: 'l' }, { value: '"', hidden: ['email', 'url'] },
+        { value: ':', visible: ['url']}, { value: '_', visible: ['email']}
+      ], [
+        { value: '⇪', ratio: 1.5, keyCode: KeyEvent.DOM_VK_CAPS_LOCK },
+        { value: 'z' }, { value: 'x' }, { value: 'c' }, { value: 'v' },
+        { value: 'b' }, { value: 'n' }, { value: 'm' },
+        { value: '⌫', ratio: 1.5, keyCode: KeyEvent.DOM_VK_BACK_SPACE }
+      ], [
+        { value: '&nbsp', ratio: 8, keyCode: KeyboardEvent.DOM_VK_SPACE },
+        { value: '↵', ratio: 2, keyCode: KeyEvent.DOM_VK_RETURN }
+      ]
+    ],
+    alternateLayout: {
+      alt: {
+        '0': 'º',
+        '$': '€£¥',
+        '?': '¿',
+        '!': '¡'
+      },
+      keys: [
+        [
+          { value: '1' }, { value: '2' }, { value: '3' } , { value: '4' },
+          { value: '5' } , { value: '6' }, { value: '7' } , { value: '8' },
+          { value: '9' }, { value: '0' }
+        ], [
+          { value: '@', hidden: ['email'] }, { value: '#' }, { value: '$' },
+          { value: '%' }, { value: '&' } , { value: '*' }, { value: '-' },
+          { value: '+' }, { value: '(' }, { value: ')' },
+          { value: '_', visible: ['email'] }
+        ], [
+          { value: 'ALT', ratio: 1.5, keyCode: KeyEvent.DOM_VK_ALT },
+          { value: '!' }, { value: '\"' }, { value: "'" }, { value: ':' },
+          { value: ';' }, { value: '/' }, { value: '?' },
+          { value: '⌫', ratio: 1.5, keyCode: KeyEvent.DOM_VK_BACK_SPACE }
+        ], [
+          { value: '&nbsp', ratio: 8, keyCode: KeyboardEvent.DOM_VK_SPACE },
+          { value: '↵', ratio: 2, keyCode: KeyEvent.DOM_VK_RETURN }
+        ]
+      ]
+    }
+  },
   sk: {
     label: 'Slovak',
+    imEngine: 'latin',
     menuLabel: 'Slovenčina',
     alt: {
       a: 'áàâąãäæ',
@@ -633,6 +717,7 @@ const Keyboards = {
   },
   tr: {
     label: 'Turkish',
+    imEngine: 'latin',
     menuLabel: 'Türkçe',
     upperCase: {
       'i': 'İ'
@@ -672,7 +757,7 @@ const Keyboards = {
     label: 'English - Dvorak',
     menuLabel: 'Dvorak',
     imEngine: 'latin',
-    needsCandidatePanel: 'true',
+    autoCorrectLanguage: 'en_us',
     alt: {
       a: 'àáâãäåāæ',
       c: 'çćč',
@@ -976,6 +1061,7 @@ const Keyboards = {
   el: {
     label: 'Greek',
     menuLabel: 'Greek',
+    imEngine: 'latin',
     alt: {
       α: 'ά',
       ε: 'έ€',
@@ -1007,6 +1093,76 @@ const Keyboards = {
         { value: '↵', ratio: 2, keyCode: KeyEvent.DOM_VK_RETURN }
       ]
     ]
+  },
+  pl: {
+    label: 'Polish',
+    imEngine: 'latin',
+    autoCorrectLanguage: 'pl',
+    menuLabel: 'Polski',
+    alt: {
+      a: 'ąáàâäåãāæ',
+      c: 'ćčç',
+      e: 'ę€éèêëē',
+      i: 'ïíìîīį',
+      o: 'óöòôōœø',
+      u: 'üúùûū',
+      s: 'śš$ß',
+      S: 'ŚŠŞ',
+      n: 'ńñ',
+      l: 'ł£',
+      y: '¥',
+      z: 'żźž',
+      '.': '?!…,',
+      ',': '„”',
+      ':': ';-—'
+    },
+    keys: [
+      [
+        { value: 'q' }, { value: 'w' }, { value: 'e' } , { value: 'r' },
+        { value: 't' } , { value: 'y' }, { value: 'u' } , { value: 'i' },
+        { value: 'o' }, { value: 'p' }
+      ], [
+        { value: 'a' }, { value: 's' }, { value: 'd' }, { value: 'f' },
+        { value: 'g' } , { value: 'h' }, { value: 'j' }, { value: 'k' },
+        { value: 'l' }, { value: ':', hidden: ['email'] },
+        { value: '_', visible: ['email'] }
+      ], [
+        { value: '⇪', ratio: 1.5, keyCode: KeyEvent.DOM_VK_CAPS_LOCK },
+        { value: 'z' }, { value: 'x' }, { value: 'c' }, { value: 'v' },
+        { value: 'b' }, { value: 'n' }, { value: 'm' },
+        { value: '⌫', ratio: 1.5, keyCode: KeyEvent.DOM_VK_BACK_SPACE }
+      ], [
+        { value: '&nbsp', ratio: 8, keyCode: KeyboardEvent.DOM_VK_SPACE },
+        { value: '↵', ratio: 2, keyCode: KeyEvent.DOM_VK_RETURN }
+      ]
+    ],
+    alternateLayout: {
+      alt: {
+        '$': '€£¥',
+        '?': '¿',
+        '!': '¡'
+      },
+      keys: [
+        [
+          { value: '1' }, { value: '2' }, { value: '3' } , { value: '4' },
+          { value: '5' } , { value: '6' }, { value: '7' } , { value: '8' },
+          { value: '9' }, { value: '0' }
+        ], [
+          { value: '@', hidden: ['email'] }, { value: '#' }, { value: '$' },
+          { value: '%' }, { value: '&' } , { value: '*' }, { value: '-' },
+          { value: '+' }, { value: '(' }, { value: ')' },
+          { value: '_', visible: ['email'] }
+        ], [
+          { value: 'ALT', ratio: 1.5, keyCode: KeyEvent.DOM_VK_ALT },
+          { value: '!' }, { value: '\"' }, { value: "'" }, { value: ':' },
+          { value: ';' }, { value: '/' }, { value: '?' },
+          { value: '⌫', ratio: 1.5, keyCode: KeyEvent.DOM_VK_BACK_SPACE }
+        ], [
+          { value: '&nbsp', ratio: 8, keyCode: KeyboardEvent.DOM_VK_SPACE },
+          { value: '↵', ratio: 2, keyCode: KeyEvent.DOM_VK_RETURN }
+        ]
+      ]
+    }
   },
   'jp-kanji': {
     label: 'Japanese - Kanji',
@@ -1124,5 +1280,91 @@ const Keyboards = {
         { value: '↵', ratio: 2, keyCode: KeyEvent.DOM_VK_RETURN }
       ]
     ]
+  },
+  ca: {
+    label: 'Catalan',
+    imEngine: 'latin',
+    menuLabel: 'català',
+    alt: {
+      a: 'àáâäåãāæª@',
+      c: 'çćč',
+      e: 'èéêëēę€ɛ',
+      i: 'íïìîīį',
+      o: 'òóöôōœøɵº',
+      u: 'úüùûū',
+      s: 'ßśš$',
+      S: 'ŚŠŞ',
+      n: 'ñń',
+      l: 'l·l ł £',
+      y: 'ÿ¥',
+      z: 'žźż',
+      r: 'R$ ',
+      '?': '!¿¡',
+      '.': ',;:·…',
+      "'": '"«»',
+      '-': '—_'
+    },
+    width: 11,
+    keys: [
+      [
+        { value: 'q' }, { value: 'w' }, { value: 'e' } , { value: 'r' },
+        { value: 't' } , { value: 'y' }, { value: 'u' } , { value: 'i' },
+        { value: 'o' }, { value: 'p' }, { value: '?' }
+      ], [
+        { value: 'a' }, { value: 's' }, { value: 'd' }, { value: 'f' },
+        { value: 'g' } , { value: 'h' }, { value: 'j' }, { value: 'k' },
+        { value: 'l' }, { value: 'ç' },
+        { value: "'", keyCode: 39, hidden: ['email', 'url'] },
+        { value: ':', visible: ['url']}, { value: '_', visible: ['email']}
+      ], [
+        { value: '⇪', ratio: 1.5, keyCode: KeyEvent.DOM_VK_CAPS_LOCK },
+        { value: 'z' }, { value: 'x' }, { value: 'c' }, { value: 'v' },
+        { value: 'b' }, { value: 'n' }, { value: 'm' }, { value: '-' },
+        { value: '⌫', ratio: 1.5, keyCode: KeyEvent.DOM_VK_BACK_SPACE }
+      ], [
+        { value: '&nbsp', ratio: 9, keyCode: KeyboardEvent.DOM_VK_SPACE },
+        { value: '↵', ratio: 2, keyCode: KeyEvent.DOM_VK_RETURN }
+      ]
+    ],
+    alternateLayout: {
+      alt: {
+        '0': 'º',
+        '1': '1r 1a',
+        '2': '2n 2a',
+        '3': '3r 3a',
+        '4': '4t 4a',
+        '5': '5è 5a 5é',
+        '6': '6è 6a 6é',
+        '7': '7è 7a 7é',
+        '8': '8è 8a 8é',
+        '9': '9è 9a 9é',
+        '€': '$ £ ¥ R$',
+        '-': '—_',
+        '?': '¿',
+        '"': '«»',
+        '.': ',;:·…',
+        '!': '¡'
+      },
+      keys: [
+        [
+          { value: '1' }, { value: '2' }, { value: '3' } , { value: '4' },
+          { value: '5' } , { value: '6' }, { value: '7' } , { value: '8' },
+          { value: '9' }, { value: '0' }
+        ], [
+          { value: '@', hidden: ['email'] }, { value: '#' }, { value: '€' },
+          { value: '%' }, { value: '&' } , { value: '*' }, { value: '-' },
+          { value: '+' }, { value: '(' }, { value: ')' },
+          { value: '_', visible: ['email'] }
+        ], [
+          { value: 'ALT', ratio: 1.5, keyCode: KeyEvent.DOM_VK_ALT },
+          { value: '!' }, { value: '\"' }, { value: "'" }, { value: ':' },
+          { value: ';' }, { value: '/' }, { value: '?' },
+          { value: '⌫', ratio: 1.5, keyCode: KeyEvent.DOM_VK_BACK_SPACE }
+        ], [
+          { value: '&nbsp', ratio: 8, keyCode: KeyboardEvent.DOM_VK_SPACE },
+          { value: '↵', ratio: 2, keyCode: KeyEvent.DOM_VK_RETURN }
+        ]
+      ]
+    }
   }
 };

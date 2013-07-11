@@ -16,24 +16,23 @@ var UtilityTray = {
 
   init: function ut_init() {
     var touchEvents = ['touchstart', 'touchmove', 'touchend'];
-
-    // XXX: Always use Mouse2Touch here.
-    // We cannot reliably detect touch support normally
-    // by evaluate (document instanceof DocumentTouch) on Desktop B2G.
     touchEvents.forEach(function bindEvents(name) {
-      // window.addEventListener(name, this);
-      Mouse2Touch.addEventHandler(window, name, this);
+      window.addEventListener(name, this);
     }, this);
 
     window.addEventListener('screenchange', this);
+    window.addEventListener('emergencyalert', this);
     window.addEventListener('home', this);
+    window.addEventListener('attentionscreenshow', this);
 
     this.overlay.addEventListener('transitionend', this);
   },
 
   handleEvent: function ut_handleEvent(evt) {
     switch (evt.type) {
+      case 'attentionscreenshow':
       case 'home':
+      case 'emergencyalert':
         if (this.shown) {
           this.hide();
         }
@@ -53,8 +52,6 @@ var UtilityTray = {
           return;
 
         this.active = true;
-        // XXX: required for Mouse2Touch fake events to function
-        evt.target.setCapture(true);
 
         this.onTouchStart(evt.touches[0]);
         break;
@@ -71,8 +68,6 @@ var UtilityTray = {
           return;
 
         this.active = false;
-        // XXX: required for Mouse2Touch fake events to function
-        document.releaseCapture();
 
         this.onTouchEnd(evt.changedTouches[0]);
         break;
@@ -85,8 +80,8 @@ var UtilityTray = {
   },
 
   onTouchStart: function ut_onTouchStart(touch) {
-    this.startX = touch.pageX;
     this.startY = touch.pageY;
+
     this.screen.classList.add('utility-tray');
     this.onTouchMove({ pageY: touch.pageY + this.statusbar.offsetHeight });
   },
@@ -119,8 +114,14 @@ var UtilityTray = {
     style.MozTransition = instant ? '' : '-moz-transform 0.2s linear';
     style.MozTransform = 'translateY(0)';
     this.shown = false;
-    if (instant)
+    this.lastY = undefined;
+    this.startY = undefined;
+
+    // If the transition has not started yet there won't be any transitionend
+    // event so let's not wait in order to remove the utility-tray class.
+    if (instant || style.MozTransform == 'translateY(0px)') {
       this.screen.classList.remove('utility-tray');
+    }
 
     if (!alreadyHidden) {
       var evt = document.createEvent('CustomEvent');

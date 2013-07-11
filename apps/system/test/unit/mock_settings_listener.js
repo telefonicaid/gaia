@@ -1,4 +1,4 @@
-requireApp('system/test/unit/mock_navigator_settings.js');
+requireApp('system/shared/test/unit/mocks/mock_navigator_moz_settings.js');
 
 var MockSettingsListener = {
   observe: function msl_observe(name, defaultValue, cb) {
@@ -15,10 +15,10 @@ var MockSettingsListener = {
         object[name] = settings[name];
         MockNavigatorSettings.createLock().set(object);
       }
-    }
+    };
     return {
       set: set
-    }
+    };
   },
 
   mName: null,

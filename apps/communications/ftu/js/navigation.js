@@ -25,15 +25,20 @@ var steps = {
   },
   5: {
     onlyForward: false,
-    hash: '#import_contacts',
+    hash: '#geolocation',
     requireSIM: false
   },
   6: {
     onlyForward: false,
-    hash: '#welcome_browser',
+    hash: '#import_contacts',
     requireSIM: false
   },
   7: {
+    onlyForward: false,
+    hash: '#welcome_browser',
+    requireSIM: false
+  },
+  8: {
     onlyForward: false,
     hash: '#browser_privacy',
     requireSIM: false
@@ -49,6 +54,7 @@ var Navigation = {
   externalUrlLoaderSelector: '#external-url-loader',
 
   init: function n_init() {
+    _ = navigator.mozL10n.get;
     var forward = document.getElementById('forward');
     var back = document.getElementById('back');
     forward.addEventListener('click', this.forward.bind(this));
@@ -101,16 +107,22 @@ var Navigation = {
     }
   },
 
-
   forward: function n_forward(event) {
     var self = this;
     var goToStepForward = function() {
       self.previousStep = self.currentStep;
       self.currentStep++;
       if (self.currentStep > numSteps) {
-        UIManager.activationScreen.classList.remove('show');
-        UIManager.finishScreen.classList.add('show');
-        Tutorial.init();
+        // Try to send Newsletter here
+        UIManager.sendNewsletter(function newsletterSent(result) {
+          if (result) { // sending process ok, we advance
+            UIManager.activationScreen.classList.remove('show');
+            UIManager.finishScreen.classList.add('show');
+            Tutorial.init();
+          } else { // error on sending, we stay where we are
+            self.currentStep--;
+          }
+        });
         return;
       }
       self.manageStep();
@@ -145,15 +157,25 @@ var Navigation = {
     }
   },
 
+  getProgressBarClassName: function n_getProgressBarClassName() {
+    // Manage step state (dynamically change)
+    var className = 'step-state step-';
+    if (this.skipped && this.currentStep > 2) {
+      className += (this.currentStep - 1) + ' less-steps';
+    } else {
+      className += this.currentStep;
+    }
 
+    return className;
+  },
 
   handleEvent: function n_handleEvent(event) {
     var actualHash = window.location.hash;
+    var className = this.getProgressBarClassName();
 
     switch (actualHash) {
       case '#languages':
         UIManager.mainTitle.innerHTML = _('language');
-        // Hide refresh button in case we end up here coming back from wifi
         break;
       case '#data_3g':
         UIManager.mainTitle.innerHTML = _('3g');
@@ -161,14 +183,17 @@ var Navigation = {
           getStatus(UIManager.updateDataConnectionStatus.bind(UIManager));
         break;
       case '#wifi':
-        UIManager.mainTitle.innerHTML = _('wifi');
+        UIManager.mainTitle.innerHTML = _('selectNetwork');
         UIManager.activationScreen.classList.remove('no-options');
         if (UIManager.navBar.classList.contains('secondary-menu')) {
           UIManager.navBar.classList.remove('secondary-menu');
           return;
         }
         // Avoid refresh when connecting
-        WifiManager.scan(UIManager.renderNetworks);
+        WifiManager.scan(WifiUI.renderNetworks);
+        break;
+      case '#geolocation':
+        UIManager.mainTitle.innerHTML = _('geolocation');
         break;
       case '#date_and_time':
         UIManager.mainTitle.innerHTML = _('dateAndTime');
@@ -178,44 +203,37 @@ var Navigation = {
         // Enabling or disabling SIM import depending on card status
         SimManager.checkSIMButton();
 
+        // Enabling or disabling SD import depending on card status
+        SdManager.checkSDButton();
+
         // If we have 3G or Wifi activate FB import
         var fbState;
         if (!WifiManager.api) {
           // Desktop
-          FacebookIntegration.checkFbImport('enabled');
+          ImportIntegration.checkImport('enabled');
           return;
         }
-        if (WifiManager.api.connection.status === 'connected' ||
-            DataMobile.isDataAvailable) {
-          fbState = 'enabled';
-        } else {
-          fbState = 'disabled';
-        }
-        FacebookIntegration.checkFbImport(fbState);
+
+        fbState = window.navigator.onLine ? 'enabled' : 'disabled';
+        ImportIntegration.checkImport(fbState);
         break;
       case '#welcome_browser':
-        UIManager.mainTitle.innerHTML = _('browserPrivacyChoices');
+        UIManager.mainTitle.innerHTML = _('aboutBrowser');
         break;
       case '#browser_privacy':
-        UIManager.progressBar.className = 'step-state step-7';
-        UIManager.mainTitle.innerHTML = _('browserPrivacyChoices');
+        UIManager.mainTitle.innerHTML = _('aboutBrowser');
         break;
       case '#about-your-rights':
       case '#about-your-privacy':
       case '#sharing-performance-data':
-        UIManager.mainTitle.innerHTML = _('browserPrivacyChoices');
+        UIManager.mainTitle.innerHTML = _('aboutBrowser');
       case this.externalUrlLoaderSelector:
-        UIManager.progressBar.className = 'hidden';
+        // override the className here
+        className = 'hidden';
         UIManager.navBar.classList.add('back-only');
         break;
     }
-    // Manage step state (dinamically change)
-    var className = 'step-state step-';
-    if (this.skipped && this.currentStep > 2) {
-      className += (this.currentStep - 1) + ' less-steps';
-    } else {
-      className += this.currentStep;
-    }
+
     UIManager.progressBar.className = className;
 
     // Managing options button
@@ -245,6 +263,12 @@ var Navigation = {
 
   manageStep: function n_manageStep() {
     var self = this;
+    // Retrieve future location
+    var futureLocation = steps[self.currentStep];
+    // There is some locations which need a 'loading'
+    if (futureLocation.hash === '#wifi') {
+      utils.overlay.show(_('scanningNetworks'), 'spinner');
+    }
     // Navigation bar management
     if (steps[this.currentStep].onlyForward) {
       UIManager.navBar.classList.add('forward-only');
@@ -253,19 +277,15 @@ var Navigation = {
     }
     // Substitute button content on last step
     var nextButton = document.getElementById('forward');
-    var innerNode = nextButton.childNodes[1];
-    if (this.currentStep == numSteps) {
-      nextButton.dataset.l10nId = 'done';
-      nextButton.textContent = _('done');
+    if (this.currentStep === numSteps) {
+      nextButton.firstChild.textContent = _('done');
     } else {
-      nextButton.dataset.l10nId = 'navbar-next';
-      nextButton.textContent = _('navbar-next');
+      nextButton.firstChild.textContent = _('navbar-next');
     }
-    nextButton.appendChild(innerNode);
-
-    window.location.hash = steps[self.currentStep].hash;
+    // Change hash to the right location
+    window.location.hash = futureLocation.hash;
     // SIM card management
-    if (steps[this.currentStep].requireSIM) {
+    if (futureLocation.requireSIM) {
       SimManager.handleCardState(function check_cardState(response) {
         self.skipped = false;
         if (!response) {
@@ -275,3 +295,4 @@ var Navigation = {
     }
   }
 };
+

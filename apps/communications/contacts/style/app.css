@@ -6,7 +6,7 @@
 
 
 /* Global */
-html, body {
+html {
   width: 100%;
   height: 100%;
   margin: 0;
@@ -17,9 +17,9 @@ html, body {
 }
 
 body {
-  background: #000;
   color: #fff;
-  font: 1.6rem/2.2rem MozTT, Sans-serif;
+  font-size: 1.6rem;
+  line-height: 2.2rem;
   text-align: center;
   vertical-align: middle;
 }
@@ -68,17 +68,16 @@ abbr, acronym {
 }
 
 strong {
-  font-family: MozTT, Sans-serif;
   font-weight: bold;
 }
 
 b {
-  font-family: MozTT, Sans-serif;
   font-weight: 600;
 }
 
 small {
-  font: 1.1rem/1rem MozTT, Sans-serif;
+  font-size: 1.1rem;
+  line-height: 1rem;
   color: #999;
 }
 
@@ -147,11 +146,6 @@ textarea {
   height: 4.6rem;
 }
 
-input[type="text"], textarea {
-  font: 1.3rem/4rem MozTT, Sans-serif;
-  font-weight: 600;
-}
-
 input[type="text"]:focus, textarea:focus {
   border-color: #7a7a7a;
 }
@@ -193,7 +187,6 @@ menu, nav, section, video, audio, canvas, progress, meter, time {
   width: 100%;
   height: 100%;
   transform: translate(0, 0);
-  transition: transform 0.5s ease;
 }
 
 .view:not(.view-noscroll) {
@@ -215,7 +208,6 @@ menu, nav, section, video, audio, canvas, progress, meter, time {
     We must fill a bug with this issue
  */
 section[role="region"] > header:first-child {
-  background-color: #cd6623;
 }
 
 /* Rewritting from buttons.css */
@@ -316,6 +308,17 @@ form p + p {
 .view-body {
   position: relative;
   height: calc(100% - 5rem);
+}
+
+#view-screenshot.contact-list > header:first-child:after {
+  background-image: none;
+}
+
+#view-screenshot.contact-list > #view-screenshot-body {
+  position: relative;
+  height: calc(100% - 5rem);
+  background: -moz-element(#view-contacts-list);
+  background-position: 0 -5rem;
 }
 
 .view-body-inner {
@@ -438,8 +441,9 @@ span[role="button"].icon-delete {
 
 span[role="button"].icon-addimage {
   background-image: url(/contacts/style/gphx/bitmap/default/forms/add.png);
-  width: 2.8rem;
-  height: 2.8rem;
+  background-size: 3rem;
+  width: 3rem;
+  height: 2.9rem;
 }
 
 li button.icon-call:before {
@@ -480,7 +484,8 @@ li button.icon-fb-profile:before {
 }
 
 li button.icon-add:before {
-  background: url(/contacts/style/gphx/bitmap/default/buttons/plus_sign.png) no-repeat center center;
+  background-image: url(/contacts/style/gphx/bitmap/default/buttons/plus_sign.png);
+  background-size: 2.8rem;
 }
 
 
@@ -580,13 +585,14 @@ span[role="button"].icon-arrow.icon-arrow-right {
 
 /* MEDIA: specific ratio used in forms; */
 .fillflow-media {
-  border: solid 1px #c8c8c8;
   margin: 0 0.5rem 0.5rem 0;
   width: 8.8rem;
   height: 8.3rem;
   position: relative;
-  background-color: #fff;
   z-index: 0;
+  border: 0.1rem solid rgb(204, 204, 204);
+  border-radius: 0.3rem 0.3rem 0.3rem 0.3rem;
+  background: #fff url("/contacts/style/gphx/bitmap/default/forms/shadow.png") repeat-x;
 }
 .fillflow-media p {
   position: absolute;
@@ -599,11 +605,11 @@ span[role="button"].icon-arrow.icon-arrow-right {
 
 .fillflow-media p em {
   display: block;
-  color: #777;
+  color: #858585;
   font-size: 1.3rem;
-  font-weight: bold;
+  font-weight: normal;
   font-style: normal;
-  margin-top: 1rem;
+  margin-top: 0.5rem;
 }
 
 .fillflow-media .edit-photo {
@@ -648,5 +654,5 @@ nav[data-type="scrollbar"] p img {
   position: absolute;
   top: 25%;
   left: 25%;
-  width: auto;
+  width: 4.8rem;
 }

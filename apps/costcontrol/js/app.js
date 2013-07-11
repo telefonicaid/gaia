@@ -23,9 +23,9 @@
  * this makes Cost Control to change to the datausage tab at the same time it
  * closes the card in the overlay layer.
  *
- * If you want to preserve a layer but changing the other, use the empty string 
+ * If you want to preserve a layer but changing the other, use the empty string
  * as the id of the layer you want to preserve.
- * For intance, you want to only close the overlay layer but not affecting the
+ * For instance, you want to only close the overlay layer but not affecting the
  * tab layer:
  * #
  *
@@ -39,29 +39,69 @@ var CostControlApp = (function() {
 
   'use strict';
 
-  // XXX: This is the point of entry, check common.js for more info
-  waitForDOMAndMessageHandler(window, onReady);
-
   var costcontrol, initialized = false;
-  function onReady() {
-    setupCardHandler();
+  function onReady(callback) {
     var mobileConnection = window.navigator.mozMobileConnection;
+    var cardState = checkCardState();
+    var iccid = mobileConnection.iccInfo.iccid;
 
-    // SIM is absent
-    if (mobileConnection.cardState === 'absent') {
-      debug('There is no SIM');
-      alert(_('widget-no-sim2-heading') + '\n' + _('widget-no-sim2-meta'));
-      window.close();
+    // SIM not ready
+    if (cardState !== 'ready') {
+      debug('SIM not ready:', cardState);
+      IccHelper.oncardstatechange = onReady;
 
-    // SIM is not ready
-    } else if (mobileConnection.cardState !== 'ready') {
-      debug('SIM not ready:', mobileConnection.cardState);
+    // SIM is ready, but ICC info is not ready yet
+    } else if (!Common.isValidICCID(iccid)) {
+      debug('ICC info not ready yet');
       mobileConnection.oniccinfochange = onReady;
 
-    // SIM is ready
+    // All ready
     } else {
+      debug('SIM ready. ICCID:', iccid);
+      IccHelper.oncardstatechange = undefined;
       mobileConnection.oniccinfochange = undefined;
-      startApp();
+      startApp(callback);
+    }
+  }
+
+  // Check the card status. Return 'ready' if all OK or take actions for
+  // special situations such as 'pin/puk locked' or 'absent'.
+  function checkCardState() {
+    var state, cardState;
+    state = cardState = IccHelper.cardState;
+
+    // SIM is absent
+    if (cardState === 'absent') {
+      debug('There is no SIM');
+      showSimErrorDialog('no-sim2');
+
+    // SIM is locked
+    } else if (
+      cardState === 'pinRequired' ||
+      cardState === 'pukRequired'
+    ) {
+      showSimErrorDialog('sim-locked');
+      state = 'locked';
+    }
+
+    return state;
+  }
+
+  function showSimErrorDialog(status) {
+    function realShowSimError(status) {
+      var header = _('widget-' + status + '-heading');
+      var msg = _('widget-' + status + '-meta');
+      Common.modalAlert(header + '\n' + msg);
+      Common.closeApplication();
+    }
+
+    if (isApplicationLocalized) {
+      realShowSimError(status);
+    } else {
+      window.addEventListener('localized', function _onlocalized() {
+        window.removeEventListener('localized', _onlocalized);
+        realShowSimError(status);
+      });
     }
   }
 
@@ -71,8 +111,9 @@ var CostControlApp = (function() {
     // View managers for dialogs and settings
     vmanager = new ViewManager();
     tabmanager = new ViewManager(
-      ['balance-tab', 'telephony-tab', 'datausage-tab']
+      ['balance-tab', 'telephony-tab', { id: 'datausage-tab', tab: 'right' }]
     );
+    settingsVManager = new ViewManager();
 
     // View handler
     window.addEventListener('hashchange', function _onHashChange(evt) {
@@ -123,33 +164,59 @@ var CostControlApp = (function() {
     });
   }
 
-  function startApp() {
-    checkSIMChange(function _onSIMChecked() {
+  function startApp(callback) {
+    function _onNoICCID() {
+      console.error('checkSIMChange() failed. Impossible to ensure consistent' +
+                    'data. Aborting start up.');
+      showSimErrorDialog('no-sim2');
+    }
+
+    Common.checkSIMChange(function _onSIMChecked() {
       CostControl.getInstance(function _onCostControlReady(instance) {
         if (ConfigManager.option('fte')) {
-          window.location = '/fte.html';
+          startFTE();
           return;
         }
         costcontrol = instance;
-        setupApp();
+        setupApp(callback);
       });
-    });
+    }, _onNoICCID);
   }
 
+  var isApplicationLocalized = false;
   window.addEventListener('localized', function _onLocalize() {
+    isApplicationLocalized = true;
     if (initialized) {
       updateUI();
     }
   });
 
-  function setupApp() {
-    // View managers for dialogs and settings
-    tabmanager = new ViewManager(
-      ['balance-tab', 'telephony-tab', { id:'datausage-tab', tab:'right' }]
-    );
-    settingsVManager = new ViewManager();
+  window.addEventListener('message', function handler_finished(e) {
+    if (e.origin !== Common.COST_CONTROL_APP) {
+      return;
+    }
 
-    // Configure settings
+    var type = e.data.type;
+
+    if (type === 'fte_finished') {
+      window.removeEventListener('message', handler_finished);
+
+      document.getElementById('splash_section').
+        setAttribute('aria-hidden', 'true');
+
+      // Only hide the FTE view when everything in the UI is ready
+      CostControlApp.afterFTU(function() {
+        document.getElementById('fte_view').classList.add('non-ready');
+        document.getElementById('fte_view').src = '';
+      });
+    }
+  });
+
+  function setupApp(callback) {
+
+    setupCardHandler();
+
+    // Configure settings buttons
     var settingsButtons = document.querySelectorAll('.settings-button');
     Array.prototype.forEach.call(settingsButtons,
       function _eachSettingsButton(button) {
@@ -197,11 +264,20 @@ var CostControlApp = (function() {
       }
     );
 
-    updateUI();
+    // Check card state when visible
+    document.addEventListener('visibilitychange',
+      function _onVisibilityChange(evt) {
+        if (!document.hidden && initialized) {
+          checkCardState();
+        }
+      }
+    );
+
+    updateUI(callback);
     ConfigManager.observe('plantype', updateUI, true);
 
     initialized = true;
-    
+
     loadSettings();
   }
 
@@ -209,7 +285,7 @@ var CostControlApp = (function() {
   function loadSettings() {
     document.getElementById('settings-view-placeholder').src = 'settings.html';
   }
-  
+
   function handleNotification(type) {
     switch (type) {
       case 'topUpError':
@@ -226,30 +302,14 @@ var CostControlApp = (function() {
   }
 
   var currentMode;
-  function updateUI() {
+  function updateUI(callback) {
     ConfigManager.requestSettings(function _onSettings(settings) {
-      var mode = costcontrol.getApplicationMode(settings);
+      var mode = ConfigManager.getApplicationMode();
       debug('App UI mode: ', mode);
 
       // Layout
       if (mode !== currentMode) {
         currentMode = mode;
-
-        if (mode === 'PREPAID') {
-          if (typeof TelephonyTab !== 'undefined') {
-            TelephonyTab.finalize();
-          }
-          if (typeof BalanceTab !== 'undefined') {
-            BalanceTab.initialize();
-          }
-        } else if (mode === 'POSTPAID') {
-          if (typeof BalanceTab !== 'undefined') {
-            BalanceTab.finalize();
-          }
-          if (typeof TelephonyTab !== 'undefined') {
-            TelephonyTab.initialize();
-          }
-        }
 
         // Stand alone mode when data usage only
         if (mode === 'DATA_USAGE_ONLY') {
@@ -276,6 +336,30 @@ var CostControlApp = (function() {
           }
         }
 
+        // XXX: Break initialization to allow Gecko to render the animation on
+        // time.
+        setTimeout(function continueLoading() {
+          if (typeof callback === 'function') {
+            window.setTimeout(callback, 0);
+          }
+          document.getElementById('main').classList.remove('non-ready');
+
+          if (mode === 'PREPAID') {
+            if (typeof TelephonyTab !== 'undefined') {
+              TelephonyTab.finalize();
+            }
+            if (typeof BalanceTab !== 'undefined') {
+              BalanceTab.initialize();
+            }
+          } else if (mode === 'POSTPAID') {
+            if (typeof BalanceTab !== 'undefined') {
+              BalanceTab.finalize();
+            }
+            if (typeof TelephonyTab !== 'undefined') {
+              TelephonyTab.initialize();
+            }
+          }
+        });
       }
     });
   }
@@ -284,7 +368,28 @@ var CostControlApp = (function() {
     return window.location.hash.split('#')[1] === 'datausage-tab';
   }
 
+  function startFTE() {
+    var mode = ConfigManager.getApplicationMode();
+    Common.startFTE(mode);
+  }
+
   return {
+    init: function() {
+      Common.waitForDOMAndMessageHandler(window, onReady);
+    },
+    afterFTU: function(cb) {
+      onReady(cb);
+    },
+    reset: function() {
+      costcontrol = null;
+      initialized = false;
+      vmanager = null;
+      tabmanager = null;
+      settingsVManager = null;
+      currentMode = null;
+      isApplicationLocalized = false;
+      window.location.hash = '';
+    },
     showBalanceTab: function _showBalanceTab() {
       window.location.hash = '#balance-tab';
     },

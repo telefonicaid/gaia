@@ -3,12 +3,10 @@
 // Support different versions of IndexedDB
 var idb = window.indexedDB || window.webkitIndexedDB ||
   window.mozIndexedDB || window.msIndexedDB;
-IDBTransaction = IDBTransaction || {};
-IDBTransaction.READ_WRITE = IDBTransaction.READ_WRITE || 'readwrite';
-IDBTransaction.READ = IDBTransaction.READ || 'readonly';
 
 var Places = {
   DEFAULT_ICON_EXPIRATION: 86400000, // One day
+  MAX_ICON_SIZE: 102400, // 100kB
   TOP_SITE_SCREENSHOTS: 4, // Number of top sites to keep screenshots for
 
   init: function places_init(callback) {
@@ -126,13 +124,42 @@ var Places = {
       xhr.open('GET', iconUri, true);
       xhr.responseType = 'blob';
       xhr.addEventListener('load', (function() {
+        // Check icon was successfully downloded
         // 0 is due to https://bugzilla.mozilla.org/show_bug.cgi?id=716491
-        if (xhr.status === 200 || xhr.status === 0) {
-          this.setIconData(iconUri, xhr.response, callback);
-        } else {
+        if (!(xhr.status === 200 || xhr.status === 0)) {
           this.setIconData(iconUri, null, callback, true);
-          console.log('error fetching icon: ' + xhr.status);
+          console.log('error downloading icon: ' + xhr.status);
+          return;
         }
+
+        var blob = xhr.response;
+        // Check the file is served as an image and isn't too big
+        if (blob.type.split('/')[0] != 'image' ||
+        blob.size > this.MAX_ICON_SIZE) {
+          this.setIconData(iconUri, null, callback, true);
+          console.log('Icon was not an image or was too big');
+          return;
+        }
+
+        // Only save the icon if it can be loaded as an image bigger than 0px
+        var img = document.createElement('img');
+        var src = window.URL.createObjectURL(blob);
+        img.src = src;
+        img.onload = (function() {
+          if (img.naturalWidth > 0) {
+            this.setIconData(iconUri, blob, callback);
+          } else {
+           this.setIconData(iconUri, null, callback, true);
+           console.log('Icon not saved because less than 1px wide');
+          }
+          window.URL.revokeObjectURL(src);
+        }).bind(this);
+        img.onerror = (function() {
+          this.setIconData(iconUri, null, callback, true);
+          console.log('Icon not saved because can not be decoded');
+          window.URL.revokeObjectURL(src);
+        }).bind(this);
+
       }).bind(this), false);
       xhr.onerror = function getIconError() {
         console.log('Error fetching icon');
@@ -222,8 +249,7 @@ Places.db = {
   },
 
   createPlace: function db_createPlace(uri, callback) {
-    var transaction = this._db.transaction(['places'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['places'], 'readwrite');
 
     var objectStore = transaction.objectStore('places');
     var readRequest = objectStore.get(uri);
@@ -274,8 +300,7 @@ Places.db = {
   },
 
   updatePlace: function db_updatePlace(place, callback) {
-    var transaction = this._db.transaction(['places'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['places'], 'readwrite');
     transaction.onerror = function dbTransactionError(e) {
       console.log('Transaction error while trying to update place: ' +
         place.uri);
@@ -296,8 +321,7 @@ Places.db = {
   },
 
   saveVisit: function db_saveVisit(visit, callback) {
-    var transaction = this._db.transaction(['visits'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['visits'], 'readwrite');
     transaction.onerror = function dbTransactionError(e) {
       console.log('Transaction error while trying to save visit');
     };
@@ -331,7 +355,7 @@ Places.db = {
     var transaction = db.transaction(['visits', 'places']);
     var visitsStore = transaction.objectStore('visits');
     var placesStore = transaction.objectStore('places');
-    visitsStore.openCursor(null, IDBCursor.PREV).onsuccess =
+    visitsStore.openCursor(null, 'prev').onsuccess =
       function onSuccess(e) {
       var cursor = e.target.result;
       if (cursor && history.length < maximum) {
@@ -350,7 +374,7 @@ Places.db = {
     var transaction = self._db.transaction('places');
     var placesStore = transaction.objectStore('places');
     var frecencyIndex = placesStore.index('frecency');
-    frecencyIndex.openCursor(null, IDBCursor.PREV).onsuccess =
+    frecencyIndex.openCursor(null, 'prev').onsuccess =
       function onSuccess(e) {
       var cursor = e.target.result;
       if (cursor && topSites.length < maximum) {
@@ -379,7 +403,7 @@ Places.db = {
     var transaction = this._db.transaction('places');
     var placesStore = transaction.objectStore('places');
     var frecencyIndex = placesStore.index('frecency');
-    frecencyIndex.openCursor(null, IDBCursor.PREV).onsuccess =
+    frecencyIndex.openCursor(null, 'prev').onsuccess =
       function onSuccess(e) {
       var cursor = e.target.result;
       if (cursor && topSites.length < maximum) {
@@ -393,8 +417,7 @@ Places.db = {
 
   clearPlaces: function db_clearPlaces(callback) {
     var db = Places.db._db;
-    var transaction = db.transaction('places',
-      IDBTransaction.READ_WRITE);
+    var transaction = db.transaction('places', 'readwrite');
     transaction.onerror = function dbTransactionError(e) {
       console.log('Transaction error while trying to clear places');
     };
@@ -410,8 +433,7 @@ Places.db = {
 
   clearVisits: function db_clearVisits(callback) {
     var db = Places.db._db;
-    var transaction = db.transaction('visits',
-      IDBTransaction.READ_WRITE);
+    var transaction = db.transaction('visits', 'readwrite');
     transaction.onerror = function dbTransactionError(e) {
       console.log('Transaction error while trying to clear visits');
     };
@@ -428,8 +450,7 @@ Places.db = {
 
   clearIcons: function db_clearIcons(callback) {
     var db = Places.db._db;
-    var transaction = db.transaction('icons',
-      IDBTransaction.READ_WRITE);
+    var transaction = db.transaction('icons', 'readwrite');
     transaction.onerror = function dbTransactionError(e) {
       console.log('Transaction error while trying to clear icons');
     };
@@ -445,8 +466,7 @@ Places.db = {
 
   clearBookmarks: function db_clearBookmarks(callback) {
     var db = Places.db._db;
-    var transaction = db.transaction('bookmarks',
-      IDBTransaction.READ_WRITE);
+    var transaction = db.transaction('bookmarks', 'readwrite');
     transaction.onerror = function dbTransactionError(e) {
       console.log('Transaction error while trying to clear bookmarks');
     };
@@ -461,8 +481,7 @@ Places.db = {
   },
 
   saveIcon: function db_saveIcon(iconEntry, callback) {
-    var transaction = this._db.transaction(['icons'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['icons'], 'readwrite');
     transaction.onerror = function dbTransactionError(e) {
       console.log('Transaction error while trying to save icon');
     };
@@ -495,8 +514,7 @@ Places.db = {
   },
 
   saveBookmark: function db_saveBookmark(bookmark, callback) {
-    var transaction = this._db.transaction(['bookmarks'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['bookmarks'], 'readwrite');
     transaction.onerror = function dbTransactionError(e) {
       console.log('Transaction error while trying to save bookmark');
     };
@@ -530,8 +548,7 @@ Places.db = {
   },
 
   deleteBookmark: function db_deleteBookmark(uri, callback) {
-    var transaction = this._db.transaction(['bookmarks'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['bookmarks'], 'readwrite');
     transaction.onerror = function dbTransactionError(e) {
       console.log('Transaction error while trying to delete bookmark');
     };
@@ -565,7 +582,7 @@ Places.db = {
     var bookmarksStore = transaction.objectStore('bookmarks');
     var bookmarksIndex = bookmarksStore.index('timestamp');
     var placesStore = transaction.objectStore('places');
-    bookmarksIndex.openCursor(null, IDBCursor.PREV).onsuccess =
+    bookmarksIndex.openCursor(null, 'prev').onsuccess =
       function onSuccess(e) {
       var cursor = e.target.result;
       if (cursor) {
@@ -587,7 +604,7 @@ Places.db = {
     var transaction = db.transaction('bookmarks');
     var objectStore = transaction.objectStore('bookmarks');
 
-    objectStore.openCursor(null, IDBCursor.PREV).onsuccess =
+    objectStore.openCursor(null, 'prev').onsuccess =
       function onSuccess(e) {
       var cursor = e.target.result;
       if (cursor) {
@@ -608,8 +625,7 @@ Places.db = {
       return;
     }
 
-    var transaction = this._db.transaction(['places'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['places'], 'readwrite');
 
     var objectStore = transaction.objectStore('places');
     var readRequest = objectStore.get(uri);
@@ -646,8 +662,7 @@ Places.db = {
   },
 
   resetPlaceFrecency: function db_resetPlaceFrecency(uri, callback) {
-    var transaction = this._db.transaction(['places'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['places'], 'readwrite');
 
     var objectStore = transaction.objectStore('places');
     var readRequest = objectStore.get(uri);
@@ -679,8 +694,7 @@ Places.db = {
   },
 
   updatePlaceIconUri: function db_updatePlaceIconUri(uri, iconUri, callback) {
-    var transaction = this._db.transaction(['places'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['places'], 'readwrite');
 
     var objectStore = transaction.objectStore('places');
     var readRequest = objectStore.get(uri);
@@ -717,8 +731,7 @@ Places.db = {
   },
 
   updatePlaceTitle: function db_updatePlaceTitle(uri, title, callback) {
-    var transaction = this._db.transaction(['places'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['places'], 'readwrite');
 
     var objectStore = transaction.objectStore('places');
     var readRequest = objectStore.get(uri);
@@ -755,8 +768,7 @@ Places.db = {
 
   updatePlaceScreenshot: function db_updatePlaceScreenshot(uri, screenshot,
     callback) {
-    var transaction = this._db.transaction(['places'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['places'], 'readwrite');
 
     var objectStore = transaction.objectStore('places');
     var readRequest = objectStore.get(uri);
@@ -797,12 +809,11 @@ Places.db = {
     // Clear all visits
     this.clearVisits();
 
-    var transaction = this._db.transaction(['places', 'icons'],
-      IDBTransaction.READ_WRITE);
+    var transaction = this._db.transaction(['places', 'icons'], 'readwrite');
     var placesStore = transaction.objectStore('places');
     var iconStore = transaction.objectStore('icons');
 
-    placesStore.openCursor(null, IDBCursor.PREV).onsuccess =
+    placesStore.openCursor(null, 'prev').onsuccess =
       function onSuccess(e) {
       var cursor = e.target.result;
       if (cursor) {

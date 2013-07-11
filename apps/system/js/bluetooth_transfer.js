@@ -109,6 +109,7 @@ var BluetoothTransfer = {
     // Prompt appears when a transfer request from a paired device is received.
     var _ = navigator.mozL10n.get;
 
+    var address = evt.address;
     var fileSize = evt.fileLength;
     var self = this;
     var icon = 'style/bluetooth_transfer/images/icon_bluetooth.png';
@@ -117,13 +118,17 @@ var BluetoothTransfer = {
     this.checkStorageSpace(fileSize,
       function checkStorageSpaceComplete(isStorageAvailable, errorMessage) {
         if (isStorageAvailable) {
-          NotificationHelper.send(_('notification-fileTransfer-title'),
-                                  _('notification-fileTransfer-description'),
-                                  icon,
-                                  function() {
-                                    UtilityTray.hide();
-                                    self.showReceivePrompt(evt);
-                                  });
+          self.getPairedDevice(function getPairedDeviceComplete() {
+            var deviceName = self.getDeviceName(address);
+            NotificationHelper.send(_('notification-fileTransfer-title',
+                                    { deviceName: deviceName }),
+                                    _('notification-fileTransfer-description'),
+                                    icon,
+                                    function() {
+                                      UtilityTray.hide();
+                                      self.showReceivePrompt(evt);
+                                    });
+          });
         } else {
           self.showStorageUnavaliablePrompt(errorMessage);
         }
@@ -143,7 +148,8 @@ var BluetoothTransfer = {
 
     var confirm = {
       title: _('transfer'),
-      callback: this.acceptReceive.bind(this, address)
+      callback: this.acceptReceive.bind(this, address),
+      recommend: true
     };
 
     var deviceName = '';
@@ -306,7 +312,7 @@ var BluetoothTransfer = {
 
   showBanner: function bt_showBanner(isComplete) {
     var _ = navigator.mozL10n.get;
-    var status = (isComplete) ? 'complete' : 'failed';
+    var status = (isComplete) ? _('complete') : _('failed');
     this.banner.addEventListener('animationend', function animationend() {
       this.banner.removeEventListener('animationend', animationend);
       this.banner.classList.remove('visible');
@@ -415,63 +421,16 @@ var BluetoothTransfer = {
       var file = getreq.result;
       // When we got the file by storage type of "sdcard"
       // use the file.type to replace the empty fileType which is given by API
-      var fileType = '';
       var fileName = file.name;
-      if (contentType != '' && contentType != 'image/*') {
-        fileType = contentType;
-      } else {
-        var fileNameExtension =
-          fileName.substring(fileName.lastIndexOf('.') + 1);
-        if (file.type != '') {
-          fileType = file.type;
-          // Refine the file type to "audio/ogg" when the file format is *.ogg
-          if (fileType == 'video/ogg' &&
-              (fileNameExtension.indexOf('ogg') != -1)) {
-            fileType == 'audio/ogg';
-          }
-        } else {
-          // Parse Filename Extension to find out MIMETYPE
-          // Following formats are supported by Gallery and Music APPs
-          var imageFormatList = ['jpg', 'jpeg', 'png'];
-          var audioFormatList = ['mp3', 'ogg', 'aac', 'mp4', 'm4a'];
-          var imageFormatIndex = imageFormatList.indexOf(fileNameExtension);
-          switch (imageFormatIndex) {
-            case 0:
-            case 1:
-              // The file type of format *.jpg, *.jpeg should be "image/jpeg"
-              fileType = 'image/jpeg';
-              break;
-            case 2:
-              // The file type of format *.png should be "image/png"
-              fileType = 'image/png';
-              break;
-          }
-
-          var audioFormatIndex = audioFormatList.indexOf(fileNameExtension);
-          switch (audioFormatIndex) {
-            case 0:
-              // The file type of format *.mp3 should be "audio/mpeg"
-              fileType = 'audio/mpeg';
-              break;
-            case 1:
-              // The file type of format *.ogg should be "audio/ogg"
-              fileType = 'audio/ogg';
-              break;
-            case 2:
-            case 3:
-            case 4:
-              // The file type of format *.acc, *.mp4, *.m4a
-              // should be "audio/mp4"
-              fileType = 'audio/mp4';
-              break;
-          }
-        }
-      }
+      var extension = fileName.split('.').pop();
+      var originalType = file.type || contentType;
+      var mappedType = (MimeMapper.isSupportedType(originalType)) ?
+        originalType : MimeMapper.guessTypeFromExtension(extension);
 
       var a = new MozActivity({
         name: 'open',
         data: {
-          type: fileType,
+          type: mappedType,
           blob: file,
           // XXX: https://bugzilla.mozilla.org/show_bug.cgi?id=812098
           // Pass the file name for Music APP since it can not open blob

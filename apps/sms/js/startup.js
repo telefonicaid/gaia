@@ -3,132 +3,69 @@
 
 'use strict';
 
-var initUIApp = function initApp() {
-  // Init UI Managers
-  ThreadUI.init();
-  ThreadListUI.init();
-  // We render the threads
-  MessageManager.getThreads(ThreadListUI.renderThreads);
-};
+var lazyLoadFiles = [
+  'shared/js/async_storage.js',
+  'shared/js/l10n_date.js',
+  'shared/js/notification_helper.js',
+  'shared/js/gesture_detector.js',
+  'js/dialog.js',
+  'js/blacklist.js',
+  'js/contacts.js',
+  'js/recipients.js',
+  'js/threads.js',
+  'js/message_manager.js',
+  'js/attachment.js',
+  'js/attachment_menu.js',
+  'js/thread_list_ui.js',
+  'js/thread_ui.js',
+  'js/compose.js',
+  'js/waiting_screen.js',
+  'js/utils.js',
+  'js/fixed_header.js',
+  'js/activity_picker.js',
+  'js/smil.js',
+  'js/link_helper.js',
+  'js/action_menu.js',
+  'js/link_action_handler.js',
+  'js/settings.js',
+  'js/notification.js',
+  'js/activity_handler.js',
+  'shared/style/input_areas.css',
+  'shared/style/switches.css',
+  'shared/style/confirm.css',
+  'shared/style_unstable/progress_activity.css',
+  'shared/style/action_menu.css',
+  'style/notification.css'
+];
 
 window.addEventListener('localized', function showBody() {
-  MessageManager.init(initUIApp);
   // Set the 'lang' and 'dir' attributes to <html> when the page is translated
   document.documentElement.lang = navigator.mozL10n.language.code;
   document.documentElement.dir = navigator.mozL10n.language.direction;
 });
 
-window.navigator.mozSetMessageHandler('activity', function actHandle(activity) {
-  MessageManager.init(initUIApp);
-  // XXX This lock is about https://github.com/mozilla-b2g/gaia/issues/5405
-  if (MessageManager.lockActivity)
-    return;
-  MessageManager.lockActivity = true;
-  activity.postResult({ status: 'accepted' });
-  var number = activity.source.data.number;
-  showThreadFromSystemMessage(number);
-});
+window.addEventListener('load', function() {
+  function initUIApp() {
+    ActivityHandler.init();
+    // Init UI Managers
+    ThreadUI.init();
+    ThreadListUI.init();
+    // We render the threads
+    MessageManager.getThreads(ThreadListUI.renderThreads);
+    // Fetch mmsSizeLimitation
+    Settings.init();
+  }
 
-/* === Incoming SMS support === */
-
-// We want to register the handler only when we're on the launch path
-if (!window.location.hash.length) {
-  window.navigator.mozSetMessageHandler('sms-received',
-    function smsReceived(message) {
-    // The black list includes numbers for which notifications should not
-    // progress to the user. Se blackllist.js for more information.
-    var number = message.sender;
-    // Class 0 handler:
-    if (message.messageClass == 'class-0') {
-      // XXX: Hack hiding the message class in the icon URL
-      // Should use the tag element of the notification once the final spec
-      // lands:
-      // See: https://bugzilla.mozilla.org/show_bug.cgi?id=782211
-      navigator.mozApps.getSelf().onsuccess = function(evt) {
-        var app = evt.target.result;
-        var iconURL = NotificationHelper.getIconURI(app);
-
-        // XXX: Add params to Icon URL.
-        iconURL += '?class0';
-        var messageBody = number + '\n' + message.body;
-        var showMessage = function() {
-          app.launch();
-          alert(messageBody);
-        };
-
-        // We have to remove the SMS due to it does not have to be shown.
-        MessageManager.deleteMessage(message.id, function() {
-          // Once we remove the sms from DB we launch the notification
-          NotificationHelper.send(message.sender, message.body,
-                                    iconURL, showMessage);
+  navigator.mozL10n.ready(function waitLocalizedForLoading() {
+    LazyLoader.load(lazyLoadFiles, function() {
+      if (!navigator.mozMobileMessage) {
+        var mocks = ['js/desktop_sms_mock.js', 'js/desktop_contacts_mock.js'];
+        LazyLoader.load(mocks, function() {
+          MessageManager.init(initUIApp);
         });
-
-      };
-      return;
-    }
-    if (BlackList.has(message.sender))
-      return;
-
-    // The SMS app is already displayed
-    if (!document.mozHidden) {
-      var currentThread = MessageManager.currentNum;
-      // If we are in the same thread, only we need to vibrate
-      if (number == currentThread) {
-        navigator.vibrate([200, 200, 200]);
         return;
       }
-    }
-
-    navigator.mozApps.getSelf().onsuccess = function(evt) {
-      var app = evt.target.result;
-      var iconURL = NotificationHelper.getIconURI(app);
-
-      // Stashing the number at the end of the icon URL to make sure
-      // we get it back even via system message
-      iconURL += '?sms-received?' + number;
-
-      var goToMessage = function() {
-        app.launch();
-        showThreadFromSystemMessage(number);
-      };
-
-      ContactDataManager.getContactData(message.sender,
-      function gotContact(contact) {
-        var sender;
-        if (contact.length && contact[0].name) {
-          sender = Utils.escapeHTML(contact[0].name[0]);
-        } else {
-          sender = message.sender;
-        }
-
-        NotificationHelper.send(sender, message.body, iconURL, goToMessage);
-      });
-    };
+      MessageManager.init(initUIApp);
+    });
   });
-
-  window.navigator.mozSetMessageHandler('notification',
-    function notificationClick(message) {
-      if (!message.clicked) {
-        return;
-      }
-
-      navigator.mozApps.getSelf().onsuccess = function(evt) {
-        var app = evt.target.result;
-        app.launch();
-
-        // Getting back the number form the icon URL
-        var notificationType = message.imageURL.split('?')[1];
-        // Case regular 'sms-received'
-        if (notificationType == 'sms-received') {
-          var number = message.imageURL.split('?')[2];
-          showThreadFromSystemMessage(number);
-          return;
-        }
-        var number = message.title;
-        // Class 0 message
-        var messageBody = number + '\n' + message.body;
-        alert(messageBody);
-      };
-    }
-  );
-}
+});

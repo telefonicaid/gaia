@@ -1,6 +1,18 @@
 Calendar.ns('Controllers').Sync = (function() {
 
   /**
+   * Private helper for choosing how to dispatch errors.
+   * When given a callback the callback will be called otherwise the error
+   * controller will be invoked.
+   */
+  function handleError(err, callback) {
+    if (callback)
+      return callback(err);
+
+    Calendar.App.errorController.dispatch(err);
+  }
+
+  /**
    * Handles all synchronization related
    * tasks. The intent is that this will
    * be the focal point for any view
@@ -44,22 +56,34 @@ Calendar.ns('Controllers').Sync = (function() {
      *    controller.once('syncComplete', cb);
      *
      */
-    all: function() {
+    all: function(callback) {
+      // this is for backwards compatibility... in reality we should remove
+      // callbacks from .all.
+      if (callback) {
+        this.once('syncComplete', callback);
+      }
+
       if (this.app.offline()) {
         this.emit('offline');
+        this.emit('syncComplete');
         return;
       }
 
       var account = this.app.store('Account');
 
-      for (var key in account.cached) {
-        this.account(account.cached[key]);
-      }
+      account.all(function(err, list) {
 
-      // If we have nothing to sync
-      if (!this.pending)
-        this.emit('syncComplete');
-    },
+        for (var key in list) {
+          this.account(list[key]);
+        }
+
+        // If we have nothing to sync
+        if (!this.pending) {
+          this.emit('syncComplete');
+        }
+
+      }.bind(this));
+   },
 
     /**
      * Initiates a sync for a single calendar.
@@ -75,8 +99,7 @@ Calendar.ns('Controllers').Sync = (function() {
       this._incrementPending();
       store.sync(account, calendar, function(err) {
         self._resolvePending();
-        if (callback)
-          callback(err);
+        handleError(err, callback);
       });
     },
 
@@ -84,6 +107,10 @@ Calendar.ns('Controllers').Sync = (function() {
      * Initiates a sync of a single account and all
      * associated calendars (calendars that exist after
      * the full sync of the account itself).
+     *
+     * The contract is if an callback is given the callback MUST handle the
+     * error given. The default behaviour is to bubble up the error up to the
+     * error controller.
      *
      * @param {Object} account sync target.
      * @param {Function} [callback] optional callback.
@@ -96,13 +123,12 @@ Calendar.ns('Controllers').Sync = (function() {
 
       this._incrementPending();
       accountStore.sync(account, function(err) {
-        // find all calendars
-        var calendars = calendarStore.remotesByAccount(
-          account._id
-        );
+        if (err) {
+          self._resolvePending();
+          return handleError(err, callback);
+        }
 
         var pending = 0;
-
         function next() {
           if (!(--pending)) {
             self._resolvePending();
@@ -112,10 +138,23 @@ Calendar.ns('Controllers').Sync = (function() {
           }
         }
 
-        for (var key in calendars) {
-          pending++;
-          self.calendar(account, calendars[key], next);
+        function fetchCalendars(err, calendars) {
+          if (err) {
+            self._resolvePending();
+            return handleError(err, callback);
+          }
+
+          for (var key in calendars) {
+            pending++;
+            self.calendar(account, calendars[key], next);
+          }
         }
+
+        // find all calendars
+        var calendars = calendarStore.remotesByAccount(
+          account._id,
+          fetchCalendars
+        );
       });
     }
   };

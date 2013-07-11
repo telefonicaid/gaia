@@ -106,11 +106,9 @@ document.addEventListener('DOMContentLoaded', function onload() {
       var result = queryAndroidDB(mcc);
 
      if (result && result.length) {
-        result.sort(function(a, b) {
-          return parseInt(result.mnc, 10) < parseInt(result.mnc, 10);
-        });
+        result.sort();
         for (var i = 0; i < result.length; i++) {
-          var mnc = parseInt(result[i].mnc, 10);
+          var mnc = result[i].mnc;
 
           var operatorVariantSettings = {};
           var voicemail = queryGnomeDB(mcc, mnc, 'voicemail');
@@ -123,7 +121,8 @@ document.addEventListener('DOMContentLoaded', function onload() {
           var otherSettings = queryOperatorVariantDB(mcc, mnc);
           if (otherSettings) {
             if (DEBUG) {
-              console.log("Other operator settings: " + JSON.stringify(otherSettings));
+              console.log('Other operator settings: ' +
+                JSON.stringify(otherSettings));
             }
             if (!operatorVariantSettings.voicemail) {
               voicemail = otherSettings['voicemail'];
@@ -131,6 +130,7 @@ document.addEventListener('DOMContentLoaded', function onload() {
                 operatorVariantSettings.voicemail = voicemail;
               }
             }
+
             var enableStrict7BitEncodingForSms =
               otherSettings['enableStrict7BitEncodingForSms'];
             if (enableStrict7BitEncodingForSms) {
@@ -142,6 +142,25 @@ document.addEventListener('DOMContentLoaded', function onload() {
             if (cellBroadcastSearchList) {
               operatorVariantSettings.cellBroadcastSearchList =
                 cellBroadcastSearchList;
+            }
+
+            var operatorSizeLimitation =
+              otherSettings['operatorSizeLimitation'];
+            if (operatorSizeLimitation) {
+              operatorVariantSettings.operatorSizeLimitation =
+                +operatorSizeLimitation;
+            }
+            var skipProxy = otherSettings['skipProxy'];
+            if (skipProxy == 'true') {
+              var skipProxyFor = otherSettings['skipProxyFor'];
+              if (skipProxyFor) {
+                if (skipProxyFor.indexOf(result[i].carrier) != -1) {
+                  if (DEBUG) {
+                    console.log('Skip proxy setting for: ' + result[i].carrier);
+                  }
+                  result[i].proxy = result[i].port = '';
+                }
+              }
             }
           }
 
@@ -158,7 +177,7 @@ document.addEventListener('DOMContentLoaded', function onload() {
             country[mnc].push(result[i]);
           } else {
             country[mnc] = [result[i]];
-            if (voicemail || otherSettings || cellBroadcastSearchList) {
+            if (voicemail || otherSettings) {
               operatorVariantSettings.type = [];
               operatorVariantSettings.type.push('operatorvariant');
               country[mnc].push(operatorVariantSettings);
@@ -185,7 +204,8 @@ document.addEventListener('DOMContentLoaded', function onload() {
       'ril.data.user': 'user',
       'ril.data.passwd': 'password',
       'ril.data.httpProxyHost': 'proxy',
-      'ril.data.httpProxyPort': 'port'
+      'ril.data.httpProxyPort': 'port',
+      'ril.data.authtype': 'authtype'
     },
     'supl': {
       'ril.supl.carrier': 'carrier',
@@ -193,7 +213,8 @@ document.addEventListener('DOMContentLoaded', function onload() {
       'ril.supl.user': 'user',
       'ril.supl.passwd': 'password',
       'ril.supl.httpProxyHost': 'proxy',
-      'ril.supl.httpProxyPort': 'port'
+      'ril.supl.httpProxyPort': 'port',
+      'ril.supl.authtype': 'authtype'
     },
     'mms': {
       'ril.mms.carrier': 'carrier',
@@ -204,12 +225,14 @@ document.addEventListener('DOMContentLoaded', function onload() {
       'ril.mms.httpProxyPort': 'port',
       'ril.mms.mmsc': 'mmsc',
       'ril.mms.mmsproxy': 'mmsproxy',
-      'ril.mms.mmsport': 'mmsport'
+      'ril.mms.mmsport': 'mmsport',
+      'ril.mms.authtype': 'authtype'
     },
     'operatorvariant': {
       'ril.iccInfo.mbdn': 'voicemail',
       'ril.sms.strict7BitEncoding.enabled': 'enableStrict7BitEncodingForSms',
-      'ril.cellbroadcast.searchlist': 'cellBroadcastSearchList'
+      'ril.cellbroadcast.searchlist': 'cellBroadcastSearchList',
+      'dom.mms.operatorSizeLimitation': 'operatorSizeLimitation'
     }
   };
 
@@ -233,9 +256,36 @@ document.addEventListener('DOMContentLoaded', function onload() {
           gAndroidDB = loadXML(ANDROID_DB_FILE);
           // First merge the local DB
           var localAndroidDB = loadXML(LOCAL_ANDROID_DB_FILE);
-          var localApns = localAndroidDB.documentElement.getElementsByTagName("apn");
-          for (var i = 0; i < localApns.length; ++i) {
-            gAndroidDB.documentElement.appendChild(localApns[i]);
+          var localApns =
+            localAndroidDB.documentElement.querySelectorAll('apn');
+          for (var localApn of localApns) {
+            // use local apn to patch origin carrier name in the Android DB
+            // if the name is not the correct one (see bug 863126).
+            // Note: This patch will not function once we get
+            // the correct names updated in the upstream database.
+            if (localApn.getAttribute('name')) {
+              var pattern = 'apn' +
+                            '[mcc="' + localApn.getAttribute('mcc') + '"]' +
+                            '[mnc="' + localApn.getAttribute('mnc') + '"]';
+              var androidApns =
+                gAndroidDB.documentElement.querySelectorAll(pattern);
+              for (var androidApn of androidApns) {
+                if (androidApn &&
+                    androidApn.getAttribute('carrier') ===
+                    localApn.getAttribute('carrier')) {
+                  if (DEBUG) {
+                    console.log('- replace "' +
+                                androidApn.getAttribute('carrier') +
+                                '" to "' + localApn.getAttribute('name') +
+                                '"');
+                  }
+                  androidApn.setAttribute('carrier',
+                                          localApn.getAttribute('name'));
+                }
+              }
+            } else {
+              gAndroidDB.documentElement.appendChild(localApn);
+            }
           }
           // Then the Gnome DB
           gGnomeDB = loadXML(GNOME_DB_FILE);
@@ -260,8 +310,8 @@ document.addEventListener('DOMContentLoaded', function onload() {
 
   function update() {
     var selection = document.getElementById('selection');
-    var mcc = parseInt(document.querySelector('input[name=mcc]').value, 10);
-    var mnc = parseInt(document.querySelector('input[name=mnc]').value, 10);
+    var mcc = document.querySelector('input[name=mcc]').value;
+    var mnc = document.querySelector('input[name=mnc]').value;
     var res = gAPN[mcc] ? (gAPN[mcc][mnc] || []) : [];
     selection.textContent = JSON.stringify(res, true, 2);
 

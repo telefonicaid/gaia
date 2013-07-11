@@ -1,6 +1,6 @@
 'use strict';
 
-var MockContactsApp = {
+var MockContacts = {
   getLength: function(prop) {
     return prop.length;
   },
@@ -12,7 +12,7 @@ var MockContactsApp = {
   },
   getTags: function() {
     return {
-      'phone-type' : [
+      'phone-type': [
         {value: 'mobile'},
         {value: 'home'},
         {value: 'work'},
@@ -22,12 +22,12 @@ var MockContactsApp = {
         {value: 'faxOther'},
         {value: 'another'}
       ],
-      'email-type' : [
+      'email-type': [
         {value: 'personal'},
         {value: 'home'},
         {value: 'work'}
       ],
-      'address-type' : [
+      'address-type': [
         {value: 'home'},
         {value: 'work'}
       ]
@@ -37,5 +37,15 @@ var MockContactsApp = {
   },
   loadFacebook: function(cb) {
     cb();
+  },
+  asyncScriptsLoaded: true,
+  cardStateChanged: function() {
+  },
+  extServices: {
+    importLive: function() {},
+    importGmail: function() {}
+  },
+  navigation: {
+    home: function() {}
   }
 };

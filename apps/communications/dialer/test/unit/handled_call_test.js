@@ -1,10 +1,11 @@
 requireApp('communications/dialer/js/handled_call.js');
+requireApp('communications/dialer/js/voicemail.js');
 
 requireApp('communications/dialer/test/unit/mock_keypad.js');
 requireApp('communications/dialer/test/unit/mock_call.js');
 requireApp('communications/dialer/test/unit/mock_contacts.js');
 requireApp('communications/dialer/test/unit/mock_call_screen.js');
-requireApp('communications/dialer/test/unit/mock_call_handler.js');
+requireApp('communications/dialer/test/unit/mock_on_call.js');
 requireApp('communications/dialer/test/unit/mock_utils.js');
 
 // We're going to swap those with mock objects
@@ -29,6 +30,7 @@ if (!this.LazyL10n) {
 }
 
 suite('dialer/handled_call', function() {
+  const VOICEMAIL_NUMBER = '123';
   var subject;
   var mockCall;
   var fakeNode;
@@ -67,6 +69,14 @@ suite('dialer/handled_call', function() {
     window.Utils = MockUtils;
 
     phoneNumber = Math.floor(Math.random() * 10000);
+
+    sinon.stub(Voicemail, 'check', function(number, callback) {
+      var isVoicemailNumber = false;
+      if (number === VOICEMAIL_NUMBER) {
+        isVoicemailNumber = true;
+      }
+      callback(isVoicemailNumber);
+    });
   });
 
   suiteTeardown(function() {
@@ -76,6 +86,7 @@ suite('dialer/handled_call', function() {
     window.KeypadManager = realKeypadManager;
     window.LazyL10n = realLazyL10n;
     window.Utils = realUtils;
+    Voicemail.check.restore();
   });
 
   setup(function() {
@@ -239,14 +250,6 @@ suite('dialer/handled_call', function() {
       assert.equal(subject.recentsEntry, MockOnCallHandler.mLastEntryAdded);
     });
 
-    test('mute off after call', function() {
-      assert.isFalse(MockCallScreen.mMuteOn);
-    });
-
-    test('speaker off after call', function() {
-      assert.isFalse(MockCallScreen.mSpeakerOn);
-    });
-
     test('remove listener', function() {
       assert.isTrue(mockCall._listenerRemoved);
     });
@@ -259,6 +262,17 @@ suite('dialer/handled_call', function() {
       assert.equal(fakeNode.dataset.occupied, 'false');
     });
   });
+
+  suite('busy', function() {
+    setup(function() {
+      mockCall._busy();
+    });
+
+    test('playing busy tone', function() {
+      assert.isTrue(MockOnCallHandler.mNotifyBusyLineCalled);
+    });
+  });
+
 
   suite('holding', function() {
     setup(function() {
@@ -307,7 +321,7 @@ suite('dialer/handled_call', function() {
       assert.equal(subject.recentsEntry.number, mockCall.number);
     });
 
-    suite('type', function() {
+    suite('type incoming', function() {
       setup(function() {
         mockCall = new MockCall('888', 'incoming');
         subject = new HandledCall(mockCall, fakeNode);
@@ -319,18 +333,153 @@ suite('dialer/handled_call', function() {
 
       test('type after connexion', function() {
         mockCall._connect();
-        assert.equal(subject.recentsEntry.type, 'incoming-connected');
+        assert.equal(subject.recentsEntry.type, 'incoming');
+        assert.equal(subject.recentsEntry.status, 'connected');
       });
 
       test('type after refusal', function() {
         mockCall._disconnect();
-        assert.equal(subject.recentsEntry.type, 'incoming-refused');
+        assert.equal(subject.recentsEntry.type, 'incoming');
+        assert.equal(subject.recentsEntry.status, null);
       });
 
       test('type after disconnexion', function() {
         mockCall._connect();
         mockCall._disconnect();
-        assert.equal(subject.recentsEntry.type, 'incoming-connected');
+        assert.equal(subject.recentsEntry.type, 'incoming');
+        assert.equal(subject.recentsEntry.status, 'connected');
+      });
+    });
+
+    suite('type outgoing', function() {
+      setup(function() {
+        mockCall = new MockCall('888', 'dialing');
+        subject = new HandledCall(mockCall, fakeNode);
+      });
+
+      test('type', function() {
+        assert.equal(subject.recentsEntry.type, 'dialing');
+      });
+
+      test('type after connexion', function() {
+        mockCall._connect();
+        assert.equal(subject.recentsEntry.type, 'dialing');
+        assert.equal(subject.recentsEntry.status, null);
+      });
+
+      test('type after refusal', function() {
+        mockCall._disconnect();
+        assert.equal(subject.recentsEntry.type, 'dialing');
+        assert.equal(subject.recentsEntry.status, null);
+      });
+
+      test('type after disconnexion', function() {
+        mockCall._connect();
+        mockCall._disconnect();
+        assert.equal(subject.recentsEntry.type, 'dialing');
+        assert.equal(subject.recentsEntry.status, null);
+      });
+    });
+
+    suite('without contact info', function() {
+      // Calling '111' means we won't find a contact with that number
+      // Check out mock_contacts.js for details
+      var contactInfo;
+      setup(function() {
+        mockCall = new MockCall('111', 'incoming');
+        subject = new HandledCall(mockCall, fakeNode);
+        mockCall._disconnect();
+      });
+
+      test('contactInfo', function() {
+        contactInfo = subject.recentsEntry.contactInfo;
+        assert.equal(contactInfo, null);
+      });
+    });
+
+    suite('with more than 1 contact', function() {
+      // Calling '222' means we will find more than 1 contact with that number
+      // Check out mock_contacts.js for details
+      var contactInfo;
+      setup(function() {
+        mockCall = new MockCall('222', 'incoming');
+        subject = new HandledCall(mockCall, fakeNode);
+        mockCall._disconnect();
+      });
+
+      test('contactInfo', function() {
+        contactInfo = subject.recentsEntry.contactInfo;
+        assert.ok(contactInfo);
+      });
+
+      test('contactsWithSameNumber', function() {
+        assert.equal(contactInfo.contactsWithSameNumber, 2);
+      });
+
+      test('matchingTel', function() {
+        var tel = {
+          value: MockContacts.mCalledWith,
+          carrier: MockContacts.mCarrier,
+          type: MockContacts.mType
+        };
+
+        assert.ok(contactInfo.matchingTel);
+        assert.equal(contactInfo.matchingTel.value, tel.value);
+        assert.equal(contactInfo.matchingTel.carrier, tel.carrier);
+        assert.equal(contactInfo.matchingTel.type, tel.type);
+      });
+
+      test('contact', function() {
+        assert.ok(contactInfo.contact);
+        var contact = contactInfo.contact;
+        assert.equal(contact.name, MockContacts.mName);
+        assert.equal(contact.photo, MockContacts.mPhoto);
+        assert.equal(contact.tel.length, 1);
+        assert.equal(contact.tel[0].value, MockContacts.mCalledWith);
+        assert.equal(contact.tel[0].carrier, MockContacts.mCarrier);
+        assert.equal(contact.tel[0].type, MockContacts.mType);
+      });
+    });
+
+    suite('contact info', function() {
+      var contactInfo;
+      setup(function() {
+        mockCall = new MockCall('888', 'incoming');
+        subject = new HandledCall(mockCall, fakeNode);
+        mockCall._disconnect();
+      });
+
+      test('contactInfo', function() {
+        contactInfo = subject.recentsEntry.contactInfo;
+        assert.ok(contactInfo);
+      });
+
+      test('contactsWithSameNumber', function() {
+        assert.equal(contactInfo.contactsWithSameNumber, 0);
+      });
+
+      test('matchingTel', function() {
+        var tel = {
+          value: MockContacts.mCalledWith,
+          carrier: MockContacts.mCarrier,
+          type: MockContacts.mType
+        };
+
+        assert.ok(contactInfo.matchingTel);
+        assert.equal(contactInfo.matchingTel.value, tel.value);
+        assert.equal(contactInfo.matchingTel.carrier, tel.carrier);
+        assert.equal(contactInfo.matchingTel.type, tel.type);
+      });
+
+      test('contact', function() {
+        assert.ok(contactInfo.contact);
+        var contact = contactInfo.contact;
+        assert.equal(contact.name, MockContacts.mName);
+        assert.equal(contact.photo, MockContacts.mPhoto);
+        assert.equal(contact.tel.length, 1);
+        assert.equal(contact.tel[0].value, MockContacts.mCalledWith);
+        assert.equal(contact.tel[0].carrier, MockContacts.mCarrier);
+        assert.equal(contact.tel[0].type, MockContacts.mType);
       });
     });
   });
@@ -351,7 +500,8 @@ suite('dialer/handled_call', function() {
 
     test('recents entry after refusal', function() {
       mockCall._disconnect();
-      assert.equal(subject.recentsEntry.type, 'incoming-refused');
+      assert.equal(subject.recentsEntry.type, 'incoming');
+      assert.equal(subject.recentsEntry.status, null);
     });
 
     test('show should do nothing', function() {
@@ -363,28 +513,96 @@ suite('dialer/handled_call', function() {
     });
   });
 
-  test('should display unknown l10n key', function() {
+  test('should display contact name', function() {
+    mockCall = new MockCall('888', 'incoming');
+    subject = new HandledCall(mockCall, fakeNode);
+
+    var numberNode = fakeNode.querySelector('.numberWrapper .number');
+    assert.equal(numberNode.textContent, 'test name');
+  });
+
+  test('should display withheld-number l10n key', function() {
     mockCall = new MockCall('', 'incoming');
     subject = new HandledCall(mockCall, fakeNode);
 
     var numberNode = fakeNode.querySelector('.numberWrapper .number');
-    assert.equal(numberNode.textContent, 'unknown');
+    assert.equal(numberNode.textContent, 'withheld-number');
+  });
+
+  test('should display emergency number label', function() {
+    mockCall = new MockCall('112', 'dialing');
+    mockCall.emergency = true;
+    subject = new HandledCall(mockCall, fakeNode);
+
+    var numberNode = fakeNode.querySelector('.numberWrapper .number');
+    assert.equal(numberNode.textContent, 'emergencyNumber');
+  });
+
+  test('should display voicemail label', function() {
+    mockCall = new MockCall('123', 'dialing');
+    subject = new HandledCall(mockCall, fakeNode);
+
+    var numberNode = fakeNode.querySelector('.numberWrapper .number');
+    assert.equal(numberNode.textContent, 'voiceMail');
   });
 
   suite('additional information', function() {
+    var additionalInfoNode;
+
+    setup(function() {
+      additionalInfoNode = fakeNode.querySelector('.additionalContactInfo');
+    });
+
     test('check additional info updated', function() {
       mockCall = new MockCall('888', 'incoming');
       subject = new HandledCall(mockCall, fakeNode);
-
-      assert.isTrue(MockKeypadManager.mUpdateAdditionalContactInfo);
+      assert.equal(additionalInfoNode.textContent, '888');
     });
 
     test('check without additional info', function() {
       mockCall = new MockCall('999', 'incoming');
       subject = new HandledCall(mockCall, fakeNode);
-
-      var additionalInfoNode = fakeNode.querySelector('.additionalContactInfo');
       assert.equal('', additionalInfoNode.textContent);
+    });
+
+    test('check replace additional info', function() {
+      mockCall = new MockCall('888', 'incoming');
+      subject = new HandledCall(mockCall, fakeNode);
+      subject.replaceAdditionalContactInfo('test additional info');
+      assert.equal(additionalInfoNode.textContent, 'test additional info');
+    });
+
+    test('check restore additional info', function() {
+      mockCall = new MockCall('888', 'incoming');
+      subject = new HandledCall(mockCall, fakeNode);
+      subject.replaceAdditionalContactInfo('test additional info');
+      subject.restoreAdditionalContactInfo();
+      assert.equal(additionalInfoNode.textContent, '888');
+    });
+  });
+
+  suite('phone number', function() {
+    var numberNode;
+
+    setup(function() {
+      numberNode = fakeNode.querySelector('.numberWrapper .number');
+    });
+
+    test('check replace number', function() {
+      mockCall = new MockCall('888', 'incoming');
+      subject = new HandledCall(mockCall, fakeNode);
+
+      subject.replacePhoneNumber('12345678');
+      assert.equal(numberNode.textContent, '12345678');
+    });
+
+    test('check restore number', function() {
+      mockCall = new MockCall('888', 'incoming');
+      subject = new HandledCall(mockCall, fakeNode);
+
+      subject.replacePhoneNumber('12345678');
+      subject.restorePhoneNumber();
+      assert.equal(numberNode.textContent, 'test name');
     });
   });
 

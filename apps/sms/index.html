@@ -4,45 +4,38 @@
     <meta charset="utf-8">
     <meta http-equiv="pragma" content="no-cache">
     <title>Messages</title>
-
     <!-- Stable Building blocks -->
     <link rel="stylesheet" type="text/css" href="shared/style/headers.css">
     <link rel="stylesheet" type="text/css" href="shared/style/edit_mode.css">
+    <link rel="stylesheet" type="text/css" href="shared/style_unstable/lists.css">
+    <!--
     <link rel="stylesheet" type="text/css" href="shared/style/input_areas.css">
     <link rel="stylesheet" type="text/css" href="shared/style/switches.css">
     <link rel="stylesheet" type="text/css" href="shared/style/confirm.css">
     <link rel="stylesheet" type="text/css" href="shared/style_unstable/progress_activity.css">
     <link rel="stylesheet" type="text/css" href="shared/style_unstable/lists.css">
-    <link rel="stylesheet" type="text/css" href="/shared/style_unstable/tabs.css">
-
+    <link rel="stylesheet" type="text/css" href="shared/style/switches.css">
+    <link rel="stylesheet" type="text/css" href="shared/style/confirm.css">
+    <link rel="stylesheet" type="text/css" href="shared/style_unstable/progress_activity.css">
+    <link rel="stylesheet" type="text/css" href="/shared/style/action_menu.css">
+    -->
     <!-- App styles -->
     <link rel="stylesheet" type="text/css" href="style/root.css">
     <link rel="stylesheet" type="text/css" href="style/common.css">
     <link rel="stylesheet" type="text/css" href="style/sms.css">
-    <link rel="stylesheet" type="text/css" href="style/custom_dialog.css">
     <!-- Localization -->
     <link rel="resource" type="application/l10n" href="locales/locales.ini">
     <link rel="resource" type="application/l10n" href="shared/locales/date.ini">
     <!-- Shared code -->
-    <script defer src="shared/js/async_storage.js"></script>
     <script defer src="shared/js/l10n.js"></script>
+    <!--
     <script defer src="shared/js/l10n_date.js"></script>
-    <script defer src="shared/js/custom_dialog.js"></script>
-    <script defer src="shared/js/desktop.js"></script>
+    <script defer src="shared/js/async_storage.js"></script>
     <script defer src="shared/js/notification_helper.js"></script>
-
-    <!-- Specific code -->
-    <script defer src="js/blacklist.js"></script>
-    <script defer src="js/contacts.js"></script>
+    <script defer src="shared/js/gesture_detector.js"></script>
+    -->
+    <script defer src="shared/js/lazy_loader.js"></script>
     <script defer src="js/startup.js"></script>
-    <script defer src="js/message_manager.js"></script>
-    <script defer src="js/thread_list_ui.js"></script>
-    <script defer src="js/thread_ui.js"></script>
-    <script defer src="js/waiting_screen.js"></script>
-    <script defer src="js/utils.js"></script>
-    <script defer src="js/search_utils.js"></script>
-    <script defer src="js/fixed_header.js"></script>
-    <script defer src="js/desktop_testing.js"></script>
 
   </head>
 
@@ -54,15 +47,24 @@
             <a href="#new" id="icon-add">
               <span class="icon icon-compose"></span>
             </a>
-            <a href="#edit" id="icon-edit-threads">
+            <a id="threads-edit-icon">
               <span class="icon icon-edit"></span>
             </a>
           </menu>
           <h1 data-l10n-id="messages">Messages</h1>
         </header>
-        <article id="thread-list-container" class="view-body" data-type="list">
+        <article id="threads-container" class="view-body" data-type="list">
         </article>
-        <div id="threads-fixed-container" class="fixed-title"></div>
+        <div id="threads-header-container" class="fixed-title"></div>
+
+        <div id="threads-no-messages" class="hide">
+          <div id="no-result-message">
+            <p data-l10n-id="noMessages-title">No messages</p>
+            <p data-l10n-id="noMessages-text">Start communicating now</p>
+          </div>
+        </div>
+
+
         <form id="threads-edit-form" role="dialog" data-type="edit">
           <section>
             <header>
@@ -72,14 +74,14 @@
               <menu type="toolbar">
                 <button id="threads-delete-button" data-l10n-id="delete">delete</button>
               </menu>
-              <h1 id="list-edit-title" data-l10n-id="editMode">Edit mode</h1>
+              <h1 id="threads-edit-mode" data-l10n-id="editMode">Edit mode</h1>
             </header>
           </section>
           <menu>
-            <button id="deselect-all-threads" class="edit-button disabled" data-l10n-id="deselect-all">
+            <button id="threads-uncheck-all-button" disabled class="edit-button" data-l10n-id="deselect-all">
               None
             </button>
-            <button id="select-all-threads" class="edit-button" data-l10n-id="select-all">
+            <button id="threads-check-all-button" class="edit-button" data-l10n-id="select-all">
               All
             </button>
           </menu>
@@ -88,33 +90,63 @@
 
       <section id="thread-messages" class="panel" role="region">
         <header class="view-header regular-header">
-          <a role="link" id="go-to-threadlist">
+          <a role="link" id="messages-back-button">
             <span class="icon icon-back"></span>
           </a>
           <menu type="toolbar">
-            <a id="icon-contact">
-              <span class="icon icon-user"></span>
-            </a>
-            <a href="#edit" id="icon-edit">
+            <a id="messages-edit-icon">
               <span class="icon icon-edit"></span>
             </a>
           </menu>
-          <h1 id="header-text" data-l10n-id="messages" aria-hidden="true">Messages</h1>
-          <form id="messages-tel-form">
-            <input id="receiver-input" type="text" name="tel" class="tel" />
-            <span id="clear-search" role="button" class="icon icon-clear"></span>
-          </form>
+          <h1 id="messages-header-text" aria-hidden="true"></h1>
         </header>
-        <div id="contact-carrier" data-l10n-id="carrier-unknown" class="carrier-wrapper">
-          Carrier unknown
+        <div id="messages-subheader" class="subheader">
+          <section id="messages-to-field">
+            <section data-l10n-id="to" id="to-label">
+              To:
+            </section>
+            <menu type="toolbar">
+              <a id="messages-contact-pick-button">
+                <span class="icon icon-user"></span>
+              </a>
+            </menu>
+            <section id="messages-recipients-list" class="singleline">
+            </section>
+          </section>
+          <div id="contact-carrier" data-l10n-id="carrier-unknown" class="carrier-wrapper">
+            Carrier unknown
+          </div>
+          <section id="messages-max-length-notice"
+                  role="notification"
+                  class="hide">
+            <p></p>
+          </section>
+          <!-- Notifications in this container will be rendered on top of the
+          Compose field. These notifications should be hidden automatically so
+          they do not prevent the user from inputting text. -->
+          <div class="overlay">
+            <section id="messages-convert-notice"
+                    role="notification"
+                    class="hide">
+              <p></p>
+            </section>
+            <section id="messages-resize-notice"
+                    role="notification"
+                    class="hide">
+              <p data-l10n-id="resize-image">Resizing the attached image</p>
+            </section>
+          </div>
         </div>
-        <article id="messages-container" class="view-body" data-type="list">
+        <article id="messages-container" class="view-body article-list" data-type="list">
         </article>
-        <form role="search" id="new-sms-form" class="bottom new-sms-form">
-          <button id="send-message" disabled data-l10n-id="send" type="submit">Send</button>
-          <p>
-            <textarea type="text" id="message-to-send" name="message-to-send" placeholder="Message" data-l10n-id="composeMessage"></textarea>
-          </p>
+        <article id="messages-participants" class="view-body article-list hide" data-type="list">
+          <ul id="messages-participants-list" class="contact-list"></ul>
+        </article>
+        <form role="search" id="messages-compose-form" class="bottom messages-compose-form" data-message-type="sms">
+          <button id="messages-attach-button" class="icon icon-attachment">Attachment</button>
+          <button id="messages-send-button" disabled data-l10n-id="send" type="submit">Send</button>
+          <!-- The <br> is needed because of 414223, which is a WONTFIX. It's just because of how contentEditable works. https://bugzilla.mozilla.org/show_bug.cgi?id=414223 -->
+          <div id="messages-input" contentEditable="true" name="message" data-l10n-id="composeMessage"><br></div>
         </form>
         <form role="dialog" id="messages-edit-form" role="dialog" data-type="edit" >
           <section>
@@ -123,16 +155,16 @@
                 <span data-l10n-id="cancel" class="icon icon-close">close</span>
               </button>
               <menu type="toolbar">
-                <button id="messages-delete-button"  data-l10n-id="delete">delete</button>
+                <button id="messages-delete-button" data-l10n-id="delete">delete</button>
               </menu>
-              <h1 id="messages-edit-title" data-l10n-id="editMode">Edit mode</h1>
+              <h1 id="messages-edit-mode" data-l10n-id="editMode">Edit mode</h1>
             </header>
           </section>
           <menu>
-            <button id="deselect-all-messages" class="edit-button disabled" data-l10n-id="deselect-all">
+            <button id="messages-uncheck-all-button" disabled class="edit-button" data-l10n-id="deselect-all">
               None
             </button>
-            <button id="select-all-messages" class="edit-button" data-l10n-id="select-all">
+            <button id="messages-check-all-button" class="edit-button" data-l10n-id="select-all">
               All
             </button>
           </menu>
@@ -149,5 +181,122 @@
         </section>
       </form>
     </article>
+    <menu id="attachment-options-menu" class="hide" tabindex="-1">
+      <div>
+        <form id="attachment-options" role="dialog" data-type="action">
+          <header></header>
+          <menu>
+            <button id="attachment-options-view"></button>
+            <button id="attachment-options-remove"></button>
+            <button id="attachment-options-replace"></button>
+            <button id="attachment-options-cancel"></button>
+          </menu>
+        </form>
+      </div>
+    </menu>
+    </div>
+    <div id="messages-contact-tmpl" class="hide">
+      <!--
+      <a class="suggestion"
+        data-number="${number}" data-source="contacts" data-name="${name}" data-display="${type}${separator}${carrier}${number}">
+        <p class="name">${nameHTML}</p>
+        <p>
+          ${type}${separator}${carrier}${numberHTML}
+        </p>
+      </a>
+      -->
+    </div>
+
+    <div id="messages-number-tmpl" class="hide">
+      <!--
+      <a class="suggestion" data-number="${number}" data-source="manual" data-name="${number}">
+        <p class="name">${number}</p>
+      </a>
+      -->
+    </div>
+
+    <div id="messages-not-downloaded-tmpl" class="hide">
+      <!--
+      <span class="not-downloaded-message">${message}</span>
+      <form><button class="download">${download}</button></form>
+      -->
+    </div>
+
+    <div id="messages-highlight-tmpl" class="hide">
+      <!--
+      <span class="highlight">${str}</span>
+      -->
+    </div>
+
+    <div id="messages-message-tmpl" class="hide">
+      <!--
+      <label class="danger">
+        <input type="checkbox" value="${id}">
+        <span></span>
+      </label>
+      <section class="bubble">
+        <aside class="pack-end">
+          <progress></progress>
+        </aside>
+        <p>${bodyHTML}</p>
+      </section>
+      -->
+    </div>
+
+    <div id="messages-thread-tmpl" class="hide">
+      <!--
+      <label class="danger">
+        <input type="checkbox" value="${id}">
+        <span></span>
+      </label>
+      <a href="#thread=${id}">
+        <aside class="icon icon-unread">unread</aside>
+        <aside class="pack-end">
+          <img src="">
+        </aside>
+        <p class="name">${number}</p>
+        <p>
+          <time>${formattedDate}</time>
+          <span class="mms-icon">MMS</span>
+          <span class="body-text">${bodyHTML}</span>
+        </p>
+      </a>
+      -->
+    </div>
+
+    <div id="messages-recipient-tmpl" class="hide">
+      <!--
+      <span class="recipient" x-inputmode="verbatim"
+        contenteditable="${editable}"
+        data-number="${number}" data-source="${source}" data-name="${name}" data-display="${display}">
+        ${name}
+      </span>
+      -->
+    </div>
+
+    <div id="attachment-tmpl" class="hide">
+      <!--
+      <head>
+        <meta charset="utf-8">
+        <base href="${baseURL}">
+        <link rel="stylesheet" type="text/css" href="style/attachment.css">
+      </head>
+      <body class="attachment ${draftClass}">
+        <div style="${inlineStyle}" class="placeholder ${type}-placeholder">
+          <div class="${errorClass}"></div>
+        </div>
+        <div class="size-indicator">${size}</div>
+      </body>
+      -->
+    </div>
+
+    <div id="height-rule-tmpl" class="hide">
+      <!--
+      #messages-recipients-list.multiline {
+        overflow-y: scroll;
+        height: ${height}px;
+      }
+      -->
+    </div>
   </body>
 </html>

@@ -4,52 +4,58 @@
 'use strict';
 
 /**
- * Create an animated icon by using a canvas element coupled with a flat image
- * containing all the animation frames arranged as a vertical row. The delay
- * between each frame is fixed.
+ * Creates an object used for refreshing the clock UI element. Handles all
+ * related timer manipulation (start/stop/cancel).
  */
+function Clock() {
+  /** One-shot timer used to refresh the clock at a minute's turn */
+  this.timeoutID = null;
 
-function AnimatedIcon(element, path, frames, delay) {
-  var context = element.getContext('2d');
+  /** Timer used to refresh the clock every minute */
+  this.timerID = null;
 
-  this.frame = 1;
-  this.frames = frames;
-  this.timerId = null;
+  /**
+   * Start the timer used to refresh the clock, will call the specified
+   * callback at every timer tick to refresh the UI. The callback used to
+   * refresh the UI will also be called immediately to ensure the UI is
+   * consistent.
+   *
+   * @param {Function} refresh Function used to refresh the UI at every timer
+   *        tick, should accept a date object as its only argument.
+   */
+  this.start = function cl_start(refresh) {
+      var date = new Date();
+      var self = this;
 
-  // Load the image and paint the first frame
-  var image = new Image();
-  image.src = path;
-  image.onload = function() {
-    var w = image.width;
-    var h = image.height / frames;
+      refresh(date);
 
-    context.drawImage(image, 0, 0, w, h, 0, 0, w, h);
-  }
+      if (this.timeoutID == null) {
+        this.timeoutID = window.setTimeout(function cl_setClockInterval() {
+          refresh(new Date());
 
-  this.start = function() {
-    var self = this;
-
-    if (this.timerId == null) {
-      this.timerId = setInterval(function() {
-          var w = image.width;
-          var h = image.height / frames;
-
-          context.drawImage(image, 0, self.frame * h, w, h, 0, 0, w, h);
-          self.frame++;
-
-          if (self.frame == self.frames) {
-            self.frame = 0;
+          if (self.timerID == null) {
+            self.timerID = window.setInterval(function cl_clockInterval() {
+              refresh(new Date());
+            }, 60000);
           }
-      }, delay);
-    }
-  }
+        }, (60 - date.getSeconds()) * 1000);
+      }
+    };
 
-  this.stop = function() {
-    if (this.timerId != null) {
-      clearInterval(this.timerId);
-      this.timerId = null;
+  /**
+   * Stops the timer used to refresh the clock
+   */
+  this.stop = function cl_stop() {
+    if (this.timeoutID != null) {
+      window.clearTimeout(this.timeoutID);
+      this.timeoutID = null;
     }
-  }
+
+    if (this.timerID != null) {
+      window.clearInterval(this.timerID);
+      this.timerID = null;
+    }
+  };
 }
 
 var StatusBar = {
@@ -96,23 +102,26 @@ var StatusBar = {
 
   headphonesActive: false,
 
+  listeningCallschanged: false,
+
   /**
    * this keeps how many current installs/updates we do
    * it triggers the icon "systemDownloads"
    */
   systemDownloadsCount: 0,
 
-  /* Objects used to animate the system downloads and network activity canvas elements */
-  networkActivityAnimation: null,
-  systemDownloadsAnimation: null,
+  /**
+   * Object used for handling the clock UI element, wraps all related timers
+   */
+  clock: new Clock(),
 
   /* For other modules to acquire */
   get height() {
-    if (this.screen.classList.contains('fullscreen-app') ||
+    if (this.screen.classList.contains('active-statusbar')) {
+      return this.attentionBar.offsetHeight;
+    } else if (this.screen.classList.contains('fullscreen-app') ||
         document.mozFullScreen) {
       return 0;
-    } else if (this.screen.classList.contains('active-statusbar')) {
-      return this.attentionBar.offsetHeight;
     } else {
       return this._cacheHeight ||
              (this._cacheHeight = this.element.getBoundingClientRect().height);
@@ -121,6 +130,11 @@ var StatusBar = {
 
   init: function sb_init() {
     this.getAllElements();
+
+    this.listeningCallschanged = false;
+
+    // Refresh the time to reflect locale changes
+    this.update.time.call(this, new Date());
 
     var settings = {
       'ril.radio.disabled': ['signal', 'data'],
@@ -131,7 +145,7 @@ var StatusBar = {
       'tethering.wifi.enabled': ['tethering'],
       'tethering.wifi.connectedClients': ['tethering'],
       'tethering.usb.connectedClients': ['tethering'],
-      'ring.enabled': ['mute'],
+      'audio.volume.notification': ['mute'],
       'alarm.enabled': ['alarm'],
       'vibration.enabled': ['vibration'],
       'ril.cf.enabled': ['callForwarding']
@@ -166,15 +180,14 @@ var StatusBar = {
     // Listen to 'moztimechange'
     window.addEventListener('moztimechange', this);
 
+    // Listen to 'lock', 'unlock', and 'lockpanelchange' from lockscreen.js in
+    // order to correctly set the visibility of the statusbar clock depending
+    // on the active lockscreen panel
+    window.addEventListener('lock', this);
+    window.addEventListener('unlock', this);
+    window.addEventListener('lockpanelchange', this);
+
     this.systemDownloadsCount = 0;
-
-    // Create the objects used to animate the statusbar-network-activity and
-    // statusbar-system-downloads canvas elements
-    this.networkActivityAnimation = new AnimatedIcon(this.icons.networkActivity,
-      '/style/statusbar/images/network-activity-flat.png', 6, 200);
-    this.systemDownloadsAnimation = new AnimatedIcon(this.icons.systemDownloads,
-      '/style/statusbar/images/system-downloads-flat.png', 8, 130);
-
     this.setActive(true);
   },
 
@@ -182,6 +195,32 @@ var StatusBar = {
     switch (evt.type) {
       case 'screenchange':
         this.setActive(evt.detail.screenEnabled);
+        break;
+
+      case 'lock':
+        // Hide the clock in the statusbar when screen is locked
+        this.icons.time.hidden = true;
+        this.clock.stop();
+        break;
+
+      case 'unlock':
+        // Display the clock in the statusbar when screen is unlocked
+        this.icons.time.hidden = false;
+        this.clock.start(this.update.time.bind(this));
+        break;
+
+      case 'lockpanelchange':
+        if (this.screen.classList.contains('locked')) {
+          // Display the clock in the statusbar if on Emergency Call screen
+          var isHidden = (evt.detail.panel == 'emergency-call') ? false : true;
+          this.icons.time.hidden = isHidden;
+
+          if (isHidden) {
+            this.clock.stop();
+          } else {
+            this.clock.start(this.update.time.bind(this));
+          }
+        }
         break;
 
       case 'chargingchange':
@@ -218,7 +257,14 @@ var StatusBar = {
         break;
 
       case 'moztimechange':
-        this.update.time.call(this);
+        navigator.mozL10n.ready((function _updateTime() {
+          // To stop clock for reseting the clock interval which runs every 60
+          // seconds. The reason to do this is that the time updated will be
+          // exactly aligned to minutes which means always getting 0 on seconds
+          // part.
+          this.clock.stop();
+          this.clock.start(this.update.time.bind(this));
+        }).bind(this));
         break;
 
       case 'mozChromeEvent':
@@ -256,8 +302,6 @@ var StatusBar = {
   setActive: function sb_setActive(active) {
     this.active = active;
     if (active) {
-      this.update.time.call(this);
-
       var battery = window.navigator.battery;
       if (battery) {
         battery.addEventListener('chargingchange', this);
@@ -277,13 +321,22 @@ var StatusBar = {
 
       window.addEventListener('wifi-statuschange',
                               this.update.wifi.bind(this));
+
+      var wifiManager = window.navigator.mozWifiManager;
+      if (wifiManager) {
+        wifiManager.connectionInfoUpdate = this.update.wifi.bind(this);
+      }
+
       this.update.wifi.call(this);
 
       window.addEventListener('moznetworkupload', this);
       window.addEventListener('moznetworkdownload', this);
-    } else {
-      clearTimeout(this._clockTimer);
 
+      if (!LockScreen.locked) {
+        // Start refreshing the clock only if it's visible
+        this.clock.start(this.update.time.bind(this));
+      }
+    } else {
       var battery = window.navigator.battery;
       if (battery) {
         battery.removeEventListener('chargingchange', this);
@@ -300,6 +353,9 @@ var StatusBar = {
 
       window.removeEventListener('moznetworkupload', this);
       window.removeEventListener('moznetworkdownload', this);
+
+      // Always prevent the clock from refreshing itself when the screen is off
+      this.clock.stop();
     }
   },
 
@@ -333,16 +389,10 @@ var StatusBar = {
       label.textContent = navigator.mozL10n.get('statusbarLabel', l10nArgs);
     },
 
-    time: function sb_updateTime() {
-      // Schedule another clock update when a new minute rolls around
+    time: function sb_updateTime(now) {
       var _ = navigator.mozL10n.get;
       var f = new navigator.mozL10n.DateTimeFormat();
-      var now = new Date();
       var sec = now.getSeconds();
-      if (this._clockTimer)
-        window.clearTimeout(this._clockTimer);
-      this._clockTimer =
-        window.setTimeout((this.update.time).bind(this), (59 - sec) * 1000);
 
       var formated = f.localeFormat(now, _('shortTimeFormat'));
       formated = formated.replace(/\s?(AM|PM)\s?/i, '<span>$1</span>');
@@ -372,14 +422,11 @@ var StatusBar = {
       // show up for 500ms.
 
       var icon = this.icons.networkActivity;
-      var animation = this.networkActivityAnimation;
 
       clearTimeout(this._networkActivityTimer);
       icon.hidden = false;
-      animation.start();
 
       this._networkActivityTimer = setTimeout(function hideNetActivityIcon() {
-        animation.stop();
         icon.hidden = true;
       }, 500);
     },
@@ -387,6 +434,9 @@ var StatusBar = {
     signal: function sb_updateSignal() {
       var conn = window.navigator.mozMobileConnection;
       if (!conn || !conn.voice)
+        return;
+
+      if (!IccHelper.enabled)
         return;
 
       var voice = conn.voice;
@@ -404,7 +454,7 @@ var StatusBar = {
       flightModeIcon.hidden = true;
       icon.hidden = false;
 
-      if (conn.cardState === 'absent') {
+      if (IccHelper.cardState === 'absent') {
         // no SIM
         delete icon.dataset.level;
         delete icon.dataset.emergency;
@@ -491,6 +541,9 @@ var StatusBar = {
         case 'connected':
           icon.hidden = false;
 
+          if (icon.dataset.connecting) {
+            delete icon.dataset.connecting;
+          }
           var relSignalStrength =
             wifiManager.connectionInformation.relSignalStrength;
           icon.dataset.level = Math.floor(relSignalStrength / 25);
@@ -525,7 +578,7 @@ var StatusBar = {
 
     mute: function sb_updateMute() {
       this.icons.mute.hidden =
-        (this.settingValues['ring.enabled'] == true);
+        (this.settingValues['audio.volume.notification'] != 0);
     },
 
     vibration: function sb_vibration() {
@@ -594,15 +647,7 @@ var StatusBar = {
 
     systemDownloads: function sb_updatesystemDownloads() {
       var icon = this.icons.systemDownloads;
-      var animation = this.systemDownloadsAnimation;
-
-      if (this.systemDownloadsCount > 0) {
-        icon.hidden = false;
-        animation.start();
-      } else {
-        animation.stop();
-        icon.hidden = true;
-      }
+      icon.hidden = (this.systemDownloadsCount === 0);
     },
 
     callForwarding: function sb_updateCallForwarding() {
@@ -620,7 +665,8 @@ var StatusBar = {
 
   addCallListener: function sb_addCallListener() {
     var telephony = navigator.mozTelephony;
-    if (telephony) {
+    if (telephony && !this.listeningCallschanged) {
+      this.listeningCallschanged = true;
       telephony.addEventListener('callschanged', this);
     }
   },
@@ -628,6 +674,7 @@ var StatusBar = {
   removeCallListener: function sb_addCallListener() {
     var telephony = navigator.mozTelephony;
     if (telephony) {
+      this.listeningCallschanged = false;
       telephony.removeEventListener('callschanged', this);
     }
   },

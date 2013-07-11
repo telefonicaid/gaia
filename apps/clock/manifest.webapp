@@ -8,6 +8,7 @@
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
+    "storage":{},
     "alarms":{},
     "settings":{ "access": "readwrite" },
     "attention":{},
@@ -33,8 +34,8 @@
   },
   "default_locale": "en-US",
   "icons": {
-    "120": "/style/icons/Clock.png",
-    "60": "/style/icons/60/Clock.png"
+    "60": "/style/icons/60/Clock.png",
+    "120": "/style/icons/Clock.png"
   },
   "orientation": "portrait-primary",
   "messages": [
