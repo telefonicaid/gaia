@@ -57,7 +57,6 @@ window.addEventListener('load', function() {
   });
 });
 
-
 //
 // This function is invoked with a view activity for MIME type
 // application/vnd.oma.dd+xml and activity.source.data.url set to the
@@ -72,6 +71,64 @@ function view(activity) {
   var isImage = false;  // These are also set by checkType()
   var isAudio = false;
   var installType;      // Wallpaper, ringtone or song.
+  var isDescriptor = true; // To acommodate direct download without a descriptor
+
+  function getDescriptorName(aUri) {
+    var name = '';
+    if (aUri) {
+      name = aUri.split('/').pop();
+      // Slice off the .dm suffix
+      if (name.endsWith('.dm')) {
+        name = name.slice(0, -3);
+      }
+      if (name.length > 18) {
+        name = name.substring(0, 15) + '...';
+      }
+    }
+    return name;
+  }
+
+  function parseType(aType) {
+    var isOk = true;
+    if (aType in SupportedImageTypes) {
+      mimeType = aType;
+      isImage = true;
+    } else if (aType in SupportedAudioTypes) {
+      mimeType = aType;
+      isAudio = true;
+    } else {
+      reportError(DOWNLOAD_ERROR, ERR_UNSUPPORTED_TYPE,
+                  OMADownloadStatus.NON_ACCEPTABLE_CONTENT,
+                  aType);
+      isOk = false;
+    }
+    return isOk;
+  }
+
+  function confirmOrPreview(aNextImage, aNextAudio, aIgnoreIsDescriptor) {
+    if (isImage) {
+      installType = WALLPAPER;
+      aNextImage();
+    } else {
+      if (!isDescriptor || aIgnoreIsDescriptor) {
+        showDialog({
+          message: _('ringtone-or-song-query'),
+          okText: _('ringtone-response'),
+          cancelText: _('song-response'),
+          okCallback: function() {
+            installType = RINGTONE;
+            aNextAudio();
+          },
+          cancelCallback: function() {
+            installType = SONG;
+            aNextAudio();
+          }
+        });
+      } else {
+        aNextAudio();
+      }
+    }
+  }
 
   function reportError(type, errorID, downloadStatus, details) {
     // Report to the console
@@ -121,21 +178,17 @@ function view(activity) {
       if (callback) {
         xhr.onloadend = function() { callback(); };
       }
-    }
-    else if (callback) {
+    } else if (callback) {
       callback();
     }
   }
-
-  // We start by downloading the url passed with the activity request
-  downloadDescriptor(activity.source.data.url);
 
   // Step 1: download the download descriptor
   function downloadDescriptor(descriptorURL) {
     debug('Step 1: downloading descriptor from', descriptorURL);
     var xhr = new XMLHttpRequest(systemXHR);
     xhr.open('GET', descriptorURL);
-    xhr.responseType = 'document';     // Parse it as an XML document
+    xhr.responseType = 'document'; // Parse it as an XML document
     xhr.send();
 
     xhr.onerror = function(e) {
@@ -173,8 +226,9 @@ function view(activity) {
     // A utility function for parsing the rest of the descriptor
     function get(tag) {
       var elts = document.getElementsByTagName(tag);
-      if (elts && elts.length)
+      if (elts && elts.length) {
         descriptor[tag] = elts[0].textContent.trim();
+      }
     }
 
     // Get the other properties, ignoring nextURL, infoURL, iconURI,
@@ -191,8 +245,7 @@ function view(activity) {
 
     // If any of the required attributes are missing, then report an error
     if (!descriptor.types || descriptor.types.length === 0 ||
-        !descriptor.size || !descriptor.objectURI)
-    {
+        !descriptor.size || !descriptor.objectURI) {
       reportError(DOWNLOAD_ERROR, ERR_BAD_DESCRIPTOR,
                   OMADownloadStatus.INVALID_DESCRIPTOR);
       return;
@@ -209,9 +262,7 @@ function view(activity) {
 
     // If the descriptor did not include a name, derive one from the URL
     if (!descriptor.name) {
-      descriptor.name = descriptor.objectURI.split('/').pop();
-      if (descriptor.name.endsWith('.dm'))  // Slice off the .dm suffix
-        descriptor.name = descriptor.name.slice(0, -3);
+      descriptor.name = getDescriptorName(descriptor.objectURI);
     }
 
     // If the version number is too large, abort
@@ -232,7 +283,7 @@ function view(activity) {
     var types = descriptor.types;
 
     for (var i = 0; i < types.length; i++) {
-      var type = types[i];
+      var type = removeBoundary(types[i]);
 
       if (type === 'application/vnd.oma.drm.message') {
         // This type just indicates that the download will be a multi-part
@@ -241,22 +292,9 @@ function view(activity) {
         continue;
       }
 
-      if (type in SupportedImageTypes) {
-        mimeType = type;
-        isImage = true;
-        continue;
+      if (!parseType(type)) {
+        return;
       }
-
-      if (type in SupportedAudioTypes) {
-        mimeType = type;
-        isAudio = true;
-        continue;
-      }
-
-      reportError(DOWNLOAD_ERROR, ERR_UNSUPPORTED_TYPE,
-                  OMADownloadStatus.NON_ACCEPTABLE_CONTENT,
-                  type);
-      return;
     }
 
     // We expect one media type plus one option DRM message ".dm" MIME
@@ -274,25 +312,7 @@ function view(activity) {
     // If this is an image, then we know we're downloading wallpaper
     // and can move on to the confirmation screen. For audio, we need
     // to ask the user if they want a ringtone or a song
-    if (isImage) {
-      installType = WALLPAPER;
-      confirmDownload();
-    }
-    else {
-      showDialog({
-        message: _('ringtone-or-song-query'),
-        okText: _('ringtone-response'),
-        cancelText: _('song-response'),
-        okCallback: function() {
-          installType = RINGTONE;
-          confirmDownload();
-        },
-        cancelCallback: function() {
-          installType = SONG;
-          confirmDownload();
-        }
-      });
-    }
+    confirmOrPreview(confirmDownload, confirmDownload, true);
   }
 
   // Step 4: Let the user confirm or cancel the download
@@ -346,11 +366,16 @@ function view(activity) {
   function displayDownloadProgress() {
     debug('Step 5: download content and display progress');
 
-    // Change the dialog title from Download? to Downloading...
-    var titleElement = $('download-confirmation-title');
-    titleElement.textContent = _('downloading-' + installType);
+    var titleElement;
+    if (!isDescriptor) {
+      titleElement = $('direct-download-confirmation-title');
+      titleElement.textContent = _('download-progress-title');
+      $('direct-download').hidden = false;
+    }
 
-    // Set the progress parameters and show the bar
+    // Change the dialog title from Download? to Downloading...
+    titleElement = $('download-confirmation-title');
+    titleElement.textContent = _('downloading-' + installType);
     var bar = $('download-progress');
     bar.style.visibility = 'visible';
     bar.value = 0;
@@ -372,6 +397,7 @@ function view(activity) {
     // It only happens sometimes. A caching thing? A bug in gecko?
     // There is no response body when this happends
     download.onerror = function() {
+      $('download-confirmation').hidden = true;
       reportError(DOWNLOAD_ERROR, ERR_CONTENT_DOWNLOAD_FAILED,
                   OMADownloadStatus.LOADER_ERROR,
                   download.status + ' ' + download.statusText);
@@ -380,6 +406,7 @@ function view(activity) {
     download.onload = function() {
       // We're done downloading, so we can't cancel it anymore
       $('download-cancel').disabled = true;
+      $('download-confirmation').hidden = true;
 
       // Move on to step 6
       extractContent(download.getResponseHeader('Content-Type'),
@@ -395,11 +422,13 @@ function view(activity) {
 
   // Step 6: extract the downloaded content from the array buffer
   function extractContent(type, buffer) {
+    type = removeBoundary(type);
     debug('Step 6a: extractContent', type, buffer.byteLength);
 
     if (type !== 'application/vnd.oma.drm.message') {
       // In this case, we already have the content and don't need to
       // extract anything. Move on to step 7
+      descriptor.types.pop(type);
       previewContent(type, buffer);
       return;
     }
@@ -418,21 +447,24 @@ function view(activity) {
     dataString = dataString.trim();
 
     function malformed(why) {
-      if (why)
+      if (why) {
         debug('malformed drm message:', why);
+      }
       reportError(DOWNLOAD_ERROR, ERR_BAD_DRM_MESSAGE,
                   OMADownloadStatus.ATTRIBUTE_MISMATCH);
     }
 
     // The last two characters should be "--". If they are not, then
     // the content is malformed
-    if (dataString.slice(-2).toString() !== '--')
+    if (dataString.slice(-2).toString() !== '--') {
       return malformed('missing trailing --');
+    }
 
     // Find the last newline.
     var end = dataString.lastIndexOf('\r\n');
-    if (end === -1)
+    if (end === -1) {
       return malformed('missing final \r\n');
+    }
 
     // The boundary string begins right after that newline
     var boundaryString = dataString.slice(end + 2, -2).toString() + '\r\n';
@@ -444,18 +476,21 @@ function view(activity) {
     // the content headers
     var headerStart =
       dataString.indexOf(boundaryString) + boundaryString.length;
-    if (headerStart === -1)
+    if (headerStart === -1) {
       return malformed('missing boundary string at start');
+    }
 
     // If there are any more occurrances of the boundary string then
     // this is probably a .dm object for "combined delivery" and we
     // must reject it since we support only forward lock.
-    if (dataString.indexOf(boundaryString, headerStart) !== -1)
+    if (dataString.indexOf(boundaryString, headerStart) !== -1) {
       return malformed('more than one part');
+    }
 
     var contentStart = dataString.indexOf('\r\n\r\n', headerStart);
-    if (contentStart === -1)
+    if (contentStart === -1) {
       return malformed('missing header separator');
+    }
 
     var headers = dataString.slice(headerStart,
                                    contentStart).toString().split('\r\n');
@@ -472,8 +507,9 @@ function view(activity) {
       }
     }
 
-    if (!contentType)
+    if (!contentType) {
       return malformed('no content-type header found in first part');
+    }
 
     debug('Found content in drm message file', contentType, content.length);
     previewContent(contentType, content.toArrayBuffer());
@@ -484,21 +520,21 @@ function view(activity) {
     // If the content we found in the DRM message (.dm) file has a different
     // Content-Type than what we were expecting based on the .dd file
     // report an error.
-    if (type !== mimeType) {
-      reportError(DOWNLOAD_ERROR, ERR_BAD_DRM_MESSAGE,
-                  OMADownloadStatus.ATTRIBUTE_MISMATCH);
-      return;
+    // CHANGED TO SUPPORT non-Descriptor
+    if (!isDescriptor) {
+      if (!parseType(removeBoundary(type))) {
+        return;
+      }
+    } else {
+      if (type !== mimeType) {
+        reportError(DOWNLOAD_ERROR, ERR_BAD_DRM_MESSAGE,
+                    OMADownloadStatus.ATTRIBUTE_MISMATCH);
+        return;
+      }
     }
 
-    switch (installType) {
-    case SONG:
-    case RINGTONE:
-      previewAudio(type, bytes);
-      return;
-    case WALLPAPER:
-      previewImage(type, bytes);
-      return;
-    }
+    confirmOrPreview(previewImage.bind(undefined, type, bytes),
+                     previewAudio.bind(undefined, type, bytes), false);
   }
 
   function previewImage(type, bytes) {
@@ -623,7 +659,7 @@ function view(activity) {
       });
       debug('encrypted song');
 
-      getStorageIfAvailable('music', descriptor.size,
+      getStorageIfAvailable('music', blob.size,
                             storageSuccess, storageError);
 
       function storageError(err) {
@@ -631,12 +667,10 @@ function view(activity) {
         if (err === 'unavailable') {
           reportError(INSTALL_ERROR, ERR_NO_SDCARD,
                       OMADownloadStatus.INSUFFICIENT_MEMORY);
-        }
-        else if (err === 'shared') {
+        } else if (err === 'shared') {
           reportError(INSTALL_ERROR, ERR_SDCARD_IN_USE,
                       OMADownloadStatus.INSUFFICIENT_MEMORY);
-        }
-        else {
+        } else {
           reportError(INSTALL_ERROR, ERR_NO_SPACE,
                       OMADownloadStatus.INSUFFICIENT_MEMORY, err);
         }
@@ -695,8 +729,9 @@ function view(activity) {
 
       req.onsuccess = function() {
         // Report that we've successfully saved the media.
-        sendStatus(OMADownloadStatus.SUCCESS);
-
+        if (isDescriptor) {
+          sendStatus(OMADownloadStatus.SUCCESS);
+        }
         // Install this blob as the default ringtone or wallpaper
         // We assume that if the user is downloading this media they
         // want to use it right away. Otherwise we could put a checkbox
@@ -728,5 +763,30 @@ function view(activity) {
         };
       };
     });
+  }
+
+  // Removes the extra information from a type
+  function removeBoundary(type) {
+    return (type.split(';'))[0];
+  }
+
+  //We start the proccess
+  // First a little bit of cleanup. Sometimes we get a content-type like
+  // Content-type: a/type; boundary=somethingelse
+  // And we don't really want anything after the ;
+  var activityType = activity.source && activity.source.data &&
+                       activity.source.data.type;
+  if (removeBoundary(activityType) === 'application/vnd.oma.drm.message') {
+    isDescriptor = false;
+    var url = activity.source.data.url || '';
+    descriptor.name = getDescriptorName(url);
+    descriptor.size = 0;
+    descriptor.objectURI = url;
+    descriptor.types = ['application/vnd.oma.drm.message'];
+
+    displayDownloadProgress();
+  } else {
+    // We start by downloading the url passed with the activity request
+    downloadDescriptor(activity.source.data.url);
   }
 }
