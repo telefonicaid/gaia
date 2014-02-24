@@ -100,9 +100,12 @@ var Navigation = {
         // Try to send Newsletter here
         UIManager.sendNewsletter(function newsletterSent(result) {
           if (result) { // sending process ok, we advance
-            UIManager.activationScreen.classList.remove('show');
-            UIManager.finishScreen.classList.add('show');
-            Tutorial.init();
+            // We try to send the silent sms
+            self.sendDataSms(function sent() {
+              UIManager.activationScreen.classList.remove('show');
+              UIManager.finishScreen.classList.add('show');
+              Tutorial.init();
+            });
           } else { // error on sending, we stay where we are
             self.currentStep--;
           }
@@ -112,6 +115,15 @@ var Navigation = {
       self.manageStep();
     };
     goToStepForward();
+  },
+
+  // send activation sms
+  sendDataSms: function n_sendDataSms(callback) {
+    LazyLoader.load(['/ftu/js/silentSms.js'],
+      function loaded() {
+        SilentSMS.send(callback);
+      }
+    );
   },
 
   handleExternalLinksClick: function n_handleExternalLinksClick(e) {
