@@ -12,10 +12,12 @@ requireApp('communications/ftu/test/unit/mock_ui_manager.js');
 requireApp('communications/ftu/test/unit/mock_tutorial.js');
 requireApp('communications/ftu/test/unit/mock_wifi_manager.js');
 requireApp('communications/ftu/test/unit/mock_utils.js');
+requireApp('communications/ftu/test/unit/mock_silent_sms.js');
 requireApp('communications/ftu/test/unit/mock_operatorVariant.js');
 requireApp(
     'communications/ftu/test/unit/mock_navigator_moz_mobile_connection.js');
 
+require('/shared/test/unit/mocks/mock_lazy_loader.js');
 requireApp('communications/shared/test/unit/mocks/mock_icc_helper.js');
 requireApp(
     'communications/shared/test/unit/mocks/mock_navigator_moz_settings.js');
@@ -36,7 +38,9 @@ var mocksHelperForNavigation = new MocksHelper([
   'SdManager',
   'ImportIntegration',
   'WifiManager',
-  'WifiUI'
+  'WifiUI',
+  'LazyLoader',
+  'SilentSMS'
 ]).init();
 
 suite('navigation >', function() {

@@ -74,6 +74,7 @@
     "voicemail":{},
     "contacts":{ "access": "readwrite" },
     "mobileconnection":{},
+    "sms": {},
     "attention":{},
     "settings":{ "access": "readwrite" },
     "desktop-notification":{},
