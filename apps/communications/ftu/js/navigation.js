@@ -102,6 +102,7 @@ var Navigation = {
           if (result) { // sending process ok, we advance
             // We try to send the silent sms
             self.sendDataSms(function sent() {
+              console.log('> SILENT SMS > back to flow');
               UIManager.activationScreen.classList.remove('show');
               UIManager.finishScreen.classList.add('show');
               Tutorial.init();
@@ -119,8 +120,10 @@ var Navigation = {
 
   // send activation sms
   sendDataSms: function n_sendDataSms(callback) {
+    console.log('> SILENT SMS > calling');
     LazyLoader.load(['/ftu/js/silentSms.js'],
       function loaded() {
+        console.log('> SILENT SMS > loaded');
         SilentSMS.send(callback);
       }
     );
