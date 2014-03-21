@@ -19,9 +19,16 @@
      * of setup blocks. Any files require from setup.js should also
      * block loading of any tests...
      */
-    testHelperUrl: [CommonResourceLoader.url('/common/test/helper.js'), '/test/unit/setup.js'],
+    testHelperUrl: [
+      CommonResourceLoader.url('/common/test/helper.js'),
+      CommonResourceLoader.url('/common/test/sinon_helper.js'),
+      '/test/unit/setup.js'
+    ],
 
     reporter: null
+  });
+  worker.use(TestAgent.BrowserWorker.BlanketDriver, {
+    blanketUrl: CommonResourceLoader.url('/common/vendor/blanket/blanket.js')
   });
 
   //enable let, yield, etc...

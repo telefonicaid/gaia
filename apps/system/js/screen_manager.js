@@ -13,6 +13,11 @@ var ScreenManager = {
    */
   screenEnabled: false,
 
+  /**
+   * If user is unlocking, postpone the timeout counter.
+   */
+  _unlocking: false,
+
   /*
    * before idle-screen-off, invoke a nice dimming to the brightness
    * to notify the user that the screen is about to be turn off.
@@ -73,7 +78,7 @@ var ScreenManager = {
    * When brightening or dimming the screen, this is how much we adjust
    * the brightness value at a time.
    */
-  BRIGHTNESS_ADJUST_STEP: 0.04,
+  BRIGHTNESS_ADJUST_STEP: 0.01,
 
   /*
    * Wait for _dimNotice milliseconds during idle-screen-off
@@ -87,10 +92,9 @@ var ScreenManager = {
   _idleTimerId: 0,
 
   /*
-   * If the screen off is triggered by promixity during phon call then
-   * we need wake it up while phone is ended.
+   * To track the reason caused screen off?
    */
-  _screenOffByProximity: false,
+  _screenOffBy: null,
 
   /*
    * Request wakelock during in_call state.
@@ -102,6 +106,11 @@ var ScreenManager = {
   init: function scm_init() {
     window.addEventListener('sleep', this);
     window.addEventListener('wake', this);
+    window.addEventListener('requestshutdown', this);
+
+    // User is unlocking by sliding or other methods.
+    window.addEventListener('unlocking-start', this);
+    window.addEventListener('unlocking-stop', this);
 
     this.screen = document.getElementById('screen');
 
@@ -110,20 +119,16 @@ var ScreenManager = {
 
     if (power) {
       power.addWakeLockListener(function scm_handleWakeLock(topic, state) {
-        switch (topic) {
-          case 'screen':
-            self._screenWakeLocked = (state == 'locked-foreground');
+        if (topic == 'screen') {
+          self._screenWakeLocked = (state == 'locked-foreground');
 
-            if (self._screenWakeLocked)
-              // Turn screen on if wake lock is acquire
-              self.turnScreenOn();
-            self._reconfigScreenTimeout();
-            break;
-
-          case 'cpu':
-            power.cpuSleepAllowed = (state != 'locked-foreground' &&
-                                     state != 'locked-background');
-            break;
+          if (self._screenWakeLocked)
+            // Turn screen on if wake lock is acquire
+            self.turnScreenOn();
+          self._reconfigScreenTimeout();
+        } else if (topic == 'cpu') {
+          power.cpuSleepAllowed = (state != 'locked-foreground' &&
+                                    state != 'locked-background');
         }
       });
     }
@@ -199,17 +204,36 @@ var ScreenManager = {
         break;
 
       case 'sleep':
-        this.turnScreenOff(true);
+        this.turnScreenOff(true, 'powerkey');
         break;
 
       case 'wake':
         this.turnScreenOn();
         break;
 
+      case 'unlocking-start':
+        this._setUnlocking();
+        break;
+
+      case 'unlocking-stop':
+        this._resetUnlocking();
+        break;
+
       case 'userproximity':
-        this._screenOffByProximity = evt.near;
+        var telephony = window.navigator.mozTelephony;
+        if (Bluetooth.isProfileConnected(Bluetooth.Profiles.SCO) ||
+            telephony.speakerEnabled ||
+            StatusBar.headphonesActive) {
+            // XXX: Remove this hack in Bug 868348
+            // We shouldn't access headset status from statusbar.
+          if (this._screenOffBy == 'proximity') {
+            this.turnScreenOn();
+          }
+          break;
+        }
+
         if (evt.near) {
-          this.turnScreenOff(true);
+          this.turnScreenOff(true, 'proximity');
         } else {
           this.turnScreenOn();
         }
@@ -217,13 +241,15 @@ var ScreenManager = {
 
       case 'callschanged':
         var telephony = window.navigator.mozTelephony;
-        if (!telephony.calls.length) {
-          if (this._screenOffByProximity) {
+        if (!telephony.calls.length &&
+            !(telephony.conferenceGroup &&
+              telephony.conferenceGroup.calls.length)) {
+
+          if (this._screenOffBy == 'proximity') {
             this.turnScreenOn();
           }
 
           window.removeEventListener('userproximity', this);
-          this._screenOffByProximity = false;
 
           if (this._cpuWakeLock) {
            this._cpuWakeLock.unlock();
@@ -233,11 +259,11 @@ var ScreenManager = {
         }
 
         // If the _cpuWakeLock is already set we are in a multiple
-        // call setup, turning the screen on to let user see the
-        // notification.
+        // call setup, the user will be notified by a tone.
         if (this._cpuWakeLock) {
-          this.turnScreenOn();
-
+          // In case of user making an extra call, the attention screen
+          // may be hidden at top so we need to confirm it's shown again.
+          AttentionScreen.show();
           break;
         }
 
@@ -249,41 +275,59 @@ var ScreenManager = {
 
       case 'statechange':
         var call = evt.target;
-        if (call.state !== 'connected') {
+        if (call.state !== 'connected' && call.state !== 'alerting') {
           break;
         }
 
-        // The call is connected. Remove the statechange listener
-        // and enable the user proximity sensor.
+        // The call is connected (MT call) or alerting (MO call).
+        // Remove the statechange listener and enable the user proximity
+        // sensor.
         call.removeEventListener('statechange', this);
 
         this._cpuWakeLock = navigator.requestWakeLock('cpu');
         window.addEventListener('userproximity', this);
+        break;
+      case 'will-unlock' :
+      case 'lockpanelchange' :
+        window.removeEventListener('will-unlock', this);
+        window.removeEventListener('lockpanelchange', this);
+        this._setIdleTimeout(this._idleTimeout, false);
+        break;
+
+      case 'requestshutdown':
+        this.turnScreenOn();
+        if (evt.detail && evt.detail.startPowerOff) {
+          evt.detail.startPowerOff(false);
+        }
         break;
     }
   },
 
   toggleScreen: function scm_toggleScreen() {
     if (this.screenEnabled) {
-      this.turnScreenOff();
+      // Currently there is no one used toggleScreen, so just set reason as
+      // toggle. If it is used by someone in the future, we can rename it.
+      this.turnScreenOff(true, 'toggle');
     } else {
       this.turnScreenOn();
     }
   },
 
-  turnScreenOff: function scm_turnScreenOff(instant) {
+  turnScreenOff: function scm_turnScreenOff(instant, reason) {
     if (!this.screenEnabled)
       return false;
 
     var self = this;
+    if (reason)
+      this._screenOffBy = reason;
 
     // Remember the current screen brightness. We will restore it when
     // we turn the screen back on.
     self._savedBrightness = navigator.mozPower.screenBrightness;
 
-    // Remove the cpuWakeLock if screen is not turned off by
-    // userproximity event.
-    if (!this._screenOffByProximity && this._cpuWakeLock) {
+    // Remove the cpuWakeLock and listening of proximity event, if screen is
+    // turned off by power key.
+    if (this._cpuWakeLock != null && this._screenOffBy == 'powerkey') {
       window.removeEventListener('userproximity', this);
       this._cpuWakeLock.unlock();
       this._cpuWakeLock = null;
@@ -292,8 +336,11 @@ var ScreenManager = {
     var screenOff = function scm_screenOff() {
       self._setIdleTimeout(0);
 
-      window.removeEventListener('devicelight', self);
+      if (self._deviceLightEnabled)
+        window.removeEventListener('devicelight', self);
 
+      window.removeEventListener('will-unlock', self);
+      window.removeEventListener('lockpanelchange', self);
       self.screenEnabled = false;
       self._inTransition = false;
       self.screen.classList.add('screenoff');
@@ -314,9 +361,7 @@ var ScreenManager = {
     };
 
     if (instant) {
-      if (!WindowManager.isFtuRunning()) {
-        screenOff();
-      }
+      screenOff();
       return true;
     }
 
@@ -346,18 +391,25 @@ var ScreenManager = {
     // Set the brightness before the screen is on.
     this.setScreenBrightness(this._savedBrightness, instant);
 
-    // If we are in a call and there is no cpuWakeLock,
-    // we would have to get one here.
+    // If we are in a call  or a conference call and there
+    // is no cpuWakeLock, we would get one here.
     var telephony = window.navigator.mozTelephony;
-    if (!this._cpuWakeLock && telephony && telephony.calls.length) {
-      telephony.calls.some(function checkCallConnection(call) {
+    var ongoingConference = telephony && telephony.conferenceGroup &&
+        telephony.conferenceGroup.calls.length;
+    if (!this._cpuWakeLock && telephony &&
+        (telephony.calls.length || ongoingConference)) {
+
+      var connected = telephony.calls.some(function checkCallConnection(call) {
         if (call.state == 'connected') {
-          this._cpuWakeLock = navigator.requestWakeLock('cpu');
-          window.addEventListener('userproximity', this);
           return true;
         }
         return false;
-      }, this);
+      });
+
+      if (connected || ongoingConference) {
+        this._cpuWakeLock = navigator.requestWakeLock('cpu');
+        window.addEventListener('userproximity', this);
+      }
     }
 
     // Actually turn the screen on.
@@ -379,26 +431,45 @@ var ScreenManager = {
   },
 
   _reconfigScreenTimeout: function scm_reconfigScreenTimeout() {
-    // Remove idle timer if screen wake lock is acquired.
-    if (this._screenWakeLocked) {
+    // Remove idle timer if screen wake lock is acquired or
+    // if no app has been displayed yet.
+    if (this._screenWakeLocked || typeof(AppWindowManager) !== 'object' ||
+        !AppWindowManager.getDisplayedApp()) {
       this._setIdleTimeout(0);
     // The screen should be turn off with shorter timeout if
     // it was never unlocked.
-    } else if (LockScreen.locked) {
-      this._setIdleTimeout(10, true);
-      var self = this;
-      var stopShortIdleTimeout = function scm_stopShortIdleTimeout() {
-        window.removeEventListener('unlock', stopShortIdleTimeout);
-        window.removeEventListener('lockpanelchange', stopShortIdleTimeout);
-        self._setIdleTimeout(self._idleTimeout, false);
-      };
-
-      window.addEventListener('unlock', stopShortIdleTimeout);
-      window.addEventListener('lockpanelchange', stopShortIdleTimeout);
-    } else {
-      this._setIdleTimeout(this._idleTimeout, false);
+    } else if (!this._unlocking) {
+      if (window.lockScreen && window.lockScreen.locked) {
+        this._setIdleTimeout(10, true);
+        window.addEventListener('will-unlock', this);
+        window.addEventListener('lockpanelchange', this);
+      } else {
+        this._setIdleTimeout(this._idleTimeout, false);
+      }
     }
   },
+
+  /**
+   * If user is unlocking, postpone the timeout counter.
+   *
+   * @this {ScreenManager}
+   */
+  _setUnlocking: function scm_setUnlocking() {
+      this._unlocking = true;
+
+      // Need to cancel it: the last set timeout would still be triggered.
+      window.clearIdleTimeout(this._idleTimerId);
+   },
+
+  /**
+   * Reset the state of user unlocking.
+   *
+   * @this {ScreenManager}
+   */
+  _resetUnlocking: function scm_resetUnlocking() {
+      this._unlocking = false;
+      this._reconfigScreenTimeout();
+   },
 
   setScreenBrightness: function scm_setScreenBrightness(brightness, instant) {
     this._targetBrightness = brightness;
@@ -482,7 +553,7 @@ var ScreenManager = {
 
     var self = this;
     var idleCallback = function idle_proxy() {
-      self.turnScreenOff(instant);
+      self.turnScreenOff(instant, 'idle_timeout');
     };
     var activeCallback = function active_proxy() {
       self.turnScreenOn(true);
@@ -493,9 +564,14 @@ var ScreenManager = {
   },
 
   fireScreenChangeEvent: function scm_fireScreenChangeEvent() {
+    var detail = { screenEnabled: this.screenEnabled };
+
+    // Tell others the cause of screen-off.
+    detail.screenOffBy = this._screenOffBy;
+
     var evt = new CustomEvent('screenchange',
       { bubbles: true, cancelable: false,
-        detail: { screenEnabled: this.screenEnabled } });
+        detail: detail });
     window.dispatchEvent(evt);
   }
 };

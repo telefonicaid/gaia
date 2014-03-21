@@ -1,11 +1,22 @@
-html, body {
+html {
+  font-size: 10px;
+}
+
+html,body {
   width: 100%;
   height: 100%;
   overflow: hidden;
   margin: 0;
   color: white;
-  font-family: 'MozTT', sans-serif;
-  font-size: 10px;
+  background-color: black;
+}
+
+#call-log-view > div {
+  background-color: white;
+}
+
+.font-light {
+  font-weight: 300;
 }
 
 a {
@@ -62,16 +73,19 @@ body.hidden *[data-l10n-id] {
 
 /* Structure for toolbar*/
 
-.icon-recents:after {
-  background-image: url("images/recents.png") !important;
+.icon-recents {
+  background-image: url("images/recents.png");
+  background-size: 3rem;
 }
 
-.icon-contacts:after {
-  background-image: url("images/contacts.png") !important;
+.icon-contacts {
+  background-image: url("images/contacts.png");
+  background-size: 3rem;
 }
 
-.icon-keypad:after {
-  background-image: url("images/dialpad.png") !important;
+.icon-keypad {
+  background-image: url("images/dialpad.png");
+  background-size: 3rem;
 }
 
 .with-keyboard #views, .with-keyboard #contacts-view,
@@ -79,20 +93,80 @@ body.hidden *[data-l10n-id] {
   height: 100% !important;
 }
 
-.with-keyboard [role="tablist"] [role="tab"] > a{
+.with-keyboard [role="tablist"] [role="tab"] > a,
+.with-keyboard [role="tablist"] [role="tab"]:before {
   display: none;
 }
 
 /* Making lazy loading look nice */
-#iframe-contacts,
+#contacts-view [role="tabpanel"],
 #recents-view.hidden [role="tabpanel"] {
-  background-image: url(/shared/style/headers/images/ui/header.png),
-                    url(/shared/style/headers/images/ui/shadow.png);
-  background-repeat: repeat-x;
-  background-position: 0 0, 0 5rem;
-  background-size: 100% 5rem, 100% 0.3rem;
+  background-color: white;
+}
+
+#contacts-view [role="tabpanel"]:before,
+#recents-view.hidden [role="tabpanel"]:before {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 5rem;
+
+  background-color: #F97C17;
+  content: "";
+}
+
+#iframe-contacts-container {
+  overflow: hidden;
+}
+
+#iframe-contacts {
+  position: absolute;
 }
 
 #recents-view.hidden [role="tabpanel"] section {
-  visibility: hidden;
+  display:none;
+}
+
+.no-opacity {
+  opacity: 0 !important;
+}
+
+/* For showing/hiding navbar */
+#views:before {
+  transform: translateX(0);
+  transition: 0.4s transform 0.4s;
+}
+
+#views.hide-toolbar:before {
+  transform: translateX(100%);
+}
+
+article[role="tab"]:before,
+article[role="tab"] > .icon {
+  transform: translateY(0%);
+  z-index: 2;
+  transition: 0.5s transform 0.5s;
+}
+
+#views.hide-toolbar > article[role="tab"]:before,
+#views.hide-toolbar > article[role="tab"] > .icon {
+  transform: translateY(100%);
+  pointer-events: none;
+}
+
+#views.hide-toolbar #iframe-contacts-container {
+  height: 100%;
+}
+
+#views.hide-toolbar > article[role="tab"] > .icon {
+  pointer-events: all;
+}
+
+#views [role="tabpanel"] {
+  pointer-events: all;
+  transition: 0s height 0.5s;
+}
+
+#contacts-view [role="tabpanel"] {
+  height: calc(100% - 4.5rem);
 }

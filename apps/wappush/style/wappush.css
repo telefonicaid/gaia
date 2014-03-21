@@ -1,0 +1,43 @@
+html {
+  font-size: 10px;
+}
+
+html,body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+  color: white;
+}
+
+[role=main] {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: white;
+  color: black;
+  z-index: 1;
+}
+
+#si-sl-screen {
+  height: -moz-calc(100% - 5rem - 5rem);
+  overflow: auto;
+}
+
+#si-sl-screen .message {
+  font-size: 2rem;
+  padding: 1rem;
+  white-space: pre-line;
+  word-wrap: break-word;
+}
+
+#cp-screen .message {
+  color: #000;
+  padding: 2rem 1.5rem;
+}
+
+#cp-screen .message p {
+  margin: 0 0 2rem;
+  font-size: 1.5rem;
+  line-height: 1.8rem;
+}

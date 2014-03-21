@@ -16,6 +16,7 @@ Calendar.ns('Controllers').Time = (function() {
 
     this._timespans = [];
     this._collection = new Calendar.IntervalTree();
+    this._collection.createIndex('eventId');
 
     this.busytime = app.store('Busytime');
   }
@@ -512,6 +513,7 @@ Calendar.ns('Controllers').Time = (function() {
      */
     removeCachedBusytime: function(id) {
       var collection = this._collection;
+
       if (id in collection.byId) {
         var busytime = collection.byId[id];
         var start = busytime.startDate;
@@ -533,10 +535,20 @@ Calendar.ns('Controllers').Time = (function() {
 
     /**
      * Remove a single event from the cache by its id.
+     * Also will clear any associated busytime record.
      *
      * @param {String} id of object to remove from cache.
      */
     removeCachedEvent: function(id) {
+      // purge any busytimes related to this event
+      var busytimes = this._collection.index('eventId', id);
+      if (busytimes) {
+        busytimes.forEach(function(busytime) {
+          this.removeCachedBusytime(busytime._id);
+        }, this);
+      }
+
+      // remove event details
       delete this._eventsCache[id];
     },
 
@@ -566,12 +578,12 @@ Calendar.ns('Controllers').Time = (function() {
       }
 
       var getEvent = true;
-      var getAlarm = false;
+      var getAlarms = false;
 
       busytimes = (Array.isArray(busytimes)) ? busytimes : [busytimes];
 
-      if (options && ('alarm' in options)) {
-        getAlarm = options.alarm;
+      if (options && ('alarms' in options)) {
+        getAlarms = options.alarms;
       }
 
       if (options && ('event' in options)) {
@@ -582,16 +594,17 @@ Calendar.ns('Controllers').Time = (function() {
       var alarmStore = this.app.store('Alarm');
       var list = [];
 
-      var stores = [];
+      // this is a readonly transaction so we can add busytimes
+      // here even though we may not use it later...
+      var stores = ['busytimes'];
 
-      if (getAlarm)
+      if (getAlarms)
         stores.push('alarms');
 
       if (getEvent)
         stores.push('events');
 
       var trans = eventStore.db.transaction(stores);
-      var self = this;
 
       trans.addEventListener('error', cb);
 
@@ -605,28 +618,30 @@ Calendar.ns('Controllers').Time = (function() {
         }
       }
 
-      // using forEach for scoping
-      // XXX: this is a hot code path needs some optimization.
-      busytimes.forEach(function(busytime, idx) {
-        if (typeof(busytime) === 'string') {
-          busytime = this._collection.byId[busytime];
-        }
+      var self = this;
 
+      /**
+       * Fetch records for a given busytime.
+       *
+       * @param {Object} busytime object.
+       * @param {Numeric} idx where to put item in array.
+       */
+      function fetchRecords(busytime, idx) {
         var result = { busytime: busytime };
         list[idx] = result;
 
-        if (getAlarm) {
+        if (getAlarms) {
           pending++;
           // its possible for more then one alarm to be present
           // for a given busytime. We are not supporting that right
           // now but in the future we may need to modify this to
           // return an array of alarms.
-          alarmStore.findByBusytimeId(busytime._id, trans,
+          alarmStore.findAllByBusytimeId(busytime._id, trans,
                                       function(err, alarm) {
 
             // unlike events we probably never want to cache alarms.
             if (alarm) {
-              result.alarm = alarm;
+              result.alarms = alarm;
             }
             next();
           });
@@ -635,8 +650,8 @@ Calendar.ns('Controllers').Time = (function() {
         if (getEvent) {
           var eventId = busytime.eventId;
 
-          if (eventId in this._eventsCache) {
-            result.event = this._eventsCache[eventId];
+          if (eventId in self._eventsCache) {
+            result.event = self._eventsCache[eventId];
           } else {
             pending++;
             eventStore.get(eventId, trans, function(err, event) {
@@ -648,6 +663,58 @@ Calendar.ns('Controllers').Time = (function() {
             });
           }
         }
+      }
+
+      function fetchBusytime(id, idx, err, record) {
+        if (!record || err) {
+          console.log('Error finding busytime', id, err);
+          return next();
+        }
+
+        // cache the busytime when it is not found...
+        // Even if the busytime is _way_ out of range later
+        // we still will clean it up when we get far enough
+        // out of its starting time...
+        self.cacheBusytime(record);
+
+        fetchRecords(record, idx);
+
+        // next will decrement the pending counter and return
+        // if there are no more pending items... We must call
+        // this here to avoid race conditions in the case where
+        // all but one busytime is uncached (which is common).
+        next();
+      }
+
+      // using forEach for scoping
+      // XXX: this is a hot code path needs some optimization.
+      busytimes.forEach(function(busytime, idx) {
+        if (typeof(busytime) === 'string') {
+
+          var record = this._collection.byId[busytime];
+
+          if (!record) {
+            console.log(
+              'Cannot find busytime by id: ', JSON.stringify(busytime)
+            );
+
+            // why pending++ ? we must add a pending item to our
+            // counter otherwise the loop may close and return prior
+            // to the busytime being fetched... later we decrement the
+            // counter in fetchBusytime.
+            pending++;
+            return this.busytime.get(
+              busytime,
+              trans,
+              fetchBusytime.bind(this, busytime, idx)
+            );
+          }
+
+          busytime = this._collection.byId[busytime];
+        }
+
+        fetchRecords(busytime, idx);
+
       }, this);
 
       // this handles the case where there

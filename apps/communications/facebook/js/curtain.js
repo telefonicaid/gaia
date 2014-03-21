@@ -6,26 +6,44 @@ var Curtain = (function() {
 
   var curtainFrame = parent.document.querySelector('#fb-curtain');
   var doc = curtainFrame.contentDocument;
-  var cancelButton = doc.querySelector('#cancel');
-  var retryButton = doc.querySelector('#retry');
 
-  var progressElement = doc.querySelector('#progressElement');
-
-  var form = doc.querySelector('form');
-
+  var cpuWakeLock, cancelButton, retryButton, okButton, progressElement, form,
+      progressTitle;
   var messages = [];
-  var elements = ['error', 'timeout', 'wait', 'message', 'progress'];
-  elements.forEach(function createElementRef(name) {
-    messages[name] = doc.getElementById(name + 'Msg');
-  });
+  var elements = ['error', 'timeout', 'wait', 'message', 'progress', 'alert'];
 
-  var progressTitle = doc.getElementById('progressTitle');
+  if (doc.readyState === 'complete') {
+    init();
+  } else {
+    // The curtain could not be loaded at this moment
+    curtainFrame.addEventListener('load', function loaded() {
+      curtainFrame.removeEventListener('load', loaded);
+      init();
+    });
+  }
 
-  var cpuWakeLock;
+  function init() {
+    cancelButton = doc.querySelector('#cancel');
+    retryButton = doc.querySelector('#retry');
+    okButton = doc.querySelector('#ok');
+
+    progressElement = doc.querySelector('#progressElement');
+
+    form = doc.querySelector('form');
+
+    elements.forEach(function createElementRef(name) {
+      messages[name] = doc.getElementById(name + 'Msg');
+    });
+
+    progressTitle = doc.getElementById('progressTitle');
+  }
 
   function doShow(type) {
+    form.classList.remove('no-menu');
     form.dataset.state = type;
     curtainFrame.classList.add('visible');
+    curtainFrame.classList.remove('fade-out');
+    curtainFrame.classList.add('fade-in');
   }
 
   function capitalize(str) {
@@ -54,12 +72,19 @@ var Curtain = (function() {
     this.setFrom = function(pfrom) {
       from = capitalize(pfrom);
       progressTitle.textContent = _('progressFB3' + from + 'Title');
-    }
+    };
 
     this.setTotal = function(ptotal) {
       total = ptotal;
       showMessage();
-    }
+    };
+
+    /**
+     *  Returns the current value
+     */
+    this.getValue = function() {
+      return counter;
+    };
   }
 
   return {
@@ -100,6 +125,7 @@ var Curtain = (function() {
           });
         break;
 
+        case 'alert':
         case 'message':
           messages[type].textContent = _(type + from);
         break;
@@ -129,10 +155,13 @@ var Curtain = (function() {
         cpuWakeLock = null;
       }
 
-      delete form.dataset.state;
-      curtainFrame.classList.remove('visible');
-      curtainFrame.addEventListener('transitionend', function tend() {
-        curtainFrame.removeEventListener('transitionend', tend);
+      curtainFrame.classList.add('fade-out');
+      curtainFrame.addEventListener('animationend', function cu_fadeOut(ev) {
+        curtainFrame.removeEventListener('animationend', cu_fadeOut);
+        curtainFrame.classList.remove('visible');
+        curtainFrame.classList.remove('fade-out');
+        curtainFrame.classList.remove('fade-in');
+        delete form.dataset.state;
         if (typeof hiddenCB === 'function') {
           hiddenCB();
         }
@@ -174,6 +203,23 @@ var Curtain = (function() {
     },
 
     /**
+     *  Allows to set a event handler that will be invoked when the user
+     *  clicks on ok button
+     *
+     *  @param {Function} okCb . Event handler.
+     *
+     */
+    set onok(okCb) {
+      if (typeof okCb === 'function') {
+        okButton.onclick = function on_ok(e) {
+          delete okButton.onclick;
+          okCb();
+          return false;
+        };
+      }
+    },
+
+    /**
      *  Returns the visibility state of the curtain
      *
      *  @return {boolean} visibility state.
@@ -181,6 +227,13 @@ var Curtain = (function() {
      */
     get visible() {
       return curtainFrame.classList.contains('visible');
+    },
+
+    /**
+     *  Hides the menu
+     */
+    hideMenu: function c_hideMenu() {
+      form.classList.add('no-menu');
     }
   };
 

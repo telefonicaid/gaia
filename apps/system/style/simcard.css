@@ -3,23 +3,37 @@
   color: #000;
 }
 
+#simpin-dialog button.back[hidden] {
+  display: none;
+}
+
 #simpin-dialog section[role="region"] {
   position: absolute;
   top: 0;
   left: 0;
   bottom: 0;
   right: 0;
+  margin-bottom: 7rem;
 }
+
 #simpin-dialog .container {
-  padding-left: 20px;
-  font-size: 1.5em;
+  position: absolute;
+  padding: 0 2rem;
+  font-size: 1.5rem;
+  height: calc(100% - 6rem);
+  width: calc(100% - 4rem);
+  overflow-y: scroll;
+}
+
+#simpin-dialog .container div {
+  white-space: normal;
 }
 
 #simpin-dialog .container > div {
-  padding-top: 10px;
+  padding-top: 1rem;
 }
 
-#errorMsg{
+#errorMsg {
   padding: 1rem;
 }
 
@@ -39,14 +53,12 @@
 }
 
 #simpin-dialog .input-wrapper input {
-  font-size: 2.0em;
+  font-size: 3rem;
   display: block;
+  width: auto;
 }
 
-#simpin-dialog .input-wrapper input[type="text"] {
-  width: auto;
-  pointer-events: none;
-  position: absolute;
-  top: 0;
+#xckArea .input-wrapper input {
+  font-size: 1.8em;
 }
 

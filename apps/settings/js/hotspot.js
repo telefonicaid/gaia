@@ -6,23 +6,47 @@
 var Hotspot = {
   init: function hotspot_init() {
     this.initHotspotPanel();
-    this.initWifiSettingDialog();
   },
 
   initHotspotPanel: function() {
     var settings = window.navigator.mozSettings;
-    var hotspotSettingBtn = document.querySelector('.hotspot-wifiSettings-btn');
-    var passwordItem = document.querySelector('#hotspot .password-item');
+    var hotspotSettingBtn =
+      document.querySelector('#hotspot-settings-section button');
+
+    function generateHotspotPassword() {
+      var words = ['amsterdam', 'ankara', 'auckland',
+                   'belfast', 'berlin', 'boston',
+                   'calgary', 'caracas', 'chicago',
+                   'dakar', 'delhi', 'dubai',
+                   'dublin', 'houston', 'jakarta',
+                   'lagos', 'lima', 'madrid',
+                   'newyork', 'osaka', 'oslo',
+                   'porto', 'santiago', 'saopaulo',
+                   'seattle', 'stockholm', 'sydney',
+                   'taipei', 'tokyo', 'toronto'];
+      var password = words[Math.floor(Math.random() * words.length)];
+      for (var i = 0; i < 4; i++) {
+        password += Math.floor(Math.random() * 10);
+      }
+      return password;
+    }
+
+    var lock = settings.createLock();
+    var req = lock.get('tethering.wifi.security.password');
+    req.onsuccess = function onThetheringPasswordSuccess() {
+      var pwd = req.result['tethering.wifi.security.password'];
+      if (!pwd) {
+        pwd = generateHotspotPassword();
+        lock.set({ 'tethering.wifi.security.password': pwd });
+      }
+    };
 
     function setHotspotSettingsEnabled(enabled) {
       // disable the setting button when internet sharing is enabled
       hotspotSettingBtn.disabled = enabled;
     }
-    function updatePasswordItemVisibility(securityType) {
-      passwordItem.hidden = (securityType == 'open');
-    }
 
-    // tehering enabled
+    // tethering enabled
     settings.addObserver('tethering.wifi.enabled', function(event) {
       setHotspotSettingsEnabled(event.settingValue);
     });
@@ -36,127 +60,18 @@ var Hotspot = {
       );
     };
 
-    // security type
-    settings.addObserver('tethering.wifi.security.type', function(event) {
-      updatePasswordItemVisibility(event.settingValue);
-    });
-
-    var reqSecurityType =
-      settings.createLock().get('tethering.wifi.security.type');
-
-    reqSecurityType.onsuccess = function dt_getStatusSuccess() {
-      updatePasswordItemVisibility(
-        reqSecurityType.result['tethering.wifi.security.type']
-      );
-    };
-
     hotspotSettingBtn.addEventListener('click',
-      this.openWifiSettingDialog.bind(this));
-  },
+      openDialog.bind(window, 'hotspot-wifiSettings'));
 
-  initWifiSettingDialog: function() {
-    var settings = window.navigator.mozSettings;
-
-    var wifiSettingsSection = document.getElementById('hotspot-wifiSettings');
-    var securityTypeSelector =
-      wifiSettingsSection.querySelector('.security-selector');
-    var passwordItem = wifiSettingsSection.querySelector('.password-item');
-    var passwordInput = passwordItem.querySelector('input');
-    var submitBtn = wifiSettingsSection.querySelector('button[type="submit"]');
-
-    function updatePasswordItemVisibility(securityType) {
-      passwordItem.hidden = (securityType === 'open');
-    }
-
-    function updateSubmitButtonState(securityType, pwdLength) {
-      submitBtn.disabled =
-        (pwdLength < 8 || pwdLength > 63) && (securityType !== 'open');
-    }
-
-    securityTypeSelector.addEventListener('change', function(event) {
-      updatePasswordItemVisibility(this.value);
-      updateSubmitButtonState(this.value, passwordInput.value.length);
-    });
-
-    passwordInput.addEventListener('input', function(event) {
-      updateSubmitButtonState(securityTypeSelector.value, this.value.length);
-    });
-  },
-
-  openWifiSettingDialog: function() {
-    var settings = window.navigator.mozSettings;
-
-    var dialogID = 'hotspot-wifiSettings';
-    var dialog = document.getElementById(dialogID);
-    var fields =
-        dialog.querySelectorAll('[data-setting]:not([data-ignore])');
-    var securityTypeSelector =
-      document.querySelector('#hotspot-wifiSettings .security-selector');
-    var passwordItem =
-      document.querySelector('#hotspot-wifiSettings .password-item');
-
-    function updatePasswordItemVisibility(securityType) {
-      passwordItem.hidden = (securityType == 'open');
-    }
-
-    // initialize all setting fields in the panel
-    function reset() {
-      if (settings) {
-        var reqSecurityType =
-          settings.createLock().get('tethering.wifi.security.type');
-
-        reqSecurityType.onsuccess = function dt_getStatusSuccess() {
-          updatePasswordItemVisibility(
-            reqSecurityType.result['tethering.wifi.security.type']
-          );
-        };
-
-        var lock = settings.createLock();
-        for (var i = 0; i < fields.length; i++) {
-          (function(input) {
-            var key = input.dataset.setting;
-            var request = lock.get(key);
-            request.onsuccess = function() {
-              input.value = request.result[key] || '';
-
-              // dispatch the event manually for select element
-              if (input.nodeName === 'SELECT') {
-                var evt = document.createEvent('Event');
-                evt.initEvent('change', true, true);
-                input.dispatchEvent(evt);
-              }
-            };
-          })(fields[i]);
-        }
+    // Localize WiFi security type string when setting changes
+    SettingsListener.observe('tethering.wifi.security.type', 'wpa-psk',
+      function(value) {
+        var l10n = navigator.mozL10n;
+        var wifiSecurityType = document.getElementById('wifi-security-type');
+        l10n.localize(wifiSecurityType, 'hotspot-' + value);
       }
-    }
-
-    // validate all settings in the dialog box
-    function submit() {
-      if (settings) {
-        var ignorePassword = (securityTypeSelector.value == 'open');
-
-        // mozSettings does not support multiple keys in the cset object
-        // with one set() call,
-        // see https://bugzilla.mozilla.org/show_bug.cgi?id=779381
-        var lock = settings.createLock();
-        for (var i = 0; i < fields.length; i++) {
-          var input = fields[i];
-          var cset = {};
-          var key = input.dataset.setting;
-
-          if (!(ignorePassword && key == 'tethering.wifi.security.password')) {
-            cset[key] = input.value;
-            lock.set(cset);
-          }
-        }
-      }
-    }
-
-    reset(); // preset all fields before opening the dialog
-    openDialog(dialogID, submit);
+    );
   }
 };
 
 navigator.mozL10n.ready(Hotspot.init.bind(Hotspot));
-

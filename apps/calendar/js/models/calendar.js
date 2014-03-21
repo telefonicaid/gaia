@@ -1,4 +1,4 @@
-(function(window) {
+Calendar.ns('Models').Calendar = (function() {
 
   function Cal(options) {
     var key;
@@ -116,6 +116,7 @@
 
     toJSON: function() {
       var result = {
+        error: this.error,
         remote: this.remote,
         accountId: this.accountId,
         localDisplayed: this.localDisplayed,
@@ -133,6 +134,6 @@
 
   };
 
-  Calendar.ns('Models').Calendar = Cal;
+  return Cal;
 
 }(this));

@@ -16,13 +16,13 @@ if (typeof utils.squareImage === 'undefined') {
       } else {
         var canvas = document.createElement('canvas');
         var min = canvas.width = canvas.height = Math.min(width, height);
-        var context = canvas.getContext('2d');
+        var context = canvas.getContext('2d', { willReadFrequently: true });
         context.drawImage(img, (width - min) / 2, (height - min) / 2, min, min,
                           0, 0, min, min);
         canvas.toBlob(callback);
       }
 
       URL.revokeObjectURL(url);
-    }
+    };
   }; // utils.squareImage
 } // if

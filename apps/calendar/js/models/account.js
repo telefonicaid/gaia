@@ -1,4 +1,5 @@
-(function(window) {
+Calendar.ns('Models').Account = (function() {
+
   function Account(options) {
     var key;
 
@@ -100,7 +101,9 @@
         'password',
         'user',
         'providerType',
-        'preset'
+        'preset',
+        'oauth',
+        'error'
       ];
 
       fields.forEach(function(key) {
@@ -116,6 +119,7 @@
 
   };
 
-  Calendar.ns('Models').Account = Account;
+
+  return Account;
 
 }(this));

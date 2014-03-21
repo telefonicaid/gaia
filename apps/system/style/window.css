@@ -1,0 +1,491 @@
+.appWindow,
+.activityWindow {
+  position: absolute;
+  left: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
+.appWindow > .appWindow {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+@media not all and (-moz-physical-home-button) {
+  #screen:not(.software-button-disabled) > #windows > .appWindow {
+    bottom: 5rem;
+  }
+}
+
+.appWindow[transition-state="closed"]:not(.fadeout):not(.homescreen):not(.edge-candidate) {
+  opacity: 0;
+}
+
+#screen.software-button-enabled #windows > .appWindow {
+  bottom: 5rem;
+}
+
+#screen.utility-tray #windows > .appWindow {
+  pointer-events: none;
+}
+
+.appWindow:not(.homescreen) {
+  background-color: black;
+}
+
+.appWindow:not(.homescreen).render {
+  background-image: none !important;
+  background-color: transparent;
+}
+
+.appWindow > iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.appWindow.navigation:not(.rocketbar) > iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 1rem;
+  width: 100%;
+  height: calc(100% - 1rem);
+}
+
+.appWindow.rocketbar:not(.navigation) > iframe {
+  position: absolute;
+  top: 5rem;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(100% - 5rem);
+}
+
+.appWindow.navigation.rocketbar > iframe {
+  position: absolute;
+  top: 5rem;
+  left: 0;
+  bottom: 1rem;
+  width: 100%;
+  height: calc(100% - 6rem);
+}
+
+
+.appWindow:not(.homescreen).render > iframe {
+  background-color: #fff;
+}
+
+#screen.active-statusbar > #windows > .appWindow,
+#screen.active-statusbar > #windows > .appWindow.fullscreen-app {
+  top: 4rem;
+  height: calc(100% - 4rem);
+}
+
+.appWindow.enlarge {
+  pointer-events: auto;
+  animation: openApp 0.3s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+.appWindow.transition-closing.perpendicular {
+  animation-duration: 0.1s;
+}
+
+.appWindow.from-cardview {
+  animation: openAppFromCardView 0.15s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+#screen.task-manager #windows > .appWindow.from-cardview {
+  animation: openAppFromTaskManager 0.15s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+/* Opacity increases start up time then we don't use it anymore for opening */
+@keyframes openApp {
+  0%   { transform: scale(0.2);}
+  100% { transform: scale(1.0);}
+}
+
+.appWindow.zoom-in {
+  transform: scale(1);
+  animation: zoom-in 0.3s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+@keyframes zoom-in {
+  0%   { transform: scale(1); }
+  100% { transform: scale(5); }
+}
+
+@keyframes openAppFromCardView {
+  0%   { transform: scale(0.8); }
+  100% { transform: scale(1.0); }
+}
+
+@keyframes openAppFromTaskManager {
+  0%   { transform: scale(0.6); }
+  100% { transform: scale(1.0); }
+}
+
+.appWindow.invoked {
+  animation: invokedApp .3s forwards linear;
+}
+
+.appWindow.invoking {
+  animation: invokingApp .3s forwards linear;
+}
+
+/* Invoking app moves out */
+@keyframes invokingApp {
+  0%   { transform: translateX(0) }
+  100% { transform: translateX(calc(-100% - 20px)); }
+}
+
+/* Invoked app moves in */
+@keyframes invokedApp {
+  0%   { transform: translateX(calc(100% + 20px)); }
+  100%  { transform: translateX(0); }
+}
+
+.appWindow.fade-in {
+  animation: fadeInApp 0.6s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+.appWindow.fade-out {
+  animation: fadeOutApp 0.6s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+/* Invoking secure app moves out */
+@keyframes fadeInApp {
+  0%  {
+         transform: scale(2.0);
+         opacity: 0.0;
+      }
+  50% {
+         transform: scale(1.5);
+         opacity: 0.5;
+      }
+  100% {
+         transform: scale(1.0);
+         opacity: 1.0;
+       }
+}
+
+/* Invoked secure app moves in */
+@keyframes fadeOutApp {
+  0%  {
+         transform: scale(1.0);
+         opacity: 1.0;
+      }
+  50% {
+         transform: scale(1.5);
+         opacity: 0.5;
+      }
+  100% {
+         transform: scale(2);
+         opacity: 0.0;
+       }
+}
+
+#windows.slow-transition .appWindow.transition-closing,
+#windows.slow-transition .appWindow.transition-opening {
+  animation-duration: 3s;
+}
+
+.appWindow.transition-closing,
+.appWindow.transition-opening {
+  /* The animation takes .3 seconds so users cannot touch the app while the
+   * closing animation is performing */
+  pointer-events: none;
+}
+
+.appWindow.reduce {
+  animation: closeApp 0.3s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+.appWindow.transition-opening.perpendicular {
+  animation-duration: 0.1s;
+  opacity: 0;
+}
+
+.appWindow.zoom-out {
+  transform: scale(5);
+  animation: zoom-out 0.3s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+@keyframes zoom-out {
+  0%   { transform: scale(5);}
+  100% { transform: scale(1);}
+}
+
+.appWindow.to-cardview {
+  animation: closeAppTowardsCardView 0.15s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+#screen.task-manager #windows > .appWindow.to-cardview {
+  animation: closeAppTowardsTaskManager 0.15s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+/* Prebuild width/height */
+#screen:not(.active-statusbar):not(.software-button-enabled):not(:-moz-full-screen-ancestor) > #windows > .appWindow:not(.fullscreen-app),
+.appWindow.homescreen {
+  top: 2rem;
+  height: calc(100% - 2rem);
+  width: 100%;
+}
+
+#screen:not(.active-statusbar):not(.software-button-enabled) > #windows > .appWindow.fullscreen-app {
+  top: 0;
+  height: 100%;
+  width: 100%;
+}
+
+#screen.active-statusbar:not(.software-button-enabled):not(:-moz-full-screen-ancestor) > #windows > .appWindow {
+  top: 4rem;
+  height: calc(100% - 4rem);
+  width: 100%;
+}
+
+#screen.active-statusbar.software-button-enabled:not(:-moz-full-screen-ancestor) > #windows > .appWindow {
+  top: 4rem;
+  bottom: 5rem;
+  height: calc(100% - 5rem - 4rem);
+  width: 100%;
+}
+
+#screen.software-button-enabled:not(:-moz-full-screen-ancestor) > #windows > .appWindow {
+  top: 2rem;
+  bottom: 5rem;
+  height: calc(100% - 5rem - 2rem);
+  width: 100%;
+}
+
+#screen.software-button-enabled:not(.active-statusbar) > #windows > .appWindow.fullscreen-app {
+  top: 0;
+  bottom: 5rem;
+  height: calc(100% - 5rem);
+  width: 100%;
+}
+
+@keyframes closeApp {
+  0%   { transform: scale(1.0); opacity: 1;}
+  100% { transform: scale(0.01); opacity: 0;}
+}
+
+@keyframes closeAppTowardsCardView {
+  0%   { transform: scale(1.0); }
+  100% { transform: scale(0.8); }
+}
+
+@keyframes closeAppTowardsTaskManager {
+  0%   { transform: scale(1.0); }
+  100% { transform: scale(0.6); }
+}
+
+.appWindow.back {
+  transition: transform 0.25s cubic-bezier(0.7, 0.0, 1.0, 1.0), visibility 0.25s cubic-bezier(0.7, 0.0, 1.0, 1.0);
+  transform: scale(0.86);
+}
+
+.appWindow.restored {
+  transform: none;
+  transition: transform 0.25s cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+#screen > #windows > .appWindow.fullscreen-app {
+  top: 0;
+}
+
+.appWindow > iframe {
+  visibility: visible;
+}
+
+.appWindow > .fade-overlay {
+  background-color: black;
+  position: absolute;
+  visibility: hidden;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.appWindow.fadeout > .fade-overlay {
+  visibility: visible;
+}
+
+.appWindow.homescreen.fadeout > .fade-overlay {
+  opacity: 0.8;
+}
+
+.appWindow > .modal-dialog,
+.appWindow > .authentication-dialog,
+.authentication-dialog > .authentication-dialog-http {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  visibility: hidden;
+}
+
+.appWindow > .contextmenu {
+  visibility: visible;
+}
+
+.appWindow > .modal-dialog.visible,
+.appWindow > .contextmenu.visible,
+.appWindow > .authentication-dialog.visible,
+.authentication-dialog > .authentication-dialog-http.visible {
+  visibility: visible;
+}
+
+.appWindow > .modal-dialog > form {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  visibility: hidden;
+}
+
+.appWindow > .modal-dialog input {
+  border-radius: 0.2rem;
+  height: 4rem;
+  font-size: 2rem;
+  width: 100%;
+  color: white;
+  background: none;
+  -moz-box-sizing: border-box;
+  margin-bottom: 1.5rem; /* not overlap by menu while keyboard pop */
+}
+
+.appWindow > .modal-dialog > form.visible {
+  visibility: visible;
+}
+
+.appWindow > form[role="dialog"][data-type="action"],
+.appWindow > form[role="dialog"][data-type="object"] {
+  position: absolute;
+}
+
+.appWindow > .screenshot-overlay {
+  visibility: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+
+  /* We need this to resize hi-res screenshot */
+  background-size: cover;
+}
+
+.appWindow > .screenshot-overlay.visible {
+  visibility: visible;
+}
+
+.appWindow > iframe.hidden {
+  visibility: hidden;
+}
+
+/* inline components */
+
+.appWindow > .appWindow {
+  z-index: 65536;
+}
+
+.appWindow > .fade-overlay {
+  z-index: 1024;
+}
+
+.appWindow > .chrome {
+  z-index: 5;
+}
+
+.appWindow > .authentication-dialog {
+  z-index: 4;
+}
+
+.appWindow > .modal-dialog {
+  z-index: 3;
+}
+
+.appWindow > .contextmenu {
+  z-index: 2;
+}
+
+.appWindow > .screenshot-overlay.visible {
+  z-index: 2;
+}
+
+.appWindow > iframe {
+  z-index: 1;
+}
+
+.appWindow > .screenshot-overlay {
+  z-index: -1;
+}
+
+/* animation */
+
+.appWindow.slideup {
+  animation: slideUp 0.3s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+.appWindow.slidedown {
+  animation: slideDown 0.3s forwards cubic-bezier(0.7, 0.0, 1.0, 1.0);
+}
+
+@keyframes slideUp {
+  0%   { transform: translateY(calc(100%)); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(calc(100%)); }
+}
+
+/* Edges */
+.edge-candidate:not(.active) {
+  /* needs to be outside the viewport */
+  transform: translateX(-100%);
+  opacity: 1;
+  will-change: transform;
+}
+
+#screen:not(:-moz-full-screen-ancestor).edges #windows > .appWindow.active {
+  will-change: transform;
+}
+
+#windows > .appWindow.inside-edges {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+#windows > .appWindow.outside-edges-left {
+  opacity: 1;
+  transform: translateX(calc(-100% - 20px));
+}
+
+#windows > .appWindow.outside-edges-right {
+  opacity: 1;
+  transform: translateX(calc(100% + 20px));
+}
+
+#screen:-moz-full-screen-ancestor > #windows .appWindow.active {
+  top: 0;
+  height: 100%;
+}

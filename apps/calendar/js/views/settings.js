@@ -1,4 +1,7 @@
 (function(window) {
+  'use strict';
+
+  var CALENDAR_PREFIX = 'calendar-';
 
   var template = Calendar.Templates.Calendar;
   var _super = Calendar.View.prototype;
@@ -6,12 +9,16 @@
   function Settings(options) {
     Calendar.View.apply(this, arguments);
 
-    this._initEvents();
     this._hideSettings = this._hideSettings.bind(this);
+    this._updateTimeouts = Object.create(null);
+
+    this._observeUI();
   }
 
   Settings.prototype = {
     __proto__: _super,
+
+    waitBeforePersist: 600,
 
     /**
      * Local update is a flag
@@ -45,63 +52,81 @@
       return this._findElement('timeViews');
     },
 
-    handleEvent: function(event) {
-      switch (event.type) {
-
-        // calendar updated
-        case 'update':
-          this._update.apply(this, event.data);
-          break;
-
-        // calendar added
-        case 'add':
-          this._add.apply(this, event.data);
-          break;
-
-        // calendar removed
-        case 'remove':
-          this._remove.apply(this, event.data);
-          break;
-      }
-    },
-
-    _initEvents: function() {
-      var store = this.app.store('Calendar');
-
-      // calendar store events
-      store.on('update', this);
-      store.on('add', this);
-      store.on('remove', this);
-
-      // dom events
+    _observeUI: function() {
       this.syncButton.addEventListener('click', this._onSyncClick.bind(this));
+
       this.calendars.addEventListener(
         'change', this._onCalendarDisplayToggle.bind(this)
       );
+    },
 
-      var el = document.getElementById('time-views');
+    _observeAccountStore: function() {
+      var store = this.app.store('Account');
+      var handler = this._updateSyncButton.bind(this);
+
+      store.on('add', handler);
+      store.on('remove', handler);
+    },
+
+    _observeCalendarStore: function() {
+      var store = this.app.store('Calendar');
+      var self = this;
+
+      function handle(method) {
+        return function() {
+          self[method].apply(self, arguments);
+        };
+      }
+
+      // calendar store events
+      store.on('update', handle('_update'));
+      store.on('add', handle('_add'));
+      store.on('remove', handle('_remove'));
+    },
+
+    _persistCalendarDisplay: function(id, displayed) {
+      var store = this.app.store('Calendar');
+      var self = this;
+
+      // clear timeout id
+      delete this._updateTimeouts[id];
+
+      function persist(err, id, model) {
+        if (err) {
+          console.log('View.Setting cannot save calendar', err);
+          return;
+        }
+
+        if (self.ondisplaypersist) {
+          self.ondisplaypersist(model);
+        }
+      }
+
+      function fetch(err, calendar) {
+        if (err) {
+          console.log('View.Setting cannot fetch calendar', id);
+          return;
+        }
+
+        calendar.localDisplayed = displayed;
+        store.persist(calendar, persist);
+      }
+
+      store.get(id, fetch);
     },
 
     _onCalendarDisplayToggle: function(e) {
-      // Possible race conditions on save
-      // 1. get calendar
       var input = e.target;
-      var store = Calendar.App.store('Calendar');
-      var model = store.cached[input.value];
-      var self = this;
+      var id = input.value;
 
-      model.localDisplayed = !!input.checked;
-      store.persist(model, function() {
-        // OK to avoid race conditions
-        // and unnecessary update calls we mark
-        // the view as _localUpdate and make our changes.
-        // we also add a once event for 'persist' to later
-        // turn this back off after all events have triggered.
-        self._localUpdate = true;
-        store.once('persist', function() {
-          self._localUpdate = false;
-        });
-      });
+      if (this._updateTimeouts[id]) {
+        clearTimeout(this._updateTimeouts[id]);
+      }
+
+      this._updateTimeouts[id] = setTimeout(
+        this._persistCalendarDisplay.bind(this, id, !!input.checked),
+        this.waitBeforePersist
+      );
     },
 
     _onSyncClick: function() {
@@ -111,46 +136,101 @@
     },
 
     _update: function(id, model) {
-      if (this._localUpdate)
-        return;
-
-      var htmlId = 'calendar-' + id;
-      var el = document.getElementById(htmlId);
+      var el = document.getElementById(this.idForModel(CALENDAR_PREFIX, id));
       var check = el.querySelector('input[type="checkbox"]');
+
+      if (el.classList.contains(Calendar.ERROR) && !model.error) {
+        el.classList.remove(Calendar.ERROR);
+      }
+
+      if (model.error) {
+        el.classList.add(Calendar.ERROR);
+      }
 
       el.querySelector(this.selectors.calendarName).textContent = model.name;
       check.checked = model.localDisplayed;
     },
 
     _add: function(id, object) {
+      var idx = this.calendars.children.length;
+
       var html = template.item.render(object);
       this.calendars.insertAdjacentHTML(
         'beforeend',
         html
       );
+
+      if (object.error) {
+        var el = this.calendars.children[
+          idx
+        ];
+
+        el.classList.add(Calendar.ERROR);
+      }
     },
 
     _remove: function(id) {
-      var htmlId = 'calendar-' + id;
-      var el = document.getElementById(htmlId);
+      var el = document.getElementById(this.idForModel(CALENDAR_PREFIX, id));
       if (el) {
         el.parentNode.removeChild(el);
       }
     },
 
     render: function() {
-      var list = this.calendars;
       var store = this.app.store('Calendar');
-      var key;
-      var html = '';
 
-      for (key in store.cached) {
-        html += template.item.render(
-          store.cached[key]
-        );
-      }
+      store.all(function(err, calendars) {
+        if (err) {
+          console.log(
+            'Error fetching calendars in View.Settings'
+          );
+          return;
+        }
 
-      list.innerHTML = html;
+        // clear list of calendars
+        this.calendars.innerHTML = '';
+
+        // append each calendar
+        var id;
+        for (id in calendars) {
+          this._add(id, calendars[id]);
+        }
+
+        // observe new calendar events
+        this._observeCalendarStore();
+
+        // observe accounts to hide sync button
+        this._observeAccountStore();
+
+        // show/hide sync button
+        this._updateSyncButton(function() {
+          if (this.onrender) {
+            this.onrender();
+          }
+        }.bind(this));
+      }.bind(this));
+    },
+
+    _updateSyncButton: function(callback) {
+      var store = this.app.store('Account');
+      var element = this.syncButton;
+      var self = this;
+
+      store.syncableAccounts(function(err, list) {
+        if (err) {
+          return callback(err);
+        }
+
+        if (list.length === 0) {
+          element.classList.remove(Calendar.ACTIVE);
+        } else {
+          element.classList.add(Calendar.ACTIVE);
+        }
+
+        // test only event
+        self.onupdatesyncbutton && self.onupdatesyncbutton();
+        typeof callback === 'function' ? callback() : '';
+      });
     },
 
     /**
@@ -178,3 +258,4 @@
   Calendar.ns('Views').Settings = Settings;
 
 }(this));
+

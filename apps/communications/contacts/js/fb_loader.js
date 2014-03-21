@@ -18,6 +18,7 @@ var fbLoader = (function() {
 
     var oauth = document.createElement('iframe');
     oauth.id = 'fb-oauth';
+    oauth.hidden = true;
     iframesFragment.appendChild(oauth);
 
     var extensions = document.createElement('iframe');
@@ -27,38 +28,24 @@ var fbLoader = (function() {
     document.body.appendChild(iframesFragment);
 
     var scripts = [
-      '/contacts/js/fb_extensions.js',
+      '/contacts/js/service_extensions.js',
       '/contacts/oauth2/js/parameters.js',
+      '/shared/js/fb/fb_request.js',
+      '/contacts/js/fb/fb_data.js',
       '/contacts/js/fb/fb_utils.js',
       '/contacts/js/fb/fb_query.js',
+      '/shared/js/fb/fb_reader_utils.js',
       '/contacts/js/fb/fb_contact_utils.js',
       '/contacts/js/fb/fb_contact.js',
       '/contacts/js/fb/fb_link.js',
       '/contacts/js/fb/fb_messaging.js',
-      '/contacts/js/value_selector.js',
-      '/contacts/js/fb/fb_data.js'
+      '/contacts/js/value_selector.js'
     ];
 
-    var fragment = document.createDocumentFragment();
-
-    var onScriptLoaded = function onScriptLoaded() {
-      scriptsLoaded++;
-      if (scriptsLoaded === scripts.length) {
-        var event = new CustomEvent('facebookLoaded');
-        window.dispatchEvent(event);
-      }
-    };
-
-    for (var i = 0; i < scripts.length; i++) {
-      var script = scripts[i];
-      var elem = document.createElement('script');
-      elem.setAttribute('type', 'text/javascript');
-      elem.src = script;
-      elem.addEventListener('load', onScriptLoaded);
-      fragment.appendChild(elem);
-    }
-
-    document.head.appendChild(fragment);
+    LazyLoader.load(scripts, function() {
+      var event = new CustomEvent('facebookLoaded');
+      window.dispatchEvent(event);
+    });
   };
 
   return {

@@ -1,7 +1,7 @@
 Calendar.ns('Views').WeekChild = (function() {
+  'use strict';
 
   var template = Calendar.Templates.Week;
-  var OrderedMap = Calendar.Utils.OrderedMap;
   var _super = Calendar.Views.DayBased.prototype;
 
   function Week(options) {
@@ -9,7 +9,7 @@ Calendar.ns('Views').WeekChild = (function() {
     this.hourEventsSelector = null;
 
     this.allDayElement = document.createElement('section');
-    this.allDayElement.classList.add('week-events')
+    this.allDayElement.classList.add('week-events');
   }
 
   Week.prototype = {

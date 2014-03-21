@@ -1,0 +1,124 @@
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+}
+
+html {
+  background: #212121;
+}
+
+body {
+  color: #5A5A5A;
+  font-size: 10px;
+}
+
+section {
+  color: #858585;
+  font-size: 1rem;
+}
+
+section.suggestions {
+  background: #1a1a1a;
+}
+
+section.suggestions ul {
+  list-style: none;
+  white-space: nowrap;
+  overflow-x: scroll;
+  padding-left: 0;
+}
+
+section.suggestions ul li {
+  display: inline-block;
+  margin-left: 1rem;
+  padding: 0.9rem 0.7rem 0.9rem 0;
+  margin: 0;
+}
+
+section.suggestions ul li+li:before {
+  content: "\2022";
+  padding-right: 0.7rem;
+}
+
+section.suggestions ul li:first-child {
+  padding-left: 0.7rem;
+}
+
+section .result * {
+  pointer-events: none;
+}
+
+.local .result {
+  display: flex;
+  flex-direction: row;
+  border-bottom: 1px solid #5A5A5A;
+  padding: 8px;
+}
+
+.local .icon {
+  margin: 2px 8px 0 0;
+  margin-top: 2px;
+  display: block;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.local .icon.empty {
+  border: 1px dashed #5A5A5A;
+  border-radius: 2px;
+}
+
+.local .meta {
+  color: #858585;
+}
+
+.local .title, .local .meta {
+  display: block;
+  white-space:nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.local .highlight {
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+/* web */
+section.apps {
+  padding-top: 1rem;
+  /* Hide the whitespace between inline elements */
+  font-size: 0;
+}
+
+section.apps section {
+  display: inline;
+  font-size: 0.8125rem;
+}
+
+section.apps .result {
+  width: calc(100%/4 - 0.4rem);
+  display: inline-block;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 6.1rem;
+  line-height: 1rem;
+  padding: 0 0.2rem;
+}
+
+section.apps img {
+  display: block;
+  margin: 0 auto 0.3rem;
+  pointer-events: none;
+  width: 2.75rem;
+}
+
+#webresults .result img {
+  border-radius: 50%;
+}

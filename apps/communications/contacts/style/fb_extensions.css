@@ -16,8 +16,8 @@
   -moz-transform: translateY(-100%);
 }
 
-#fb-extensions.closing {
-  -moz-transform: translateY(0);
+#fb-extensions.hidden {
+  visibility: hidden;
 }
 
 .facebook.removed dl,
@@ -47,6 +47,10 @@ p.facebook.removed input {
 
 .with-photo.removed.facebook {
   border: none;
+}
+
+#settingsFb li p {
+  margin-left: 0;
 }
 
 #settings-article[data-state="fb-disabled"] #settingsFb,

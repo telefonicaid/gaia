@@ -1,0 +1,88 @@
+#search-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(100%);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+#screen.software-button-enabled #search-bar {
+  height: calc(100% - 5rem);
+}
+
+#search-bar[data-visible] {
+  pointer-events: auto;
+}
+
+#search-bar form p {
+  background: #0B0B0C;
+  display: flex;
+  flex-direction: row;
+  padding-top: 2rem;
+}
+
+#search-input {
+  flex-grow: 1;
+  width: auto;
+  border: 0;
+  border-radius: 0;
+  line-height: 4rem;
+  background: #0B0B0C;
+  color: #fff;
+  padding-right: 0;
+}
+
+.task-manager #search-input {
+  padding-left: 2.6rem;
+  background: url(search.png) no-repeat 0.5rem center;
+}
+
+#search-bar #search-input::-moz-placeholder {
+  font-style: italic;
+  color: #929496;
+}
+
+#search-reset.hidden {
+  opacity: 0;
+}
+
+#search-bar #search-reset {
+  display: inline-block;
+  position: static;
+  flex-shrink: 0;
+}
+
+#search-bar #search-cancel {
+  display: inline-block;
+  text-decoration: none;
+  outline: 0;
+  padding: 0.5rem 0;
+  width: auto;
+  flex-shrink: 0;
+}
+
+#search-bar #search-cancel span {
+  pointer-events: none;
+  border-left: 1px solid #929496;
+  display: inline-block;
+  padding: 0.7rem 0.8rem 0.5rem;
+  font-size: 1.4rem;
+  color: #929496;
+}
+
+#search-bar #search-container {
+  background: #212121;
+  height: calc(100% - 6rem);
+}
+
+#search-bar #search-container iframe {
+  border: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#screen.rocketbar-focus .screenshotView {
+  opacity: 0.5;
+}

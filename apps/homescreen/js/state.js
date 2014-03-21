@@ -4,7 +4,8 @@
 const HomeState = (function() {
   var DB_NAME = 'homescreen';
   var GRID_STORE_NAME = 'grid';
-  var DB_VERSION = 1;
+  var SV_APP_STORE_NAME = 'svAppsInstalled';
+  var DB_VERSION = 2;
 
   var database = null;
   var initQueue = [];
@@ -12,6 +13,7 @@ const HomeState = (function() {
   function loadInitialState(iterator, success, error) {
     var grid = Configurator.getSection('grid') || [];
 
+    // add the actual grid pages from the configurator
     for (var i = 0; i < grid.length; i++) {
       grid[i] = {
         index: i,
@@ -60,9 +62,19 @@ const HomeState = (function() {
 
     request.onupgradeneeded = function(event) {
       var db = event.target.result;
-      if (event.oldVersion == 0) {
-        emptyDB = true;
-        db.createObjectStore(GRID_STORE_NAME, { keyPath: 'index' });
+      var oldVersion = event.oldVersion || 0;
+      switch (oldVersion) {
+        case 0:
+          emptyDB = true;
+          db.createObjectStore(GRID_STORE_NAME, { keyPath: 'index' });
+          /* falls through */
+        case 1:
+          // This works as we're just adding a new object store.
+          // Please take into accout that in case we were altering the schema
+          // this wouldn't be enough
+          if (!db.objectStoreNames.contains(SV_APP_STORE_NAME)) {
+            db.createObjectStore(SV_APP_STORE_NAME, { keyPath: 'manifest' });
+          }
       }
     };
   }
@@ -95,59 +107,76 @@ const HomeState = (function() {
     callback(txn, store);
   }
 
+  function saveTable(table, objectsArr, success, error) {
+    if (!database) {
+      if (error) {
+        error('Database is not available');
+      }
+      return;
+    }
+
+    newTxn(table, 'readwrite', function(txn, store) {
+      store.clear();
+      var len = objectsArr.length;
+      for (var i = 0; i < len; i++) {
+        store.put(objectsArr[i]);
+      }
+      if (success) {
+        success();
+      }
+    });
+  }
+
+  function loadTable(table, iterator, success, error) {
+    if (!database) {
+      if (error) {
+        error('Database is not available');
+      }
+      return;
+    }
+
+    newTxn(table, 'readonly', function(txn, store) {
+      store.openCursor().onsuccess = function onsuccess(event) {
+        var cursor = event.target.result;
+        if (!cursor)
+          return;
+        iterator(cursor.value);
+        cursor.continue();
+      };
+    }, function() { success && success(); }, error);
+  }
+
   return {
     /**
      * Initialize the database and return the homescreen state to the
      * success callback.
      */
-    init: function st_init(iterator, success, error) {
+    init: function st_init(iteratorGrid, success, error, iteratorSVApps) {
       openDB(function(emptyDB) {
         if (emptyDB) {
-          loadInitialState(iterator, success, error);
+          loadInitialState(iteratorGrid, success, error);
           return;
         }
-        HomeState.getGrid(iterator, success, error);
+        HomeState.getGrid(iteratorGrid, success, error);
+        HomeState.getSVApps(iteratorSVApps);
       }, error);
     },
 
     saveGrid: function st_saveGrid(pages, success, error) {
-      if (!database) {
-        if (error) {
-          error('Database is not available');
-        }
-        return;
-      }
+      saveTable(GRID_STORE_NAME, pages, success, error);
+    },
 
-      newTxn(GRID_STORE_NAME, 'readwrite', function(txn, store) {
-        store.clear();
-        var len = pages.length;
-        for (var i = 0; i < len; i++) {
-          store.put(pages[i]);
-        }
-        if (success) {
-          success();
-        }
-      });
+    saveSVInstalledApps: function st_saveSVInstalledApps(svApps, success,
+                                                         error) {
+      saveTable(SV_APP_STORE_NAME, svApps, success, error);
     },
 
     getGrid: function st_getGrid(iterator, success, error) {
-      if (!database) {
-        if (error) {
-          error('Database is not available');
-        }
-        return;
-      }
+      loadTable(GRID_STORE_NAME, iterator, success, error);
+    },
 
-      newTxn(GRID_STORE_NAME, 'readonly', function(txn, store) {
-        store.openCursor().onsuccess = function onsuccess(event) {
-          var cursor = event.target.result;
-          if (!cursor)
-            return;
-
-          iterator(cursor.value);
-          cursor.continue();
-        };
-      }, function() { success(); }, error);
+    getSVApps: function st_getSVApps(iterator, success, error) {
+      loadTable(SV_APP_STORE_NAME, iterator, success, error);
     }
   };
 })();

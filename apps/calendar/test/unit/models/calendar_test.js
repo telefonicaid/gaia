@@ -1,8 +1,4 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('models/calendar.js');
-});
-
-suite('models/calendar', function() {
+suiteGroup('Models.Calendar', function() {
 
   var subject;
   var remoteCalendar;
@@ -80,6 +76,7 @@ suite('models/calendar', function() {
     var date = subject.firstEventSyncDate = new Date(2012, 0, 1);
 
     var expected = {
+      error: undefined,
       lastEventSyncToken: subject.lastEventSyncToken,
       lastEventSyncDate: subject.lastEventSyncDate,
       localDisplayed: subject.localDisplayed,

@@ -11,6 +11,8 @@ if (typeof window.oauth2 === 'undefined') {
 
     var STORAGE_KEY = 'tokenData';
 
+    var APP_ORIGIN = location.origin;
+
     /**
      *  Clears credential data stored locally
      *
@@ -70,6 +72,7 @@ if (typeof window.oauth2 === 'undefined') {
         var token_ts = tokenData.token_ts;
 
         if (expires !== 0 && Date.now() - token_ts >= expires) {
+          window.console.warn('Access token has expired, restarting flow');
           startOAuth(state, service);
           return;
         }
@@ -78,6 +81,12 @@ if (typeof window.oauth2 === 'undefined') {
           ready(access_token);
         }
       });
+    };
+
+    function getLocation(href) {
+      var l = document.createElement('a');
+      l.href = href;
+      return l;
     };
 
     /**
@@ -94,6 +103,11 @@ if (typeof window.oauth2 === 'undefined') {
     function tokenDataReady(e) {
       var parameters = e.data;
       if (!parameters || !parameters.access_token) {
+        return;
+      }
+      var location = getLocation(oauthflow.params[accessTokenCbData.service].
+        redirectURI);
+      if (e.origin !== APP_ORIGIN) {
         return;
       }
 
@@ -119,7 +133,7 @@ if (typeof window.oauth2 === 'undefined') {
               parent.postMessage({
                 type: 'token_stored',
                 data: ''
-              },oauthflow.params[accessTokenCbData.service].appOrigin);
+              }, APP_ORIGIN);
         });
       },0);
     } // tokenReady

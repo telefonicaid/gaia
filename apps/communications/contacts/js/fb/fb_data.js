@@ -1,267 +1,174 @@
 'use strict';
 
+// WARNING: This file lazy loads:
+// 'shared/js/fb/fb_data_reader.js
+// 'shared/js/fb/fb_tel_index.js'
+// 'shared/js/binary_search.js'
+// 'shared/js/simple_phone_matcher.js' (will be removed once bug 938265 lands)
+
 var fb = window.fb || {};
 
-if (!window.fb.contacts) {
-  (function(document) {
+  (function() {
+    var contacts = fb.contacts || {};
+    fb.contacts = contacts;
 
-    var contacts = fb.contacts = {};
-    var indexedDB = window.mozIndexedDB || window.webkitIndexedDB ||
-      window.indexedDB;
+    var Reader;
+    var readerLoaded = false;
 
-    var database;
-    var DB_NAME = 'Gaia_Facebook_Friends';
-    var OLD_DB_VERSIONS = [1.0, 2.0];
-    var DB_VERSION = 3.0;
-    var OLD_STORE_NAMES = ['FBFriends', 'FBFriendsV2'];
-    var STORE_NAME = 'FBFriendsV3';
-    var INDEX_LONG_PHONE = 'byTelephone';
-    var INDEX_SHORT_PHONE = 'byShortTelephone';
-    var isInitialized = false;
-    var migrationNeeded = false;
-    var oldStoreName;
+    // Record Id for the index
+    var INDEX_ID = 1;
+    var isIndexDirty = false;
+    var READER_LOADED_EV = 'reader_loaded';
 
-    function DatabaseMigrator(items) {
-      var pointer = 0;
-      var CHUNK_SIZE = 5;
-      var numResponses = 0;
-      var self = this;
+    var TEL_INDEXER_JS = '/shared/js/fb/fb_tel_index.js';
+    var PHONE_MATCHER_JS = '/shared/js/simple_phone_matcher.js';
+    var FB_READER_JS = '/shared/js/fb/fb_data_reader.js';
+    var BINARY_SEARCH_JS = '/shared/js/binary_search.js';
 
-      this.items = items;
+    contacts.UID_NOT_FOUND = 'UIDNotFound';
+    contacts.ALREADY_EXISTS = 'AlreadyExists';
 
-      function continueCb() {
-        numResponses++;
-        pointer++;
-        if (pointer < self.items.length && numResponses === CHUNK_SIZE) {
-          numResponses = 0;
-          migrateSlice(pointer);
-        }
-        else if (pointer >= self.items.length) {
-          if (typeof self.onfinish === 'function') {
-            self.onfinish();
-          }
-        }
-      }
-
-      this.start = function() {
-        if (Array.isArray(self.items) && self.items.length > 0) {
-          migrateSlice(0);
-        }
-        else {
-          if (typeof self.onfinish === 'function') {
-            self.onfinish();
-          }
-        }
-      };
-
-      function migrateSlice(from) {
-        for (var i = from; i < from + CHUNK_SIZE
-             && i < self.items.length; i++) {
-          var req = new fb.utils.Request();
-          var item = self.items[i];
-          doSave(item, req);
-          req.onsuccess = function saveSuccess() {
-            console.log('FB Cache: Success migrating ', item.uid);
-            continueCb();
-          };
-          req.onerror = function saveError() {
-            console.error('FB Cache: Error migrating ', item.uid);
-            continueCb();
-          };
-        }
-      }
-    }
-
-    /**
-     *  Creates the store
-     *
-     */
-    function createStore(e) {
-      var db = e.target.result;
-      if (db.objectStoreNames.contains(STORE_NAME)) {
-        db.deleteObjectStore(STORE_NAME);
-      }
-      return db.createObjectStore(STORE_NAME, { keyPath: 'uid' });
-    }
-
-    function createStoreAndIndex(e) {
-      var store = createStore(e);
-      store.createIndex(INDEX_LONG_PHONE, 'telephone', {
-        unique: true,
-        multiEntry: true
+    // This is needed for having proxy methods setted and ready before
+    // the real reader methods (in fb_data_reader) are loaded
+    if (!contacts.init) {
+      var proxyMethods = ['get', 'getLength', 'getByPhone', 'search',
+                          'refresh', 'init', 'restart'];
+      proxyMethods.forEach(function(aMethod) {
+        contacts[aMethod] = defaultFunction.bind(null, aMethod);
       });
-      store.createIndex(INDEX_SHORT_PHONE, 'shortTelephone', {
-        unique: true,
-        multiEntry: true
-      });
+      LazyLoader.load(FB_READER_JS, onreaderLoaded);
+    }
+    else {
+      onreaderLoaded();
     }
 
-    function upgradeDB(e) {
-      var oldDbSearch = OLD_DB_VERSIONS.indexOf(e.oldVersion);
-      if (oldDbSearch !== -1 && e.newVersion === DB_VERSION) {
-        window.console.warn('Upgrading Facebook Cache!!!!!');
-        migrationNeeded = true;
-        oldStoreName = OLD_STORE_NAMES[oldDbSearch];
-        createStoreAndIndex(e);
-      }
-      else if (e.newVersion === 1.0) {
-        createStore(e);
-      }
-      else if (e.newVersion === DB_VERSION) {
-        createStoreAndIndex(e);
-      }
+    function onreaderLoaded() {
+      readerLoaded = true;
+      Reader = fb.contacts;
+      document.dispatchEvent(new CustomEvent(READER_LOADED_EV));
     }
 
-    function clearOldObjStore(cb) {
-      var transaction = database.transaction([oldStoreName], 'readwrite');
-      var objectStore = transaction.objectStore(oldStoreName);
-
-      var req = objectStore.clear();
-      req.onsuccess = cb;
-      req.onerror = function error_del_objstore(e) {
-        window.console.error('FB Cache. Error while clearing old Obj Store',
-                             e.target.error.name);
-        cb();
-      };
+    function setIndex(index) {
+      Reader.dsIndex = index;
+      isIndexDirty = false;
     }
 
-    function migrateData(onfinishCb) {
-      if (!database.objectStoreNames.contains(oldStoreName)) {
-        onfinishCb();
-        return;
+    function datastore() {
+      return Reader.datastore;
+    }
+
+    function index() {
+      return Reader.dsIndex;
+    }
+
+    function defaultFunction(target) {
+      var args = [];
+      for (var j = 1; j < arguments.length; j++) {
+        args.push(arguments[j]);
       }
-
-      var transaction = database.transaction([oldStoreName], 'readonly');
-      var objectStore = transaction.objectStore(oldStoreName);
-
-      var req = objectStore.mozGetAll();
-
-      req.onsuccess = function(e) {
-        var data = e.target.result;
-
-        var migrator = new DatabaseMigrator(data);
-         migrator.onfinish = function migration_finished() {
-          window.console.log('FB Cache: Migration process finished!!');
-          migrationNeeded = false;
-          clearOldObjStore(onfinishCb);
-        };
-        migrator.start();
-      };
-
-      req.onerror = function(e) {
-        window.console.error('FB Cache: Data migration failed !!!! ');
-        onfinishCb();
-      };
+      if (!readerLoaded) {
+        document.addEventListener(READER_LOADED_EV, function rd_loaded() {
+          document.removeEventListener(READER_LOADED_EV, rd_loaded);
+          Reader[target].apply(this, args);
+        });
+      }
+      else {
+        // As the reader load will overwrite those functions probably this
+        // will never be called
+        Reader[target].apply(this, args);
+      }
     }
 
     function initError(outRequest, error) {
       outRequest.failed(error);
     }
 
-    function doGet(uid, outRequest) {
-      var transaction = database.transaction([STORE_NAME], 'readonly');
-      var objectStore = transaction.objectStore(STORE_NAME);
-      var areq = objectStore.get(uid);
-
-      areq.onsuccess = function(e) {
-        outRequest.done(e.target.result);
-      };
-
-      areq.onerror = function(e) {
-        outRequest.failed(e.target.error);
+    // Ensures a proper error object is returned
+    function safeError(err) {
+      if (err && err.name) {
+        return err;
+      }
+      return {
+        name: 'UnknownError'
       };
     }
 
-    /**
-     *  Allows to obtain the FB contact information by UID
-     *
-     *
-     */
-    contacts.get = function(uid) {
-      var retRequest = new fb.utils.Request();
-
-      window.setTimeout(function get() {
-        contacts.init(function() {
-          doGet(uid, retRequest);
-        }, function() {
-          initError(retRequest);
-        });
-      },0);
-
-      return retRequest;
-    };
-
-    function doGetByPhone(tel, outRequest) {
-      var transaction = database.transaction([STORE_NAME], 'readonly');
-      var objectStore = transaction.objectStore(STORE_NAME);
-
-      var index = objectStore.index(INDEX_LONG_PHONE);
-      var areq = index.get(tel);
-      areq.onsuccess = function(e) {
-        if (e.target.result) {
-          outRequest.done(e.target.result);
-        }
-        else {
-          var otherIndex = objectStore.index(INDEX_SHORT_PHONE);
-          var otherReq = otherIndex.get(tel);
-          otherReq.onsuccess = function(e) {
-            outRequest.done(e.target.result);
-          };
-          otherReq.onerror = function(e) {
-            outRequest.failed(e.target.error);
-          };
-        }
-      };
-
-      areq.onerror = function(e) {
-        outRequest.failed(e.target.error);
-      };
+    // Creates a default handler for errors
+    function defaultError(request) {
+      return defaultErrorCb.bind(null, request);
     }
 
-    contacts.getByPhone = function(tel) {
-      var outRequest = new fb.utils.Request();
+    // Creates a default handler for success
+    function defaultSuccess(request) {
+      return defaultSuccessCb.bind(null, request);
+    }
 
-      window.setTimeout(function get_by_phone() {
-        contacts.init(function get_by_phone() {
-          doGetByPhone(tel, outRequest);
-        },
-        function() {
-          initError(outRequest);
+    function defaultErrorCb(request, error) {
+      request.failed(safeError(error));
+    }
+
+    function defaultSuccessCb(request, result) {
+      request.done(result);
+    }
+
+    function doSave(obj, outRequest) {
+      LazyLoader.load([TEL_INDEXER_JS, PHONE_MATCHER_JS,
+                       BINARY_SEARCH_JS] , function() {
+        var uid = obj.uid;
+        datastore().add(obj, uid).then(function success() {
+          indexByPhone(obj, uid);
+          isIndexDirty = true;
+          outRequest.done();
+        }, function error(err) {
+            if (err.name === 'ConstraintError') {
+              err = {
+                name: contacts.ALREADY_EXISTS
+              };
+            }
+            outRequest.failed(err);
         });
-      }, 0);
+      });
+    }
 
-      return outRequest;
-    };
+    function indexByPhone(obj, newId) {
+      // Update index by tel
+      // As this is populated by FB importer we don't need to have
+      // extra checks
+      if (Array.isArray(obj.tel)) {
+        obj.tel.forEach(function(aTel) {
+          var variants = SimplePhoneMatcher.generateVariants(aTel.value);
 
-    function doSave(obj,outRequest) {
-      var transaction = database.transaction([STORE_NAME], 'readwrite');
-
-      transaction.onerror = function(e) {
-        outRequest.failed(e.target.error);
-      };
-
-      var objectStore = transaction.objectStore(STORE_NAME);
-
-      if (Array.isArray(obj.tel) && obj.tel.length > 0) {
-        obj.telephone = [];
-        obj.tel.forEach(function(atel) {
-          obj.telephone.push(atel.value);
+          variants.forEach(function(aVariant) {
+            index().byTel[aVariant] = newId;
+          });
+          // To avoid the '+' char
+          TelIndexer.index(index().treeTel, aTel.value.substring(1), newId);
         });
       }
+    }
 
-      var req = objectStore.put(obj);
-      req.onsuccess = function(e) {
-        outRequest.done(e.target.result);
-      };
+    function reIndexByPhone(oldObj, newObj, dsId) {
+      removePhoneIndex(oldObj);
+      indexByPhone(newObj, dsId);
+      TelIndexer.orderTree(index().treeTel);
+    }
 
-      req.onerror = function(e) {
-        outRequest.failed(e.target.error);
-      };
+    function removePhoneIndex(deletedFriend) {
+      // Need to update the tel indexes
+      if (Array.isArray(deletedFriend.tel)) {
+        deletedFriend.tel.forEach(function(aTel) {
+          TelIndexer.remove(index().treeTel, aTel.value.substring(1));
+
+          var variants = SimplePhoneMatcher.generateVariants(aTel.value);
+          variants.forEach(function(aVariant) {
+            delete index().byTel[aVariant];
+          });
+        });
+      }
     }
 
     /**
-     *  Allows to save FB Contact Information
-     *
+     *  Allows to save FB Friend Information
      *
      */
     contacts.save = function(obj) {
@@ -271,83 +178,147 @@ if (!window.fb.contacts) {
         contacts.init(function() {
           doSave(obj, retRequest);
         },
-        function() {
-          initError(retRequest);
+        function(err) {
+          initError(retRequest, err);
         });
-      },0);
+      }, 0);
 
       return retRequest;
     };
 
-    function doGetAll(outRequest) {
-      var transaction = database.transaction([STORE_NAME], 'readonly');
-      var objectStore = transaction.objectStore(STORE_NAME);
-
-      var req = objectStore.mozGetAll();
-
-      req.onsuccess = function(e) {
-        var data = e.target.result;
-        var out = {};
-        data.forEach(function(contact) {
-          out[contact.uid] = contact;
-        });
-        outRequest.done(out);
-      };
-
-      req.onerror = function(e) {
-        outRequest.failed(e.target.error);
-      };
-    }
-
-    contacts.getAll = function() {
+    /**
+     *  Allows to update FB Friend Information
+     *
+     *
+     */
+    contacts.update = function(obj) {
       var retRequest = new fb.utils.Request();
 
-      window.setTimeout(function() {
-        contacts.init(function get_all() {
-          doGetAll(retRequest);
+      window.setTimeout(function save() {
+        contacts.init(function() {
+          doUpdate(obj, retRequest);
         },
-        function() {
-          initError(retRequest);
+        function(err) {
+          initError(retRequest, err);
         });
-      },0);
+      }, 0);
 
       return retRequest;
     };
 
-    function doRemove(uid,outRequest) {
-      var transaction = database.transaction([STORE_NAME], 'readwrite');
-      transaction.oncomplete = function(e) {
-        outRequest.done(e.target.result);
-      };
+    function doUpdate(obj, outRequest) {
+      LazyLoader.load([TEL_INDEXER_JS, PHONE_MATCHER_JS,
+                       BINARY_SEARCH_JS], function() {
+        var uid = obj.uid;
 
-      transaction.onerror = function(e) {
-        outRequest.failed(e.target.error);
-      };
-      var objectStore = transaction.objectStore(STORE_NAME);
+        var successCb = successUpdate.bind(null, outRequest);
+        var errorCb = errorUpdate.bind(null, outRequest, uid);
 
-      objectStore.delete(uid);
+        // It is necessary to get the old object and delete old indexes
+        datastore().get(uid).then(function success(oldObj) {
+          if (!oldObj) {
+            errorCb({
+              name: contacts.UID_NOT_FOUND
+            });
+            return;
+          }
+          reIndexByPhone(oldObj, obj, uid);
+          datastore().put(obj, uid).then(function success() {
+            return datastore().put(index(), INDEX_ID);
+          }, errorCb).then(successCb, errorCb);
+        }, errorCb);   // datastore.get
+      });
+    }
+
+    function successUpdate(outRequest) {
+      outRequest.done();
+    }
+
+    function errorUpdate(outRequest, uid, error) {
+      window.console.error('Error while updating datastore for: ', uid);
+      outRequest.failed(error);
+    }
+
+    function doRemove(uid, outRequest, forceFlush) {
+      LazyLoader.load([TEL_INDEXER_JS, PHONE_MATCHER_JS,
+                       BINARY_SEARCH_JS], function() {
+        var errorCb = errorRemove.bind(null, outRequest, uid);
+        var objToDelete;
+
+        datastore().get(uid).then(function success_get_remove(object) {
+          objToDelete = object;
+          if (!objToDelete) {
+            errorRemove(outRequest, uid, {
+              name: contacts.UID_NOT_FOUND
+            });
+            return;
+          }
+          datastore().remove(uid).then(function success_rm(removed) {
+            successRemove(outRequest, objToDelete, forceFlush, removed);
+          }, errorCb);
+        }, errorCb);
+      });  // LazyLoader.load
+    }
+
+    // Needs to update the index data conveniently
+    function successRemove(outRequest, deletedFriend, forceFlush, removed) {
+      if (removed === true) {
+        isIndexDirty = true;
+
+        removePhoneIndex(deletedFriend);
+        if (forceFlush) {
+          var flushReq = fb.contacts.flush();
+
+          flushReq.onsuccess = function() {
+            isIndexDirty = false;
+            outRequest.done(true);
+          };
+          flushReq.onerror = function() {
+            outRequest.failed(flushReq.error);
+          };
+        }
+        else {
+          outRequest.done(true);
+        }
+      }
+      else {
+        outRequest.done(false);
+      }
+    }
+
+    function errorRemove(outRequest, uid, error) {
+      error = safeError(error);
+      window.console.error('FB Data: Error while removing ', uid, ': ',
+                           error.name);
+      outRequest.failed(error);
     }
 
     /**
      *  Allows to remove FB contact from the DB
      *
-     *
      */
-    contacts.remove = function(uid) {
+    contacts.remove = function(uid, flush) {
+      var hasToFlush = (flush === true ? flush : false);
       var retRequest = new fb.utils.Request();
 
       window.setTimeout(function remove() {
         contacts.init(function() {
-          doRemove(uid, retRequest);
+          doRemove(uid, retRequest, hasToFlush);
         },
-        function() {
-           initError(retRequest);
+        function(err) {
+           initError(retRequest, err);
         });
-      },0);
+      }, 0);
 
       return retRequest;
     };
 
+    /**
+     *  Removes all the FB Friends and the index
+     *
+     *  The index is restored as empty
+     *
+     */
     contacts.clear = function() {
       var outRequest = new fb.utils.Request();
 
@@ -355,65 +326,52 @@ if (!window.fb.contacts) {
         contacts.init(function() {
           doClear(outRequest);
         },
-        function() {
-           initError(outRequest);
+        function(err) {
+           initError(outRequest, err);
         });
-      },0);
+      }, 0);
 
       return outRequest;
     };
 
     function doClear(outRequest) {
-      var transaction = database.transaction([STORE_NAME], 'readwrite');
-      transaction.oncomplete = function(e) {
-        outRequest.done(e.target.result);
-      };
-
-      transaction.onerror = function(e) {
-        outRequest.failed(e.target.error);
-      };
-      var objectStore = transaction.objectStore(STORE_NAME);
-
-      objectStore.clear();
+      datastore().clear().then(function success() {
+        setIndex(null);
+        // TODO:
+        // This is working but there are open questions on the mailing list
+        datastore().put(index(), INDEX_ID).then(defaultSuccess(outRequest),
+          function error(err) {
+            err = safeError(err);
+            window.console.error('Error while re-creating the index: ',
+                                 err.name);
+            outRequest.failed(err);
+          }
+        );
+      }, defaultError(outRequest));
     }
 
-    function notifyOpenSuccess(cb) {
-      isInitialized = true;
-      if (typeof cb === 'function') {
-        cb();
-      }
-    }
+    /**
+     *  Persists the index on the datastore
+     *
+     */
+    contacts.flush = function() {
+      var outRequest = new fb.utils.Request();
 
-    contacts.init = function(cb, errorCb) {
-      if (isInitialized === true) {
-        cb();
-        return;
-      }
-
-      var req = indexedDB.open(DB_NAME, DB_VERSION);
-
-      req.onsuccess = function(e) {
-        database = e.target.result;
-        if (migrationNeeded === true) {
-          migrateData(function migrated() {
-            notifyOpenSuccess(cb);
-          });
+      window.setTimeout(function do_Flush() {
+        if (!(datastore()) || !isIndexDirty) {
+          window.console.warn(
+                      'The datastore has not been initialized or is not dirty');
+          outRequest.done();
+          return;
         }
-        else {
-          notifyOpenSuccess(cb);
-        }
-      };
 
-      req.onerror = function(e) {
-        window.console.error('FB: Error while opening the DB: ',
-                                                        e.target.error.name);
-        if (typeof errorCb === 'function') {
-          errorCb();
-        }
-      };
+        TelIndexer.orderTree(index().treeTel);
+        datastore().put(index(), INDEX_ID).then(
+                                              defaultSuccess(outRequest),
+                                              defaultError(outRequest));
+      }, 0);
 
-      req.onupgradeneeded = upgradeDB;
+      return outRequest;
     };
 
-  }) (document);
-}
+  })();

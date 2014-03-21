@@ -1,7 +1,8 @@
 {
   "name": "PDF Viewer",
-  "description": "Portable Document Format(PDF) Viewer",
+  "description": "Portable Document Format (PDF) Viewer",
   "type": "certified",
+  "role": "system",
   "developer": {
     "name": "The pdf.js Team",
     "url": "https://github.com/mozilla/pdf.js"
@@ -9,7 +10,7 @@
   "locales": {
     "en-US": {
       "name": "PDF Viewer",
-      "description": "Portable Document Format(PDF) Viewer"
+      "description": "Portable Document Format (PDF) Viewer"
     }
   },
   "default_locale": "en-US",
@@ -17,7 +18,7 @@
     "48": "/icon.png",
     "64": "/icon64.png"
   },
-  "orientation": "portrait-primary",
+  "orientation": "default",
   "activities": {
     "view" : {
       "filters": {

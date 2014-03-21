@@ -1,7 +1,7 @@
 
 'use strict';
 
-const PaginationBar = (function() {
+var PaginationBar = (function() {
   var style, previousTotal, scroller;
 
   var dir = document.documentElement.dir === 'rtl' ? -100 : 100;
@@ -21,11 +21,16 @@ const PaginationBar = (function() {
 
     /*
      * Shows the pagination bar
-     *
-     * @param {String} container that holds the pagination bar
      */
     show: function pb_show() {
       style.visibility = 'visible';
+    },
+
+    /*
+     * Hides the pagination bar
+     */
+    hide: function pb_hide() {
+      style.visibility = 'hidden';
     },
 
     /*

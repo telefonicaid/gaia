@@ -9,11 +9,13 @@
   },
   "permissions": {
     "sms":{},
-    "contacts":{ "access": "readonly" },
+    "storage":{},
     "mobileconnection":{},
-    "settings":{ "access": "readonly" },
+    "contacts":{ "access": "readonly" },
+    "settings":{ "access": "readwrite" },
     "audio-channel-notification":{},
-    "desktop-notification":{}
+    "desktop-notification":{},
+    "phonenumberservice": {}
   },
   "locales": {
     "ar": {
@@ -34,16 +36,28 @@
     }
   },
   "default_locale": "en-US",
-  "background_page": "/background.html#0",
   "icons": {
-    "120": "/style/icons/Sms.png",
-    "60": "/style/icons/60/Sms.png"
+    "60": "/style/icons/Sms_60.png",
+    "90": "/style/icons/Sms_90.png",
+    "120": "/style/icons/Sms_120.png"
   },
-  "orientation": "portrait-primary",
+  "orientation": "default",
   "activities": {
     "new": {
+      "href": "/index.html#activity-new",
       "filters": {
-        "type": "websms/sms"
+        "type": "websms/sms",
+        "number": {
+          "pattern":"[\\w\\s+#*().-]{0,50}"
+        }
+       },
+      "disposition": "inline",
+      "returnValue": true
+    },
+    "share": {
+      "filters": {
+        "type": ["image/*", "audio/*", "video/*"],
+        "number": 1
        },
       "disposition": "window"
     }
@@ -51,5 +65,10 @@
   "messages": [
      { "sms-received": "/index.html" },
      { "notification": "/index.html" }
-  ]
+  ],
+  "datastores-access": {
+    "Gaia_Facebook_Friends": {
+      "description": "Facebook Friends"
+    }
+  }
 }

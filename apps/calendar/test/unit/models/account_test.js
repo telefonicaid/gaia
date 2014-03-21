@@ -1,12 +1,7 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('provider/calendar/abstract.js');
-  requireLib('provider/calendar/local.js');
-  requireLib('provider/local.js');
+requireLib('provider/abstract.js');
+requireLib('provider/local.js');
 
-  requireLib('models/account.js');
-});
-
-suite('account', function() {
+suiteGroup('Models.Account', function() {
   var subject;
   var provider;
 
@@ -47,6 +42,7 @@ suite('account', function() {
       subject.providerType = 'local';
       subject.preset = 'google';
       subject.calendarHome = '/foo/home';
+      subject.oauth = { code: 'xxx' };
     });
 
     test('output', function() {
@@ -58,7 +54,9 @@ suite('account', function() {
         user: subject.user,
         providerType: subject.providerType,
         calendarHome: '/foo/home',
-        preset: 'google'
+        preset: 'google',
+        oauth: { code: 'xxx' },
+        error: undefined
       };
 
       assert.deepEqual(subject.toJSON(), expected);

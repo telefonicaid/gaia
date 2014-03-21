@@ -29,6 +29,23 @@
     }
   }
 
+  function mnmt_countEventListener(evtName, func) {
+    var count = 0;
+    var list = listeners[evtName];
+
+    if (!list) {
+      return count;
+    }
+
+    for (var i = 0; i < list.length; ++i) {
+      if (list[i] === func) {
+        count += 1;
+      }
+    }
+
+    return count;
+  }
+
   function mnmt_mTriggerEvent(evt) {
     var evtName = evt.type;
     if (listeners[evtName]) {
@@ -42,9 +59,11 @@
     }
   }
 
-  var Mock= {
+  var Mock = {
+    dialEmergency: function() {},
     addEventListener: mnmt_addEventListener,
     removeEventListener: mnmt_removeEventListener,
+    mCountEventListener: mnmt_countEventListener,
     mTeardown: mnmt_init,
     mTriggerEvent: mnmt_mTriggerEvent
   };

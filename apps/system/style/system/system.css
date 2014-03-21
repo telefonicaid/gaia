@@ -1,24 +1,19 @@
 html {
   font-size: 10px;
-}
-
-@media screen and (min-width: 480px) {
-  html {
-    font-size: 13.3px;
-  }
+  font-weight: 500;
+  width: 100%;
+  height: 100%;
+  background-color: black;
+  overflow: hidden;
+  padding: 0;
 }
 
 body {
   width: 100%;
   height: 100%;
-  margin: 0px;
-  padding: 0px;
-
+  margin: 0;
   overflow: hidden;
-
-  font-family: 'MozTT', sans-serif;
   color: #fff;
-  font-size: 12px;
 }
 
 #screen {
@@ -26,9 +21,8 @@ body {
   overflow: hidden;
   width: 100%;
   height: 100%;
-
   background-color: #000;
-  background-size: cover;
+  background-size: cover; /* Possible memory over-consumption with huge images, it should be removed for improving stability*/
   background-repeat: no-repeat;
   background-position: 50% 50%;
 }
@@ -66,30 +60,42 @@ body {
   }
 }
 
+#bottom-panel {
+  position: absolute;
+  display: none;
+  bottom: 0;
+  width: 100%;
+  height: 1rem;
+}
+
+#bottom-panel.visible{
+  display: block;
+}
+
 .poweroff-ring {
   display: block;
   position: absolute;
   border-radius: 50%;
-  width: 60px;
-  height: 60px;
-  margin-left: -30px;
-  margin-top: -30px;
+  width: 6rem;
+  height: 6rem;
+  margin-left: -3rem;
+  margin-top: -3rem;
   left: 50%;
   opacity: 0;
 }
 
 #poweroff-ring-1 {
-  top: 120px;
+  top: 12rem;
   background-color: #e66600;
 }
 
 #poweroff-ring-2 {
-  top: 240px;
+  top: 24rem;
   background-color: #dc4e00;
 }
 
 #poweroff-ring-3 {
-  top: 360px;
+  top: 36rem;
   background-color: #d24500;
 }
 
@@ -101,10 +107,10 @@ body {
   left: 50%;
   margin: auto;
   background-color: black;
-  width: 40px;
-  height: 40px;
-  margin-top: -20px;
-  margin-left: -20px;
+  width: 4rem;
+  height: 4rem;
+  margin-top: -2rem;
+  margin-left: -2rem;
 }
 
 #poweroff-ring-2 > span {
@@ -209,271 +215,52 @@ body {
 
 #windows {
   position: absolute;
-  left: 0px;
+  left: 0;
   width: 100%;
-  top: -100%;
-  height: 0;
-  max-height: 0;
-  border: 0px;
-  overflow: hidden;
-}
-
-#windows.active {
   top: 0;
   height: 100%;
   max-height: 100%;
-}
-
-#windows > .appWindow {
-  position: fixed;
-  border: 0;
-  margin: 0;
-  padding: 0;
+  border: 0rem;
   overflow: hidden;
-  left: 0;
-  top: 20px;
-
-  /* Need to leave this in here to prevent flickering. */
-  transform: scale(1);
-
-/*
- * Do not specify height/width here!
- * They should be handle executively in window_manager.js
- *
- */
-
-/*
- * Disable this for now because it forces an expensive fallback path in
- * Gecko.  The performance issue should be fixed by
- * https://bugzilla.mozilla.org/show_bug.cgi?id=697645 or a related bug.
- *
-  border-radius: 8px;
- */
 }
 
-#windows > .appWindow > iframe {
+#secure-windows {
   position: absolute;
-  top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
-  border: none;
-}
-
-#screen.active-statusbar #windows > .appWindow {
-  top: 40px;
-}
-
-#windows > .appWindow:not(.homescreen) {
-  background-color: #fff;
-}
-
-#windows > .appWindow:not(.homescreen).default-background {
-  background: url('/shared/resources/branding/splash_screen_generic.png') center center no-repeat #fff;
-}
-
-#windows > .appWindow:not(.active):not(.homescreen):not(.opening):not(.closing) {
-  visibility: hidden;
-}
-
-#windows > .appWindow:not(.homescreen):not(.active):not(.inlineActivity):not(.opening) {
-  opacity: 0;
-  transform: scale(0.6);
-}
-
-#windows > .appWindow.opening {
-  transition: transform 0.25s ease, opacity 0.15s ease;
-}
-
-#windows.slow-transition > .appWindow.opening {
-  transition: transform 5s ease, opacity 3s ease;
-}
-
-#screen.cards-view > #windows > .appWindow.opening,
-#screen.cards-view > #windows > .appWindow.closing,
-#screen.switch-app > #windows > .appWindow.opening,
-#screen.switch-app > #windows > .appWindow.closing {
-  transition: transform 0.25s ease;
-  visibility: inherit;
-  opacity: 1;
-}
-
-#screen.switch-app > #windows.slow-transition > .appWindow.opening,
-#screen.switch-app > #windows.slow-transition > .appWindow.closing {
-  transition: transform 5s ease;
-}
-
-#screen.switch-app > #windows > .appWindow.opening-card {
-  transform: translateX(70%) scale(0.6);
-  visibility: inherit;
-  opacity: 1;
-}
-
-#screen.switch-app > #windows > .appWindow.opening-switching {
-  transform: scale(0.6);
-  transition: transform 0.25s ease;
-  visibility: inherit;
-  opacity: 1;
-}
-
-#screen.switch-app > #windows.slow-transition > .appWindow.opening-switching {
-  transition: transform 5s ease;
-}
-
-#screen.switch-app > #windows > .appWindow.closing-card {
-  transform: translateX(-70%) scale(0.6);
-  transition: transform 0.25s ease;
-  visibility: inherit;
-  opacity: 1;
-}
-
-#screen.switch-app > #windows.slow-transition > .appWindow.closing-card {
-  transition: transform 5s ease;
-}
-
-#windows > .appWindow.closing {
-  transition: transform 0.25s ease, opacity 0.15s ease 0.1s;
-}
-
-#windows.slow-transition > .appWindow.closing {
-  transition: transform 5s ease, opacity 3s ease 2s;
-}
-
-#windows > .appWindow.inlineActivity,
-#windows > .appWindow.hideBottom {
-  transform: translateY(100%);
-  transition: transform 0.25s ease, visibility 0.25s ease;
-}
-
-#windows.slow-transition > .appWindow.inlineActivity,
-#windows.slow-transition > .appWindow.hideBottom {
-  transition: transform 5s ease, visibility 5s ease;
-}
-
-#windows > .appWindow.back {
-  transition: transform 0.25s ease, visibility 0.25s ease;
-  transform: scale(0.86);
-}
-
-#windows > .appWindow.restored {
-  transform: none;
-  transition: transform 0.25s ease;
-}
-
-#windows > .appWindow.inlineActivity.active {
-  transform: none;
-}
-
-#screen > #windows > .appWindow.fullscreen-app {
   top: 0;
-}
-
-#screen.attention > #windows > .appWindow.fullscreen-app,
-#screen.attention > #windowSprite,
-#screen.fullscreen-app.attention > #windowSprite {
-  height: calc(100% - 40px);
-  top: 40px;
-}
-
-#windowSprite.before-inline-activity {
-  transform: translateY(calc(100% - 1px));
-  opacity: 1;
-  visibility: visible;
-}
-
-#windowSprite.inline-activity-opening {
-  transition: transform 0.25s ease;
-  transform: translateY(0);
-  opacity: 1;
-  visibility: visible;
-}
-
-#windowSprite.inline-activity-opened {
-  transition: opacity 0.15s ease;
-
-  transform: translateY(0);
-  opacity: 0;
-  visibility: visible;
-}
-
-#windowSprite.before-open {
-  transform: scale(0.6);
-  /* 0.01 opacity is needed to make sure Gecko paints and fire
-     MozAfterPaint event for us. */
-  opacity: 0.01;
-  visibility: visible;
-}
-
-#windowSprite.opening {
-  transition: transform 0.25s ease, opacity 0.15s ease;
-
-  transform: scale(1);
-  opacity: 1;
-  visibility: visible;
-}
-
-#screen.trustedui #windowSprite.opening {
-  opacity: 0;
-}
-
-#windowSprite.opened {
-  transition: opacity 0.15s ease;
-
-  transform: scale(1);
-  opacity: 0;
-  visibility: visible;
-}
-
-#windowSprite.before-close {
-  transform: scale(1);
-  /* 0.01 opacity is needed to make sure Gecko paints and fire
-     MozAfterPaint event for us. */
-  opacity: 0.01;
-  visibility: visible;
-}
-
-#windowSprite.closing {
-  transition: opacity 0.05s ease;
-
-  transform: scale(1);
-  opacity: 1;
-  visibility: visible;
-}
-
-#windowSprite.closed {
-  transition: transform 0.25s ease, opacity 0.15s ease;
-
-  transform: scale(0.6);
-  opacity: 0;
-  visibility: visible;
-}
-
-.accessibility-invert {
-  filter: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgogIDxmaWx0ZXIKICAgICAgaWQ9ImludmVydEZpbHRlciIKICAgICAgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj4KICAgIDxmZUNvbG9yTWF0cml4CiAgICAgICAgdmFsdWVzPSItMSAwIDAgMCAxIDAgLTEgMCAwIDEgMCAwIC0xIDAgMSAwIDAgMCAxIDAgIiAvPgogIDwvZmlsdGVyPgo8L3N2Zz4K#invertFilter);
-}
-
-iframe.backgroundWindow {
-  position: absolute;
-  top: -1px;
-  left: -1px;
-  width: 1px;
-  height: 1px;
-  visibility: hidden;
+  height: 100%;
+  max-height: 100%;
+  border: 0rem;
+  overflow: hidden;
 }
 
 #dialog-overlay {
   position: absolute;
-  top: 20px;
+  top: 2rem;
   left: 0;
   width: 100%;
-  height: calc(100% - 20px);
+  height: calc(100% - 2rem);
   visibility: hidden;
   pointer-events: none;
 }
 
-#screen.active-statusbar #dialog-overlay {
-  top: 40px;
-  height: calc(100% - 40px);
+@media not all and (-moz-physical-home-button) {
+  #dialog-overlay {
+    bottom: 5rem;
+    height: calc(100% - 2rem - 5rem);
+  }
+}
+
+#screen.software-button-enabled #windows > #dialog-overlay {
+  bottom: 5rem;
+  height: calc(100% - 2rem - 5rem);
+}
+
+#screen.active-statusbar #dialog-overlay,
+#screen.active-statusbar.fullscreen-app #dialog-overlay {
+  top: 4rem;
+  height: calc(100% - 4rem);
 }
 
 #screen:-moz-full-screen-ancestor #dialog-overlay,
@@ -492,13 +279,12 @@ iframe.backgroundWindow {
   pointer-events: auto;
 }
 
-#screen.authentication-dialog #dialog-overlay,
-#screen.authentication-dialog #authentication-dialog,
 #screen.crash-dialog #dialog-overlay,
-#screen.crash-dialog #crash-dialog
+#screen.crash-dialog #crash-dialog,
 #screen.modal-dialog #dialog-overlay,
 #screen.modal-dialog #modal-dialog,
 #screen.popup #popup-container,
+#screen.fxa-dialog #fxa-dialog,
 #screen.trustedui #trustedui-container,
 #screen.trustedui #dialog-overlay {
   visibility: visible;
@@ -516,23 +302,23 @@ iframe.backgroundWindow {
   }
 }
 
-#system-banner {
+.generic-dialog.banner {
   z-index: 0;
   visibility: hidden;
   opacity: 0;
   transform: translateY(100%);
 }
 
-#system-banner.visible {
+.generic-dialog.banner.visible {
   animation: banner-bounce 4s;
   visibility: visible;
 }
 
-#system-banner button {
+.generic-dialog.banner button {
   width: auto;
 }
 
-#system-banner[data-button="false"] button {
+.generic-dialog.banner[data-button="false"] button {
   visibility: hidden;
 }
 
@@ -540,40 +326,9 @@ iframe.backgroundWindow {
   visibility: hidden;
 }
 
-/*
-  Styles for FTU starting
-*/
-
-#screen.ftu > [data-z-index-level="app"] > .appWindow.homescreen,
-#screen.ftu > [data-z-index-level="app"] > .appWindow.homescreen.active {
-  opacity: 0;
-}
-
-#screen.ftuStarting #lockscreen {
-  display: none;
-}
-
-#screen.ftuStarting #statusbar {
-  opacity: 0;
-}
-
-/* For app error */
-
-.appWindow > iframe {
-  z-index: 1;
-}
-
-.appError {
-  display: none;
-  background-color: black;
-  z-index: 0;
-}
-
-.appWindow > .appError {
-  background-color: black;
-}
-
-.appError.visible {
-  z-index: 2;
-  display: block;
+@media (min-width: 768px) {
+  #dialog-overlay {
+    background-color: rgba(0,0,0,0.6);
+    background: url(../themes/default/images/ui/menu_bg.png) no-repeat;
+  }
 }

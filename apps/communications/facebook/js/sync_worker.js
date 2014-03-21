@@ -1,14 +1,18 @@
 'use strict';
 
-importScripts('/contacts/js/fb/fb_query.js',
-              '/contacts/js/fb/fb_contact_utils.js', 'console.js');
+importScripts('/shared/js/fb/fb_request.js',
+              '/contacts/js/fb/fb_query.js',
+              '/contacts/js/fb/fb_contact_utils.js',
+              '/shared/js/fb/fb_reader_utils.js',
+              'console.js');
 
 (function(wutils) {
 
   var uids,
       timestamp,
       access_token,
-      forceUpdateUids;
+      forceUpdateUids,
+      targetPictureSize;
 
   wutils.addEventListener('message', processMessage);
 
@@ -41,6 +45,13 @@ importScripts('/contacts/js/fb/fb_query.js',
     null,
     ')'
   ];
+
+  // Query to know the total amount of friends
+  var COUNT_QUERY = 'SELECT uid FROM user WHERE uid IN ' +
+                    '(SELECT uid1 FROM friend WHERE uid2=me())';
+
+  // Indicates whether the worker started with or without data
+  var withData = false;
 
   function debug() {
     function getString(a) {
@@ -115,6 +126,15 @@ importScripts('/contacts/js/fb/fb_query.js',
       query2: REMOVED_QUERY.join('')
     };
 
+    // In any sync without data (periodic one) we also request the total amount
+    // of friends in order to update it
+    // Please take into account that that cannot be done with a friend_count
+    // query as it also returns those friends who are deactivated
+    // See https://bugzilla.mozilla.org/show_bug.cgi?id=838605
+    if (!withData) {
+      outQueries.query3 = COUNT_QUERY;
+    }
+
     return JSON.stringify(outQueries);
   }
 
@@ -122,11 +142,14 @@ importScripts('/contacts/js/fb/fb_query.js',
     var message = e.data;
 
     if (message.type === 'start') {
+      withData = false;
+
       uids = message.data.uids;
       access_token = message.data.access_token;
       timestamp = message.data.timestamp;
       forceUpdateUids = message.data.imgNeedsUpdate;
       fb.operationsTimeout = message.data.operationsTimeout;
+      targetPictureSize = message.data.targetPictureSize;
 
       debug('Worker acks contacts to check: ', Object.keys(uids).length);
 
@@ -137,11 +160,14 @@ importScripts('/contacts/js/fb/fb_query.js',
       getFriendsToBeUpdated(Object.keys(uids), Object.keys(forceUpdateUids));
     }
     else if (message.type === 'startWithData') {
+      withData = true;
       debug('worker Acks start with data');
 
       fb.operationsTimeout = message.data.operationsTimeout;
       uids = message.data.uids;
       access_token = message.data.access_token;
+      targetPictureSize = message.data.targetPictureSize;
+
       getNewImgsForFriends(Object.keys(uids), access_token);
     }
   }
@@ -169,12 +195,22 @@ importScripts('/contacts/js/fb/fb_query.js',
       var removeList = response.data[1].fql_result_set;
       // removeList = [{target_id: '100001127136581'}];
 
+      var theData = {
+        totalToChange: updateList.length + removeList.length,
+        queryTimestamp: qts
+      };
+
+      if (!withData) {
+        if (response.data[2] &&
+            Array.isArray(response.data[2].fql_result_set)) {
+          var friendCount = response.data[2].fql_result_set.length;
+          theData.newFriendNumber = friendCount;
+        }
+      }
+
       wutils.postMessage({
         type: 'totals',
-        data: {
-          totalToChange: updateList.length + removeList.length,
-          queryTimestamp: qts
-        }
+        data: theData
       });
 
       syncUpdatedFriends(updateList);
@@ -279,7 +315,7 @@ importScripts('/contacts/js/fb/fb_query.js',
             contactId: contact.contactId
           }
         });
-      }
+      };
     }
   }
 
@@ -306,7 +342,7 @@ importScripts('/contacts/js/fb/fb_query.js',
           contactId: uids[uid].contactId
         }
       });
-    }
+    };
   }
 
 
@@ -318,7 +354,7 @@ importScripts('/contacts/js/fb/fb_query.js',
 
     this.start = function() {
       retrieveImg(this.friends[next]);
-    }
+    };
 
     function imgRetrieved(blob) {
       if (typeof self.onimageready === 'function') {
@@ -337,8 +373,9 @@ importScripts('/contacts/js/fb/fb_query.js',
     }
 
     function retrieveImg(uid) {
-      fb.utils.getFriendPicture(uid, imgRetrieved, access_token);
+      fb.utils.getFriendPicture(uid, imgRetrieved, access_token,
+                                targetPictureSize);
     }
-  }
+  };
 
 })(self);

@@ -1,0 +1,47 @@
+<element name="simpin" extends="section">
+  <template>
+
+    <header>
+      <a id="simpin-back" href="#"><span class="icon icon-back">back</span></a>
+      <h1 data-l10n-id="simSecurity-header"> SIM Security </h1>
+    </header>
+
+    <div>
+      <header>
+        <h2 data-l10n-id="whatIsSimPin">What is a SIM PIN?</h2>
+      </header>
+      <ul>
+        <li class="description">
+          <p data-l10n-id="simPinIntro1">
+            A SIM PIN prevents access to the SIM card cellular data networks.
+            When it’s on, any device containing the SIM card will request the
+            PIN upon restart.
+          </p>
+          <p data-l10n-id="simPinIntro2">
+            A SIM PIN is not the same as the Passcode used to unlock the device.
+          </p>
+        </li>
+      </ul>
+      <ul id="simpin-container"></ul>
+    </div>
+
+    <script src="shared/js/template.js"></script>
+    <script src="js/simcard_dialog.js"></script>
+    <script src="js/simcard_lock.js"></script>
+    <div id="simpin-tmpl" hidden>
+       <!--
+       <li class="simpin-enabled simpin-enabled-${sim-index} simpin-${sim-index}">
+         <label class="pack-switch">
+           <input type="checkbox" data-ignore data-sim-index="${sim-index}" data-type="checkSimPin"/>
+           <span>${sim-name}</span>
+         </label>
+       </li>
+       <li class="simpin-change simpin-change-${sim-index} simpin-${sim-index}" hidden>
+         <label>
+           <button class="icon icon-view" data-l10n-id="changeSimPin" data-sim-index="${sim-index}" data-type="changeSimPin">${change-sim-label}</button>
+         </label>
+       </li>
+       -->
+    </div>
+  </template>
+</element>

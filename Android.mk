@@ -14,7 +14,10 @@ LOCAL_SRC_FILES := profile.tar.gz
 LOCAL_MODULE_PATH := $(TARGET_OUT_DATA)/local
 include $(BUILD_PREBUILT)
 
-GAIA_MAKE_FLAGS := -C $(GAIA_PATH)
+# We will keep this flag in .b2g.mk so |./flash.sh gaia| follows
+# will correctly pick up the flags.
+GAIA_MAKE_FLAGS :=
+
 GAIA_PROFILE_INSTALL_PARENT := $(TARGET_OUT_DATA)/local
 GAIA_APP_INSTALL_PARENT := $(GAIA_PROFILE_INSTALL_PARENT)
 CLEAN_PROFILE := 0
@@ -23,6 +26,12 @@ CLEAN_PROFILE := 0
 ifneq ($(filter user userdebug, $(TARGET_BUILD_VARIANT)),)
 GAIA_MAKE_FLAGS += PRODUCTION=1
 B2G_SYSTEM_APPS := 1
+endif
+
+# Gaia currently needs to specify the default scale value manually or pictures
+# with correct resolution will not be applied.
+ifneq (,$(GAIA_DEV_PIXELS_PER_PX))
+GAIA_MAKE_FLAGS += GAIA_DEV_PIXELS_PER_PX=$(GAIA_DEV_PIXELS_PER_PX)
 endif
 
 ifeq ($(B2G_SYSTEM_APPS),1)
@@ -37,6 +46,7 @@ $(LOCAL_INSTALLED_MODULE):
 	@echo Gaia install path: $(GAIA_APP_INSTALL_PATH)
 	mkdir -p $(GAIA_PROFILE_INSTALL_PARENT) $(GAIA_APP_INSTALL_PARENT)
 	rm -rf $(GAIA_APP_INSTALL_PATH)
+	@rm -rf $(GAIA_APP_INSTALL_PARENT)/svoperapps
 	cd $(GAIA_PROFILE_INSTALL_PARENT) && tar xfz $(abspath $<)
 	mkdir -p $(TARGET_OUT)/b2g
 	cp $(GAIA_PATH)/profile/user.js $(TARGET_OUT)/b2g/user.js
@@ -60,10 +70,19 @@ $(LOCAL_PATH)/profile.tar.gz:
 ifeq ($(CLEAN_PROFILE), 1)
 	rm -rf $(GAIA_PATH)/profile $(GAIA_PATH)/profile.tar.gz
 endif
-	$(MAKE) -j1 $(GAIA_MAKE_FLAGS) profile
-	@if [ ! -d $(GAIA_PATH)/profile/indexedDB ]; then \
-	cd $(GAIA_PATH)/profile && tar cfz $(abspath $@) webapps; \
-	else \
-	cd $(GAIA_PATH)/profile && tar cfz $(abspath $@) indexedDB webapps; \
+	echo $(GAIA_MAKE_FLAGS) > $(GAIA_PATH)/.b2g.mk
+	$(MAKE) -C $(GAIA_PATH) $(GAIA_MAKE_FLAGS) profile
+	@FOLDERS='webapps'; \
+	if [ -d $(GAIA_PATH)/profile/indexedDB ]; then \
+	FOLDERS="indexedDB $${FOLDERS}"; \
+	fi; \
+	if [ -d $(GAIA_PATH)/profile/svoperapps ]; then \
+	FOLDERS="svoperapps $${FOLDERS}"; \
+	fi; \
+	cd $(GAIA_PATH)/profile && tar cfz $(abspath $@) $${FOLDERS}; \
+	if [ -d $(GAIA_PATH)/profile/indexedDB ]; then \
 	rm -rf $(GAIA_PATH)/profile/indexedDB; \
+	fi; \
+	if [ -d $(GAIA_PATH)/profile/svoperapps ]; then \
+	rm -rf $(GAIA_PATH)/profile/svoperapps; \
 	fi

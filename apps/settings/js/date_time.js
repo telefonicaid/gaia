@@ -88,54 +88,135 @@ navigator.mozL10n.ready(function SettingsDateAndTime() {
   var gTimePicker = document.getElementById('time-picker');
   var gDate = document.getElementById('clock-date');
   var gTime = document.getElementById('clock-time');
+  var gTimezone = document.getElementById('timezone-raw');
+  var gTimezoneValue = document.getElementById('timezone-value');
   var _updateDateTimeout = null;
   var _updateClockTimeout = null;
+  var _timeAutoEnabled = false;
 
+  function updateUI() {
+    gDatePicker.disabled = _timeAutoEnabled;
+    gTimePicker.disabled = _timeAutoEnabled;
+    gTimezoneRegion.disabled = (_timezoneAutoAvailable && _timeAutoEnabled);
+    gTimezoneCity.disabled = (_timezoneAutoAvailable && _timeAutoEnabled);
+    gTimezone.hidden = !(_timezoneAutoAvailable && _timeAutoEnabled);
 
-  /**
-   * Monitor time.nitz.automatic-update.enabled changes
-   */
-
-  var kTimeAutoEnabled = 'time.nitz.automatic-update.enabled';
-
-  function setTimeAutoEnabled(enabled) {
-    gTimeAutoSwitch.dataset.state = enabled ? 'auto' : 'manual';
+    if (_timeAutoEnabled) {
+      document.getElementById('time-manual').classList.add('disabled');
+      if (_timezoneAutoAvailable) {
+        document.getElementById('timezone').classList.add('disabled');
+      }
+    } else {
+      document.getElementById('time-manual').classList.remove('disabled');
+      document.getElementById('timezone').classList.remove('disabled');
+    }
   }
 
-  settings.addObserver(kTimeAutoEnabled, function(event) {
+  /**
+   * Monitor time.clock.automatic-update.enabled changes.
+   * Also sync to time.timezone.automatic-update.enabled.
+   */
+  var kClockAutoEnabled = 'time.clock.automatic-update.enabled';
+  var kTimezoneAutoEnabled = 'time.timezone.automatic-update.enabled';
+
+  function setTimeAutoEnabled(enabled) {
+    _timeAutoEnabled = enabled;
+    gTimeAutoSwitch.dataset.state = enabled ? 'auto' : 'manual';
+    gTimezone.hidden = !(_timezoneAutoAvailable && _timeAutoEnabled);
+
+    var cset = {};
+    cset[kTimezoneAutoEnabled] = enabled;
+    settings.createLock().set(cset);
+
+    updateUI();
+    if (_timeAutoEnabled) {
+      return;
+    }
+
+    // Reset the timezone to the previous user selected value
+    var reqUserTZ = settings.createLock().get('time.timezone.user-selected');
+    reqUserTZ.onsuccess = function dt_getUserTimezoneSuccess() {
+      var userSelTimezone = reqUserTZ.result['time.timezone.user-selected'];
+      if (userSelTimezone) {
+        settings.createLock().set({'time.timezone': userSelTimezone});
+      }
+    };
+  }
+
+  settings.addObserver(kClockAutoEnabled, function(event) {
     setTimeAutoEnabled(!!event.settingValue);
   });
 
-  var reqTimeAutoEnabled = settings.createLock().get(kTimeAutoEnabled);
-  reqTimeAutoEnabled.onsuccess = function dt_getStatusSuccess() {
-    setTimeAutoEnabled(reqTimeAutoEnabled.result[kTimeAutoEnabled]);
+  var reqClockAutoEnabled = settings.createLock().get(kClockAutoEnabled);
+  reqClockAutoEnabled.onsuccess = function clock_getStatusSuccess() {
+    setTimeAutoEnabled(reqClockAutoEnabled.result[kClockAutoEnabled]);
   };
 
-
   /**
-   * Hide automatic time setting if NITZ is not available
+   * Hide automatic time setting if no source available.
    */
 
-  var kTimeAutoAvailable = 'time.nitz.available';
+  var _clockAutoAvailable = false;
+  var _timezoneAutoAvailable = false;
+  var kClockAutoAvailable = 'time.clock.automatic-update.available';
+  var kTimezoneAutoAvailable = 'time.timezone.automatic-update.available';
 
   function setTimeAutoAvailable(available) {
     gTimeAutoSwitch.hidden = !available;
     if (!available) { // disable the time auto-update if N/A
       var cset = {};
-      cset[kTimeAutoEnabled] = false;
+      cset[kClockAutoEnabled] = false;
+      cset[kTimezoneAutoEnabled] = false;
       settings.createLock().set(cset);
     }
   }
 
-  settings.addObserver(kTimeAutoAvailable, function(event) {
-    setTimeAutoAvailable(!!event.settingValue);
+  function setClockAutoAvailable(available) {
+    _clockAutoAvailable = available;
+    setTimeAutoAvailable(_clockAutoAvailable || _timezoneAutoAvailable);
+  }
+
+  function setTimezoneAutoAvailable(available) {
+    var needUpdateUI = (_timezoneAutoAvailable != available);
+    _timezoneAutoAvailable = available;
+    setTimeAutoAvailable(_clockAutoAvailable || _timezoneAutoAvailable);
+    if (needUpdateUI) {
+      updateUI();
+    }
+  }
+
+  settings.addObserver(kClockAutoAvailable, function(event) {
+    setClockAutoAvailable(!!event.settingValue);
   });
 
-  var reqTimeAutoAvailable = settings.createLock().get(kTimeAutoAvailable);
-  reqTimeAutoAvailable.onsuccess = function nitz_getStatusSuccess() {
-    setTimeAutoAvailable(!!reqTimeAutoAvailable.result[kTimeAutoAvailable]);
+  settings.addObserver(kTimezoneAutoAvailable, function(event) {
+    setTimezoneAutoAvailable(!!event.settingValue);
+  });
+
+  var reqClockAutoAvailable = settings.createLock().get(kClockAutoAvailable);
+  reqClockAutoAvailable.onsuccess = function clock_getStatusSuccess() {
+    setClockAutoAvailable(!!reqClockAutoAvailable.result[kClockAutoAvailable]);
   };
 
+  var reqTimezoneAutoAvailable =
+    settings.createLock().get(kTimezoneAutoAvailable);
+  reqTimezoneAutoAvailable.onsuccess = function timezone_getStatusSuccess() {
+    setTimezoneAutoAvailable(
+      !!reqTimezoneAutoAvailable.result[kTimezoneAutoAvailable]);
+  };
+
+  function updateTimezone(timezone) {
+    gTimezoneValue.textContent = timezone;
+  }
+
+  settings.addObserver('time.timezone', function(event) {
+    updateTimezone(event.settingValue);
+  });
+
+  var reqTimezone = settings.createLock().get('time.timezone');
+  reqTimezone.onsuccess = function timezone_getStatusSuccess() {
+    updateTimezone(reqTimezone.result['time.timezone']);
+  };
 
   /**
    * UI startup
@@ -145,21 +226,9 @@ navigator.mozL10n.ready(function SettingsDateAndTime() {
   updateDate();
   updateClock();
 
-  // need to provide an onchange callback to tzSelect, so that
-  // when we change region, both region/city will be updated
-  function tzOnchange() {
-    var selectList = [gTimezoneRegion, gTimezoneCity];
-    selectList.forEach(function initLabel(select) {
-      var button = select.previousElementSibling;
-      var index = select.selectedIndex;
-      if (index >= 0) {
-        button.textContent = select.options[index].textContent;
-      }
-    });
-  }
-
   // monitor time.timezone changes, see /shared/js/tz_select.js
-  tzSelect(gTimezoneRegion, gTimezoneCity, tzOnchange, tzOnchange);
+  var noOp = function() {};
+  tzSelect(gTimezoneRegion, gTimezoneCity, noOp, noOp);
 
   gDatePicker.addEventListener('input', function datePickerChange() {
     setTime('date');
@@ -182,8 +251,17 @@ navigator.mozL10n.ready(function SettingsDateAndTime() {
     updateClock();
   });
 
-  document.addEventListener('mozvisibilitychange', function visibilityChange() {
-    if (!document.mozHidden) {
+  window.addEventListener('localized', function localized() {
+    // Update date and time locale when language is changed
+    var d = new Date();
+    var f = new navigator.mozL10n.DateTimeFormat();
+    var format = _('shortTimeFormat');
+    gDate.textContent = f.localeFormat(d, '%x');
+    gTime.textContent = f.localeFormat(d, format);
+  });
+
+  document.addEventListener('visibilitychange', function visibilityChange() {
+    if (!document.hidden) {
       updateDate();
       updateClock();
     } else {

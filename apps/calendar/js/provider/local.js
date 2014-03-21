@@ -1,6 +1,8 @@
-  Calendar.ns('Provider').Local = (function() {
+/* global uuid */
+Calendar.ns('Provider').Local = (function() {
+  'use strict';
 
-  const LOCAL_CALENDAR_ID = 'local-first';
+  var LOCAL_CALENDAR_ID = 'local-first';
 
   function Local() {
     Calendar.Provider.Abstract.apply(this, arguments);
@@ -18,7 +20,6 @@
   Local.defaultCalendar = function() {
     //XXX: Make async
     var l10nId = 'calendar-local';
-    var list = {};
     var name;
 
     if ('mozL10n' in window.navigator) {

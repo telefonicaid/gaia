@@ -13,53 +13,134 @@
     var next = 0;
     var self = this;
     var serviceConnector = pConnector;
+    var totalImported = 0;
+
+    var mustHold = false;
+    var holded = false;
+    var mustFinish = false;
+
+    var isOnLine = navigator.onLine;
+
+    window.addEventListener('online', onLineChanged);
+    window.addEventListener('offline', onLineChanged);
+
+    function onLineChanged() {
+      isOnLine = navigator.onLine;
+    }
 
     function contactSaved(e) {
+      var cfdata = this;
       if (typeof self.oncontactimported === 'function') {
-        window.setTimeout(self.oncontactimported, 0);
+        window.setTimeout(function() {
+          self.oncontactimported(cfdata);
+        }, 0);
       }
       continueCb();
     }
 
-    function saveMozContact(deviceContact) {
-      var mzContact = new mozContact();
-      mzContact.init(deviceContact);
+    function contactSaveError(err) {
+      window.console.error('Error while importing contact: ', err.name);
 
-      var req = navigator.mozContacts.save(deviceContact);
+      if (typeof self.onerror === 'function') {
+        window.setTimeout(self.onerror.bind(null, err), 0);
+      }
+      continueCb();
+    }
 
-      req.onsuccess = contactSaved;
-      req.onerror = function() {
-        window.console.error('Error while importing contact: ',
-                             req.error.name);
-      };
+    function saveMozContact(deviceContact, successCb, errorCb) {
+      var req = navigator.mozContacts.save(
+        utils.misc.toMozContact(deviceContact));
+
+      req.onsuccess = successCb;
+      req.onerror = errorCb;
     }
 
     function pictureReady(blobPicture) {
-      var deviceContact = self.adapt(this);
-      deviceContact.photo = [blobPicture];
+      var serviceContact = this;
 
-      self.persist(deviceContact);
+      var done = function() {
+        var deviceContact = self.adapt(serviceContact);
+        self.persist(deviceContact, contactSaved.bind(serviceContact),
+                     contactSaveError);
+      };
+
+      // Photo is assigned to the service contact as it is needed by the
+      // Fb Connector
+      if (!blobPicture) {
+        done();
+        return;
+      }
+
+      utils.thumbnailImage(blobPicture, function gotThumbnail(thumbnail) {
+        if (blobPicture !== thumbnail) {
+          serviceContact.photo = [blobPicture, thumbnail];
+        } else {
+          serviceContact.photo = [blobPicture];
+        }
+        done();
+      });
     }
 
     function pictureError() {
       window.console.error('Error while getting picture for contact: ',
                            this.user_id);
-      self.persist(self.adapt(this));
+      self.persist(self.adapt(this), contactSaved.bind(this), contactSaveError);
     }
 
     function pictureTimeout() {
       window.console.warn('Timeout while getting picture for contact: ',
                            this.user_id);
-      self.persist(self.adapt(this));
+      self.persist(self.adapt(this), contactSaved.bind(this),
+                   contactSaveError);
     }
 
     this.start = function() {
+      mustHold = false;
+      holded = false;
+      mustFinish = false;
       importContacts(next);
     };
 
+    this.hold = function() {
+      mustHold = true;
+    };
+
+    this.finish = function() {
+      mustFinish = true;
+
+      if (holded) {
+        notifySuccess();
+      }
+    };
+
+    this.resume = function() {
+      mustHold = false;
+      holded = false;
+      mustFinish = false;
+
+      window.setTimeout(function resume_import() {
+        importContacts(next);
+      }, 0);
+    };
+
     // This method might be overritten
-    this.persist = function(contactData) {
-      saveMozContact(contactData);
+    this.persist = function(contactData, successCb, errorCb) {
+      var cbs = {
+        onmatch: function(matches) {
+          contacts.adaptAndMerge(this, matches, {
+            success: successCb,
+            error: errorCb
+          });
+        }.bind(utils.misc.toMozContact(contactData)),
+        onmismatch: function() {
+          saveMozContact(this, successCb, function onMismatchError(evt) {
+            errorCb(evt.target.error);
+          });
+        }.bind(contactData)
+      };
+
+      // Try to match and if so merge is performed
+      contacts.Matcher.match(contactData, 'passive', cbs);
     };
 
     // This method might be overwritten
@@ -77,24 +158,45 @@
           timeout: pictureTimeout.bind(serviceContact)
         };
 
-        serviceConnector.downloadContactPicture(serviceContact,
+        if (isOnLine === true) {
+          serviceConnector.downloadContactPicture(serviceContact,
                                              access_token, callbacks);
+        }
+        else {
+          callbacks.success(null);
+        }
+      }
+    }
+
+    function notifySuccess() {
+      if (typeof self.onsuccess === 'function') {
+        window.setTimeout(function do_success() {
+          self.onsuccess(totalImported);
+        }, 0);
       }
     }
 
     function continueCb() {
       next++;
       numResponses++;
+      totalImported++;
       if (next < total && numResponses === CHUNK_SIZE) {
         numResponses = 0;
-        importContacts(next);
+        if (!mustHold && !mustFinish) {
+          importContacts(next);
+        }
+        else if (mustFinish && !holded) {
+          notifySuccess();
+        }
+
+        if (mustHold) {
+          holded = true;
+        }
       }
       else if (next >= total) {
         // End has been reached
-        if (typeof self.onsuccess === 'function') {
-          window.setTimeout(self.onsuccess, 0);
-        }
+        notifySuccess();
       }
     }
-  }
+  };
 })();

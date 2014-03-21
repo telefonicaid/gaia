@@ -1,11 +1,7 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('models/calendar.js');
-  requireLib('models/account.js');
-  requireLib('controllers/sync.js');
-});
+requireLib('models/calendar.js');
+requireLib('models/account.js');
 
-suite('controllers/sync', function() {
-
+suiteGroup('Controllers.Sync', function() {
   var account;
   var calendar;
   var event;
@@ -16,9 +12,15 @@ suite('controllers/sync', function() {
 
   var accModel;
 
-  setup(function(done) {
-    this.timeout(10000);
+  function stageAccountSyncError(err) {
+    account.sync = function() {
+      var args = Array.slice(arguments);
+      var cb = args.pop();
+      Calendar.nextTick(cb.bind(this, err));
+    };
+  }
 
+  setup(function(done) {
     app = testSupport.calendar.app();
     db = app.db;
     subject = new Calendar.Controllers.Sync(app);
@@ -62,6 +64,10 @@ suite('controllers/sync', function() {
     subject.all();
   });
 
+  test('sync all, no accounts with callback', function(done) {
+    subject.all(done);
+  });
+
   suite('#all', function() {
     var list = [];
 
@@ -79,21 +85,25 @@ suite('controllers/sync', function() {
       };
     });
 
-    test('sync account', function() {
+    test('sync account', function(done) {
       var calledModels = [];
+      var pending = 2;
+
+      function complete() {
+        list.forEach(function(item, idx) {
+          assert.hasProperties(item, calledModels[idx]);
+        });
+       }
 
       subject.account = function(model) {
         calledModels.push(model);
+        if (!--pending) {
+          done(complete);
+        }
       };
-
       subject.all();
-
-      assert.deepEqual(
-        calledModels,
-        list,
-        'requests a sync of all accounts'
-      );
     });
+
   });
 
   suite('individual sync operations', function() {
@@ -163,34 +173,63 @@ suite('controllers/sync', function() {
     });
 
     suite('#account', function() {
-      test('success', function() {
-        var firedCallback = false;
+
+      test('error without a callback', function(done) {
+        app.errorController.dispatch = function(given) {
+          done(function() {
+            assert.ok(!subject.pending);
+            assert.equal(err, given);
+          });
+        };
+
+        var err = new Calendar.Error();
+        stageAccountSyncError(err);
+        subject.account(accModel);
+        assert.equal(subject.pending, 1);
+      });
+
+      test('error with a callback', function(done) {
+        var err = new Error();
+        stageAccountSyncError(err);
+        subject.account(accModel, function(givenErr) {
+          done(function() {
+            assert.equal(givenErr, err, 'sends error');
+          });
+        });
+      });
+
+      test('success', function(done) {
+        var pendingCalendarSync = 2;
+
+        // verify we sync accounts
+        account.sync = function(account, callback) {
+          assert.equal(account._id, accModel._id);
+          assertDoesNotEmit('syncComplete');
+          callback();
+        };
+
+        var lastCalendar;
+        // verify we sync calendars
+        calendar.sync = function(acc, calendar, callback) {
+          assert.equal(accModel._id, acc._id);
+          assert.equal(calendar.accountId, acc._id);
+
+          Calendar.nextTick(function() {
+            callback();
+            if (!--pendingCalendarSync) {
+              assert.notEqual(lastCalendar._id, calendar._id);
+            } else {
+              lastCalendar = calendar;
+              assertDoesNotEmit('syncComplete');
+            }
+          });
+        };
+
         subject.account(accModel, function() {
-          firedCallback = true;
+          done(function() {
+            assertEmit('syncComplete');
+          });
         });
-
-        assertEmit('syncStart');
-        assert.equal(accountSyncCall[0], accModel);
-
-        // successful sync
-        accountSyncCall[1]();
-
-        // not done until calendars have synced
-        assertDoesNotEmit('syncComplete');
-        assert.length(calendarSyncCalls, 2);
-
-        // complete all calls
-        calendarSyncCalls.forEach(function(item) {
-          var cb = item.pop();
-          assert.ok(
-            !firedCallback,
-            'does not fire callback before all are complete'
-          );
-          cb();
-        });
-
-        assert.ok(firedCallback, 'fires after all sync operations');
-        assertEmit('syncComplete');
       });
     });
 

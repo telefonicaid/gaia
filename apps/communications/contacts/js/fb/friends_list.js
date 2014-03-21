@@ -1,17 +1,64 @@
 'use strict';
 
-var fbFriends = window.fbFriends || {};
+var FriendListRenderer = (function() {
 
-fbFriends.List = (function() {
-  var groupsList = document.querySelector('#groups-list');
+  // Order criteria
+  var orderCriteria = {
+    firstName: ['givenName', 'familyName', 'email1'],
+    lastName: ['familyName', 'givenName', 'email1']
+  };
 
-  var load = function load(contacts, cb) {
+  var HEADER_LETTERS = [
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ',          // Roman
+    'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ' ,           // Greek
+    'АБВГДЂЕЁЖЗИЙЈКЛЉМНЊОПРСТЋУФХЦЧЏШЩЭЮЯ' // Cyrillic (Russian + Serbian)
+  ].join('');
+
+  // Options by default
+  var defaults = {
+    container: '#groups-list',
+    orderBy: 'lastName'
+  };
+
+  // Callback to notify when finish
+  var finishCb;
+  var totalContacts;
+  var lock;
+  var CHUNK_SIZE = 10;
+
+  var render = function render(contacts, cb, options) {
+    // Populate defaults
+    for (var key in defaults) {
+      if (typeof options[key] === 'undefined') {
+        options[key] = defaults[key];
+      }
+    }
+
+    finishCb = cb;
+    totalContacts = contacts.length;
+
+    lock = navigator.requestWakeLock('cpu');
+
+    doRender(contacts, cb, options);
+  };
+
+  var doRender = function doRender(contacts, cb, options) {
+    var groupsList = document.querySelector(options.container);
+    var orderBy = options.orderBy;
+    var order = orderCriteria[orderBy];
+
+    // Sorting friend list
+    contacts.sort(function(a, b) {
+      return getStringToBeOrdered(a, order).localeCompare(
+                                                getStringToBeOrdered(b, order));
+    });
+
     // Hash containing each group
     var groups = {};
 
     contacts.forEach(function(contact) {
       // Contacts are ordered so it is pretty easy to group them
-      var groupName = getGroupName(contact);
+      var groupName = getGroupName(contact, order);
       if (!groups[groupName]) {
         groups[groupName] = [];
       }
@@ -19,69 +66,140 @@ fbFriends.List = (function() {
       groups[groupName].push(contact);
     });
 
-    var agroups = Object.keys(groups);
+    // We are going to delete the paragraph that paints the other order for the
+    // contact's name from template...
+    var notRenderedParagraph = groupsList.querySelector('[data-order-by="' +
+                   (orderBy === 'firstName' ? 'lastName' : 'firstName') + '"]');
+    if (notRenderedParagraph) {
+      notRenderedParagraph.parentNode.removeChild(notRenderedParagraph);
+    }
+    // Start first element of HEADER_LETTERS (A)
+    var letterStart = 0;
+    doRenderGroupChunk(letterStart, HEADER_LETTERS[letterStart],
+                       groupsList, groups);
+  };
 
-    var fragment = document.createDocumentFragment();
+  // Controls group rendering one by one
+  function doRenderGroupChunk(index, group, groupsList, groups) {
+    renderGroup(groupsList, group, groups[group], function(fragment) {
+      if (fragment) {
+        groupsList.appendChild(fragment);
+      }
+      fragment = null;
 
-    // For each group
-    agroups.forEach(function(group) {
-      // New element appended
-      var ele = utils.templates.append(groupsList, {
-        group: group,
-        letter: getGroupLetter(group)
-      }, fragment);
-      // This is the <ol> and <header> is children[0]
-      var list = ele.children[1];
-
-      // Array of friends
-      var friends = groups[group];
-      // For each friend in the group
-      friends.forEach(function(friend) {
-        var searchInfo = [];
-        var searchable = ['givenName', 'familyName'];
-        searchable.forEach(function(field) {
-          if (friend[field] && friend[field][0]) {
-            searchInfo.push(friend[field][0]);
-          }
+      var headerLettersLength = HEADER_LETTERS.length;
+      if (index + 1 <= headerLettersLength) {
+        window.setTimeout(function renderNextGroup() {
+          doRenderGroupChunk(index + 1, HEADER_LETTERS[index + 1],
+                        groupsList, groups);
         });
+      }
+      else if (group != '#') {
+        window.setTimeout(function renderNextGroup() {
+          doRenderGroupChunk(index + 1, '#', groupsList, groups);
+        });
+      }
+      else {
+         // Deleting template
+        groupsList.removeChild(groupsList.firstElementChild);
 
-        // Enabling searching by email
-        if (friend['email1']) {
-          searchInfo.push(friend['email1']);
+         if (typeof finishCb === 'function') {
+        // We wait a delay depending on number of nodes
+        // Afterwards the curtain will be displayed
+          window.setTimeout(finishCb, totalContacts * 2);
         }
+        if (lock) {
+          lock.unlock();
+        }
+      }
+    });
+  }
 
-        friend.search = utils.text.normalize(searchInfo.join(' '));
+  // Renders the items in a group in chunks
+  function doRenderGroupItems(from, groupsList, group, friends, element, cb) {
+    var end = from + CHUNK_SIZE;
+
+    // This is the <ol> and <header> is children[0]
+    var list = element.children[1];
+
+    for (var i = from; i < end && i < friends.length; i++) {
+      var friend = friends[i];
+
+      if (friend.search && friend.search.length > 0) {
+        // Set the picture size
+        var box = importUtils.getPreferredPictureBox();
+        friend.picwidth = box.width;
+        friend.picheight = box.height;
+
+        friend.search = Normalizer.toAscii(friend.search);
 
         // New friend appended
         utils.templates.append(list, friend);
-      });
-
-      // Template is deleted from the list
-      list.removeChild(list.firstElementChild);
-    });
-
-    groupsList.innerHTML = ''; // Deleting template
-    groupsList.appendChild(fragment);
-
-    FixedHeader.init('#mainContent', '#fixed-container',
-                     '.fb-import-list header');
-    if (typeof cb === 'function') {
-      // We wait a delay depending on number of nodes (the curtain is displayed)
-      window.setTimeout(function () { cb(); }, contacts.length * 2);
+      }
     }
-  };
 
-  function getStringToBeOrdered(contact) {
-    var ret = [];
-
-    ret.push(contact.familyName ? contact.familyName[0] : '');
-    ret.push(contact.givenName ? contact.givenName[0] : '');
-
-    return ret.join('');
+    if (i < friends.length) {
+      window.setTimeout(function renderNextChunk() {
+        doRenderGroupItems(end, groupsList, group, friends, element, cb);
+      });
+    }
+    else {
+      list.removeChild(list.firstElementChild);
+      cb();
+    }
   }
 
-  function getGroupName(contact) {
-    var ret = getStringToBeOrdered(contact);
+  // Renders a group
+  function renderGroup(groupsList, group, friends, cb) {
+    if (!friends || friends.length === 0) {
+      window.setTimeout(cb);
+      return;
+    }
+
+    // Document fragment that will hold the group nodes
+    var fragment = document.createDocumentFragment();
+
+    // New element appended
+    var element = utils.templates.append(groupsList, {
+      group: group
+    }, fragment);
+
+    // For each friend in the group
+    doRenderGroupItems(0, groupsList, group, friends, element, function() {
+      cb(fragment);
+    });
+  }
+
+  function getStringToBeOrdered(contact, order) {
+    var ret = contact.search;
+
+    if (!ret) {
+      ret = [];
+
+      order.forEach(function(field) {
+        ret.push(getValue(contact, field));
+      });
+
+      ret = contact.search = ret.join('');
+    }
+
+    return ret;
+  }
+
+  function getValue(contact, field) {
+    var out = contact[field];
+
+    if (out) {
+      out = Array.isArray(out) ? out[0] : out;
+    } else {
+      out = '';
+    }
+
+    return out;
+  };
+
+  function getGroupName(contact, order) {
+    var ret = getStringToBeOrdered(contact, order);
 
     ret = ret.charAt(0).toUpperCase();
     ret = ret.replace(/[ÁÀ]/ig, 'A');
@@ -90,18 +208,13 @@ fbFriends.List = (function() {
     ret = ret.replace(/[ÓÒ]/ig, 'O');
     ret = ret.replace(/[ÚÙ]/ig, 'U');
 
-    var code = ret.charCodeAt(0);
-    if (code < 65 || code > 90) {
-      ret = 'und';
+    if (HEADER_LETTERS.indexOf(ret) < 0) {
+      ret = '#';
     }
     return ret;
   }
 
-  function getGroupLetter(group) {
-    return group === 'und' ? '#' : group;
-  }
-
   return {
-    'load': load
+    'render': render
   };
 })();

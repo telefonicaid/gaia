@@ -3,17 +3,22 @@
   "description": "Gaia Homescreen",
   "launch_path": "/index.html#root",
   "type": "certified",
+  "role": "homescreen",
   "developer": {
     "name": "The Gaia Team",
     "url": "https://github.com/andreasgal/gaia"
   },
   "permissions": {
+    "mobileconnection":{},
     "webapps-manage":{},
     "systemXHR":{},
     "settings":{ "access": "readwrite" },
-    "device-storage:pictures":{ "access": "readonly" },
     "open-remote-window":{},
-    "geolocation": {}
+    "storage":{},
+    "geolocation": {},
+    "alarms": {},
+    "power":{},
+    "contacts":{ "access": "readonly" }
   },
   "locales": {
     "ar": {
@@ -34,16 +39,28 @@
     }
   },
   "default_locale": "en-US",
-  "orientation": "portrait-primary",
+  "icons": {
+    "30": "/style/icons/HomeScreen.png"
+  },
+  "orientation": "default",
   "activities": {
     "save-bookmark": {
       "filters": {
         "type": "url",
-        "url": { "required":true, "regexp":"/^https?:/" }
+        "url": { "required":true, "pattern":"https?:.{1,16384}" }
       },
       "disposition": "inline",
       "href": "/save-bookmark.html",
       "returnValue": true
+    }
+  },
+  "messages": [
+    { "alarm": "/index.html" }
+  ],
+  "datastores-owned": {
+    "eme_store": {
+      "access": "readwrite",
+      "description": "Stores Everything.me data"
     }
   }
 }

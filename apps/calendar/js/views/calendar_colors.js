@@ -1,4 +1,5 @@
 Calendar.ns('Views').CalendarColors = (function() {
+  'use strict';
 
   function Colors() {
     this.colorMap = Object.create(null);
@@ -23,6 +24,7 @@ Calendar.ns('Views').CalendarColors = (function() {
       var store = Calendar.App.store('Calendar');
       store.on('persist', this);
       store.on('remove', this);
+      store.on('preRemove', this);
     },
 
     handleEvent: function(e) {
@@ -30,6 +32,9 @@ Calendar.ns('Views').CalendarColors = (function() {
         case 'persist':
           // 1 is the model
           this.updateRule(e.data[1]);
+          break;
+        case 'preRemove':
+          this.hideCalendar(e.data[0]);
           break;
         case 'remove':
           // 0 is an id of a model
@@ -39,12 +44,24 @@ Calendar.ns('Views').CalendarColors = (function() {
     },
 
     render: function() {
-      var store = Calendar.App.store('Calendar');
-      var key;
+      var calendarStore = Calendar.App.store('Calendar');
 
-      for (key in store.cached) {
-        this.updateRule(store.cached[key]);
-      }
+      calendarStore.all(function(err, calendars) {
+        if (err) {
+          console.log('Error fetch calendars in CalendarColors');
+        }
+
+        var id;
+        for (id in calendars) {
+          this.updateRule(calendars[id]);
+        }
+
+        if (this.onrender) {
+          this.onrender();
+        }
+
+      }.bind(this));
+
     },
 
     /**
@@ -65,6 +82,14 @@ Calendar.ns('Views').CalendarColors = (function() {
       return this.calendarId(String(id));
     },
 
+    hideCalendar: function(id) {
+      this.updateRule({
+        _id: id,
+        localDisplayed: false,
+        color: '#CCC'
+      });
+    },
+
     /**
      * associates a color with a
      * calendar/calendar id with a color.
@@ -73,7 +98,6 @@ Calendar.ns('Views').CalendarColors = (function() {
      */
     updateRule: function(calendar) {
       var id = this.getId(calendar);
-      var styles = this.colorMap[id];
       var color = calendar.color;
       var rules = this._styles.cssRules;
       var map;

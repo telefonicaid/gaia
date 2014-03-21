@@ -1,9 +1,8 @@
 (function(window) {
+  'use strict';
 
   function Store() {
     Calendar.Store.Abstract.apply(this, arguments);
-
-    this._remoteByAccount = Object.create(null);
   }
 
   /**
@@ -25,27 +24,15 @@
       'alarms', 'icalComponents'
     ],
 
-    _parseId: function(id) {
-      return id;
-    },
+    _parseId: Calendar.Store.Abstract.prototype.probablyParseInt,
 
     _addToCache: function(object) {
-      var remote = object.remote.id;
-
       this._cached[object._id] = object;
-
-      if (!(object.accountId in this._remoteByAccount)) {
-        this._remoteByAccount[object.accountId] = {};
-      }
-      this._remoteByAccount[object.accountId][remote] = object;
     },
 
     _removeFromCache: function(id) {
-      if (id in this.cached) {
-        var object = this.cached[id];
-        var remote = object.remote.id;
-        delete this.cached[id];
-        delete this._remoteByAccount[object.accountId][remote];
+      if (id in this._cached) {
+        delete this._cached[id];
       }
     },
 
@@ -66,19 +53,84 @@
       store.removeByIndex('calendarId', id, trans);
     },
 
-    remotesByAccount: function(accountId) {
-      if (accountId in this._remoteByAccount) {
-        return this._remoteByAccount[accountId];
+    /**
+     * Marks a given calendar with an error.
+     *
+     * Emits a 'error' event immediately.. This method is typically
+     * triggered by an account wide error.
+     *
+     *
+     * @param {Object} calendar model.
+     * @param {Calendar.Error} error for given calendar.
+     * @param {IDBTransaction} transaction optional.
+     * @param {Function} callback fired when model is saved [err, id, model].
+     */
+    markWithError: function(calendar, error, trans, callback) {
+      if (typeof(trans) === 'function') {
+        callback = trans;
+        trans = null;
       }
-      return Object.create(null);
+
+      if (!calendar._id) {
+        throw new Error('given calendar must be persisted.');
+      }
+
+      calendar.error = {
+        name: error.name,
+        date: new Date()
+      };
+
+      this.persist(calendar, trans, callback);
+    },
+
+    /**
+     * Find calendars in a specific account.
+     * Results will be returned in an object where
+     * the key is the remote.id and the value is the calendar.
+     *
+     * @param {String|Numeric} accountId id of account.
+     * @param {Function} callback [err, object] see above.
+     */
+    remotesByAccount: function(accountId, trans, callback) {
+      if (typeof(trans) === 'function') {
+        callback = trans;
+        trans = null;
+      }
+
+      if (!trans) {
+        trans = this.db.transaction(this._store);
+      }
+
+      var store = trans.objectStore(this._store);
+
+      var reqKey = IDBKeyRange.only(accountId);
+      var req = store.index('accountId').mozGetAll(reqKey);
+
+      req.onerror = function remotesError(e) {
+        callback(e.target.error);
+      };
+
+      var self = this;
+      req.onsuccess = function remotesSuccess(e) {
+        var result = Object.create(null);
+        e.target.result.forEach(function(calendar) {
+          result[calendar.remote.id] = self._createModel(
+            calendar,
+            calendar._id
+          );
+        });
+
+        callback(null, result);
+      };
     },
 
     /**
      * Sync remote and local events for a calendar.
+     *
+     * TODO: Deprecate use of this function in favor of a sync methods
+     *       inside of providers.
      */
     sync: function(account, calendar, callback) {
-      var self = this;
-      var store = this.db.getStore('Event');
       var provider = Calendar.App.provider(
         account.providerType
       );
@@ -89,68 +141,70 @@
      * Shortcut to find provider for calendar.
      *
      * @param {Calendar.Models.Calendar} calendar input calendar.
-     * @return {Calendar.Provider.Abstract} provider.
+     * @param {Function} callback [err, provider].
      */
-    providerFor: function(calendar) {
-      var acc = this.accountFor(calendar);
-      return Calendar.App.provider(acc.providerType);
-    },
-
-    /**
-     * Finds account for calendar
-     *
-     * @param {Calendar.Models.Calendar} calendar input calendar.
-     * @return {Calendar.Models.Account} cached account.
-     */
-    accountFor: function(calendar) {
-      return this.db.getStore('Account').cached[calendar.accountId];
-    },
-
-    /**
-     * Find calendar(s) with a specific capability:
-     * NOTE: this method only searches through cached calendars.
-     *
-     * Possible Capabilities:
-     *
-     *  - createEvent
-     *  - deleteEvent
-     *  - editEvent
-     *
-     * @param {String} type name of capability.
-     * @return {Array[Calendar.Model.Calendar]} list of calendar models.
-     */
-    findWithCapability: function(type) {
-      var accounts = this.db.getStore('Account');
-      var propName;
-
-      if (!(type in Store.capabilities)) {
-        throw new Error('invalid capability: "' + type + '"');
-      }
-
-      propName = Store.capabilities[type];
-
-      var list = this.cached;
-      var result = [];
-      var cal;
-      var id;
-      var account;
-      var provider;
-
-      for (id in list) {
-        cal = list[id];
-        account = accounts.cached[cal.accountId];
-        if (account) {
-          provider = Calendar.App.provider(account.providerType);
-          var caps = provider.calendarCapabilities(cal);
-          if (caps[propName]) {
-            result.push(cal);
-          }
+    providerFor: function(calendar, callback) {
+      this.ownersOf(calendar, function(err, owners) {
+        if (err) {
+          return callback(err);
         }
+
+        callback(
+          null,
+          Calendar.App.provider(owners.account.providerType)
+        );
+      });
+    },
+
+    /**
+     * Finds calendar/account for a given event.
+     *
+     * TODO: think about moving this function into its
+     * own file as a mixin.
+     *
+     * @param {Object|String|Numeric} objectOrId must contain .calendarId.
+     * @param {Function} callback [err, { ... }].
+     */
+    ownersOf: function(objectOrId, callback) {
+      var result = {};
+
+      var accountStore = this.db.getStore('Account');
+
+      // case 1. given a calendar
+      if (objectOrId instanceof Calendar.Models.Calendar) {
+        result.calendar = objectOrId;
+        accountStore.get(objectOrId.accountId, fetchAccount);
+        return;
       }
 
-      return result;
-    }
+      // case 2 given a calendar id or object
 
+      if (typeof(objectOrId) === 'object') {
+        objectOrId = objectOrId.calendarId;
+      }
+
+      // why??? because we use this method in event store too..
+      var calendarStore = this.db.getStore('Calendar');
+      calendarStore.get(objectOrId, fetchCalendar);
+
+      function fetchCalendar(err, calendar) {
+        if (err) {
+          return callback(err);
+        }
+
+        result.calendar = calendar;
+        accountStore.get(calendar.accountId, fetchAccount);
+      }
+
+      function fetchAccount(err, account) {
+        if (err) {
+          return callback(err);
+        }
+
+        result.account = account;
+        callback(null, result);
+      }
+    }
   };
 
   Calendar.ns('Store').Calendar = Store;

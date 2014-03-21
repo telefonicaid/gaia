@@ -1,5 +1,6 @@
 {
   "ar"        : "عربي",
+  "ca"        : "Català",
   "cs"        : "Čeština",
   "de"        : "Deutsch",
   "el"        : "Ελληνικά",
@@ -14,6 +15,8 @@
   "ro"        : "Română",
   "ru"        : "Русский",
   "sk"        : "Slovenčina",
+  "sr-Cyrl"   : "Српски",
+  "sr-Latn"   : "Srpski",
   "tr"        : "Türkçe",
   "zh-TW"     : "正體中文 (繁體)"
 }

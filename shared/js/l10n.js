@@ -10,10 +10,37 @@
 
 (function(window) {
   var gL10nData = {};
-  var gTextProp = 'textContent';
   var gLanguage = '';
   var gMacros = {};
   var gReadyState = 'loading';
+
+  // DOM element properties that may be localized with a key:value pair.
+  var gNestedProps = ['style', 'dataset'];
+
+
+  /**
+   * Localization resources are declared in the HTML document with <link> nodes:
+   *   <link rel="prefetch" type="application/l10n" href="locales.ini" />
+   * Such *.ini files are multi-locale dictionaries where all supported locales
+   * are listed / defined / imported, and where a fallback locale can easily be
+   * defined.
+   *
+   * These *.ini files can also be compiled to locale-specific JSON dictionaries
+   * with the `getDictionary()' method.  Such JSON dictionaries can be used:
+   *  - either with a <link> node:
+   *   <link rel="prefetch" type="application/l10n" href="{{locale}}.json" />
+   *   (in which case, {{locale}} will be replaced by `navigator.language')
+   *  - or with an inline <script> node:
+   *   <script type="application/l10n" lang="fr"> ... </script>
+   *   (in which case, the script matching `navigator.language' will be parsed)
+   *
+   * This is where `gDefaultLocale' comes in: if a JSON dictionary for the
+   * current `navigator.language' value can't be found, use the one matching the
+   * default locale.  Note that if the <html> element has a `lang' attribute,
+   * its value becomes the default locale.
+   */
+
+  var gDefaultLocale = 'en-US';
 
 
   /**
@@ -41,17 +68,39 @@
 
   var gDEBUG = 1;
 
-  function consoleLog(message) {
+  function consoleLog() {
     if (gDEBUG >= 2) {
-      console.log('[l10n] ' + message);
+      var args = [].slice.apply(arguments);
+      args.unshift('[l10n] ');
+      console.log(args.join(''));
     }
   };
 
-  function consoleWarn(message) {
+  function consoleWarn() {
     if (gDEBUG) {
-      console.warn('[l10n] ' + message);
+      var args = [].slice.apply(arguments);
+      args.unshift('[l10n] ');
+      console.warn(args.join(''));
     }
   };
+
+  function consoleWarn_missingKeys(untranslatedElements, lang) {
+    var len = untranslatedElements.length;
+    if (!len || !gDEBUG) {
+      return;
+    }
+
+    var missingIDs = [];
+    for (var i = 0; i < len; i++) {
+      var l10nId = untranslatedElements[i].getAttribute('data-l10n-id');
+      if (missingIDs.indexOf(l10nId) < 0) {
+        missingIDs.push(l10nId);
+      }
+    }
+    console.warn('[l10n] ' +
+        missingIDs.length + ' missing key(s) for [' + lang + ']: ' +
+        missingIDs.join(', '));
+  }
 
 
   /**
@@ -65,9 +114,13 @@
     return document.querySelectorAll('link[type="application/l10n"]');
   }
 
-  function getL10nDictionary() {
-    var script = document.querySelector('script[type="application/l10n"]');
-    // TODO: support multiple and external JSON dictionaries
+  function getL10nDictionary(lang) {
+    var getInlineDict = function(locale) {
+      var sel = 'script[type="application/l10n"][lang="' + locale + '"]';
+      return document.querySelector(sel);
+    };
+    // TODO: support multiple internal JSON dictionaries
+    var script = getInlineDict(lang) || getInlineDict(gDefaultLocale);
     return script ? JSON.parse(script.innerHTML) : null;
   }
 
@@ -76,8 +129,9 @@
   }
 
   function getL10nAttributes(element) {
-    if (!element)
+    if (!element) {
       return {};
+    }
 
     var l10nId = element.getAttribute('data-l10n-id');
     var l10nArgs = element.getAttribute('data-l10n-args');
@@ -86,10 +140,38 @@
       try {
         args = JSON.parse(l10nArgs);
       } catch (e) {
-        consoleWarn('could not parse arguments for #' + l10nId);
+        consoleWarn('could not parse arguments for #', l10nId);
       }
     }
     return { id: l10nId, args: args };
+  }
+
+  function setTextContent(element, text) {
+    // standard case: no element children
+    if (!element.firstElementChild) {
+      element.textContent = text;
+      return;
+    }
+
+    // this element has element children: replace the content of the first
+    // (non-blank) child textNode and clear other child textNodes
+    var found = false;
+    var reNotBlank = /\S/;
+    for (var child = element.firstChild; child; child = child.nextSibling) {
+      if (child.nodeType === 3 && reNotBlank.test(child.nodeValue)) {
+        if (found) {
+          child.nodeValue = '';
+        } else {
+          child.nodeValue = text;
+          found = true;
+        }
+      }
+    }
+    // if no (non-empty) textNode is found, insert a textNode before the
+    // element's first child.
+    if (!found) {
+      element.insertBefore(document.createTextNode(text), element.firstChild);
+    }
   }
 
   function fireL10nReadyEvent() {
@@ -120,7 +202,7 @@
    *    triggered when the an error has occured.
    *
    * @return {void}
-   *    uses the following global variables: gL10nData, gTextProp.
+   *    fills gL10nData.
    */
 
   function parseResource(href, lang, successCallback, failureCallback) {
@@ -128,8 +210,9 @@
 
     // handle escaped characters (backslashes) in a string
     function evalString(text) {
-      if (text.lastIndexOf('\\') < 0)
+      if (text.lastIndexOf('\\') < 0) {
         return text;
+      }
       return text.replace(/\\\\/g, '\\')
                  .replace(/\\n/g, '\n')
                  .replace(/\\r/g, '\r')
@@ -151,7 +234,9 @@
       var reComment = /^\s*#|^\s*$/;
       var reSection = /^\s*\[(.*)\]\s*$/;
       var reImport = /^\s*@import\s+url\((.*)\)\s*$/i;
-      var reSplit = /^([^=\s]*)\s*=\s*(.+)$/; // TODO: escape EOLs with '\'
+      var reSplit = /^([^=\s]*)\s*=\s*(.+)$/;
+      var reUnicode = /\\u([0-9a-fA-F]{1,4})/g;
+      var reMultiline = /[^\\]\\$/;
 
       // parse the *.properties file into an associative array
       function parseRawLines(rawText, extendedSyntax) {
@@ -165,8 +250,15 @@
           var line = entries[i];
 
           // comment or blank line?
-          if (reComment.test(line))
+          if (reComment.test(line)) {
             continue;
+          }
+
+          // multi-line?
+          while (reMultiline.test(line) && i < entries.length) {
+            line = line.slice(0, line.length - 1) +
+              entries[++i].replace(reBlank, '');
+          }
 
           // the extended syntax supports [lang] sections and @import rules
           if (extendedSyntax) {
@@ -188,7 +280,11 @@
           // key-value pair
           var tmp = line.match(reSplit);
           if (tmp && tmp.length == 3) {
-            dictionary[tmp[1]] = evalString(tmp[2]);
+            // unescape unicode char codes if needed (e.g. '\u00a0')
+            var val = tmp[2].replace(reUnicode, function(match, token) {
+              return unescape('%u' + '0000'.slice(token.length) + token);
+            });
+            dictionary[tmp[1]] = evalString(val);
           }
         }
       }
@@ -209,7 +305,7 @@
     function loadResource(url, onSuccess, onFailure, asynchronous) {
       onSuccess = onSuccess || function _onSuccess(data) {};
       onFailure = onFailure || function _onFailure() {
-        consoleWarn(url + ' not found.');
+        consoleWarn(url, ' not found.');
       };
 
       var xhr = new XMLHttpRequest();
@@ -240,23 +336,38 @@
 
     // load and parse l10n data (warning: global variables are used here)
     loadResource(href, function(response) {
-      // parse *.properties text data into an l10n dictionary
-      var data = parseProperties(response);
-
-      // find attribute descriptions, if any
-      for (var key in data) {
-        var id, prop, index = key.lastIndexOf('.');
-        if (index > 0) { // an attribute has been specified
-          id = key.substring(0, index);
-          prop = key.substr(index + 1);
-        } else { // no attribute: assuming text content by default
-          id = key;
-          prop = gTextProp;
+      if (/\.json$/.test(href)) {
+        gL10nData = JSON.parse(response); // TODO: support multiple JSON files
+      } else { // *.ini or *.properties file
+        var data = parseProperties(response);
+        for (var key in data) {
+          var id, prop, nestedProp, index = key.lastIndexOf('.');
+          if (index > 0) { // a property name has been specified
+            id = key.slice(0, index);
+            prop = key.slice(index + 1);
+            index = id.lastIndexOf('.');
+            if (index > 0) { // a nested property may have been specified
+              nestedProp = id.substr(index + 1);
+              if (gNestedProps.indexOf(nestedProp) > -1) {
+                id = id.substr(0, index);
+                prop = nestedProp + '.' + prop;
+              }
+            }
+          } else { // no property name: assuming text content by default
+            index = key.lastIndexOf('[');
+            if (index > 0) { // we have a macro index
+              id = key.slice(0, index);
+              prop = '_' + key.slice(index);
+            } else {
+              id = key;
+              prop = '_';
+            }
+          }
+          if (!gL10nData[id]) {
+            gL10nData[id] = {};
+          }
+          gL10nData[id][prop] = data[key];
         }
-        if (!gL10nData[id]) {
-          gL10nData[id] = {};
-        }
-        gL10nData[id][prop] = data[key];
       }
 
       // trigger callback
@@ -267,64 +378,97 @@
   };
 
   // load and parse all resources for the specified locale
-  function loadLocale(lang, callback) {
-    callback = callback || function _callback() {};
-
+  function loadLocale(lang, translationRequired) {
     clear();
+    gReadyState = 'loading';
     gLanguage = lang;
 
-    // check all <link type="application/l10n" href="..." /> nodes
-    // and load the resource files
-    var langLinks = getL10nResourceLinks();
-    var langCount = langLinks.length;
-    if (langCount == 0) {
-      // we might have a pre-compiled dictionary instead
-      var dict = getL10nDictionary();
-      if (dict && dict.locales && dict.default_locale) {
-        consoleLog('using the embedded JSON directory, early way out');
-        gL10nData = dict.locales[lang] || dict.locales[dict.default_locale];
-        callback();
-      } else {
-        consoleLog('no resource to load, early way out');
+    var untranslatedElements = [];
+
+    // if there is an inline / pre-compiled dictionary,
+    // the current HTML document can be translated right now
+    var inlineDict = getL10nDictionary(lang);
+    if (inlineDict) {
+      gL10nData = inlineDict;
+      if (translationRequired) {
+        untranslatedElements = translateFragment();
       }
-      // early way out
-      fireL10nReadyEvent(lang);
-      gReadyState = 'complete';
-      return;
     }
 
-    // start the callback when all resources are loaded
-    var onResourceLoaded = null;
-    var gResourceCount = 0;
-    onResourceLoaded = function() {
-      gResourceCount++;
-      if (gResourceCount >= langCount) {
-        callback();
-        fireL10nReadyEvent(lang);
-        gReadyState = 'complete';
+    // translate the document if required and fire a `localized' event
+    function finish() {
+      if (translationRequired) {
+        if (!inlineDict) {
+          // no inline dictionary has been used: translate the whole document
+          untranslatedElements = translateFragment();
+        } else if (untranslatedElements.length) {
+          // the document should have been already translated but the inline
+          // dictionary didn't include all necessary l10n keys:
+          // try to translate all remaining elements now
+          untranslatedElements = translateElements(untranslatedElements);
+        }
       }
-    };
+      // tell the rest of the world we're done
+      // -- note that `gReadyState' must be set before the `localized' event is
+      //    fired for `localizeElement()' to work as expected
+      gReadyState = 'complete';
+      fireL10nReadyEvent(lang);
+      consoleWarn_missingKeys(untranslatedElements, lang);
+    }
 
-    // load all resource files
+    // l10n resource loader
     function l10nResourceLink(link) {
-      var href = link.href;
-      var type = link.type;
-      this.load = function(lang, callback) {
-        var applied = lang;
-        parseResource(href, lang, callback, function() {
-          consoleWarn(href + ' not found.');
-          applied = '';
+      /**
+       * l10n resource links can use the following syntax for href:
+       * <link type="application/l10n" href="resources/{{locale}}.json" />
+       * -- in which case, {{locale}} will be replaced by `navigator.language'.
+       */
+      var re = /\{\{\s*locale\s*\}\}/;
+
+      var parse = function(locale, onload, onerror) {
+        var href = unescape(link.href).replace(re, locale);
+        parseResource(href, locale, onload, function notFound() {
+          consoleWarn(href, ' not found.');
+          onerror();
         });
-        return applied; // return lang if found, an empty string if not found
+      };
+
+      this.load = function(locale, onload, onerror) {
+        onerror = onerror || function() {};
+        parse(locale, onload, function parseFallbackLocale() {
+          /**
+           * For links like <link href="resources/{{locale}}.json" />,
+           * there's no way to know if the resource file matching the current
+           * language has been found... before trying to fetch it with XHR
+           * => if something went wrong, try the default locale as fallback.
+           */
+          if (re.test(unescape(link.href)) && gDefaultLocale != locale) {
+            consoleLog('Trying the fallback locale: ', gDefaultLocale);
+            parse(gDefaultLocale, onload, onerror);
+          } else {
+            onerror();
+          }
+        });
       };
     }
 
-    for (var i = 0; i < langCount; i++) {
-      var resource = new l10nResourceLink(langLinks[i]);
-      var rv = resource.load(lang, onResourceLoaded);
-      if (rv != lang) { // lang not found, used default resource instead
-        consoleWarn('"' + lang + '" resource not found');
-        gLanguage = '';
+    // check all <link type="application/l10n" href="..." /> nodes
+    // and load the resource files
+    var resourceLinks = getL10nResourceLinks();
+    var resourceCount = resourceLinks.length;
+    if (!resourceCount) {
+      consoleLog('no resource to load, early way out');
+      translationRequired = false;
+      finish();
+    } else {
+      var onResourceCallback = function() {
+        if (--resourceCount <= 0) { // <=> all resources have been XHR'ed
+          finish();
+        }
+      };
+      for (var i = 0, l = resourceCount; i < l; i++) {
+        var resource = new l10nResourceLink(resourceLinks[i]);
+        resource.load(lang, onResourceCallback, onResourceCallback);
       }
     }
   }
@@ -353,6 +497,8 @@
    *       fun(0)    -> 'other'
    *       fun(1000) -> 'other'.
    */
+
+  var kPluralForms = ['zero', 'one', 'two', 'few', 'many', 'other'];
 
   function getPluralRules(lang) {
     var locales2rules = {
@@ -743,7 +889,7 @@
     // return a function that gives the plural form name for a given integer
     var index = locales2rules[lang.replace(/-.*$/, '')];
     if (!(index in pluralRules)) {
-      consoleWarn('plural form unknown for [' + lang + ']');
+      consoleWarn('plural form unknown for [', lang, ']');
       return function() { return 'other'; };
     }
     return pluralRules[index];
@@ -752,12 +898,14 @@
   // pre-defined 'plural' macro
   gMacros.plural = function(str, param, key, prop) {
     var n = parseFloat(param);
-    if (isNaN(n))
+    if (isNaN(n)) {
       return str;
+    }
 
-    // TODO: support other properties (l20n still doesn't...)
-    if (prop != gTextProp)
+    var data = gL10nData[key];
+    if (!data) {
       return str;
+    }
 
     // initialize _pluralRules
     if (!gMacros._pluralRules) {
@@ -765,17 +913,17 @@
     }
     var index = '[' + gMacros._pluralRules(n) + ']';
 
-    // try to find a [zero|one|two] key if it's defined
-    if (n === 0 && (key + '[zero]') in gL10nData) {
-      str = gL10nData[key + '[zero]'][prop];
-    } else if (n == 1 && (key + '[one]') in gL10nData) {
-      str = gL10nData[key + '[one]'][prop];
-    } else if (n == 2 && (key + '[two]') in gL10nData) {
-      str = gL10nData[key + '[two]'][prop];
-    } else if ((key + index) in gL10nData) {
-      str = gL10nData[key + index][prop];
-    } else if ((key + '[other]') in gL10nData) {
-      str = gL10nData[key + '[other]'][prop];
+    // try to find a [zero|one|two] form if it's defined
+    if (n === 0 && (prop + '[zero]') in data) {
+      str = data[prop + '[zero]'];
+    } else if (n == 1 && (prop + '[one]') in data) {
+      str = data[prop + '[one]'];
+    } else if (n == 2 && (prop + '[two]') in data) {
+      str = data[prop + '[two]'];
+    } else if ((prop + index) in data) {
+      str = data[prop + index];
+    } else if ((prop + '[other]') in data) {
+      str = data[prop + '[other]'];
     }
 
     return str;
@@ -786,18 +934,22 @@
    * l10n dictionary functions
    */
 
+  var reArgs = /\{\{\s*(.+?)\s*\}\}/;                       // arguments
+  var reIndex = /\{\[\s*([a-zA-Z]+)\(([a-zA-Z]+)\)\s*\]\}/; // index macros
+
   // fetch an l10n object, warn if not found, apply `args' if possible
   function getL10nData(key, args) {
     var data = gL10nData[key];
     if (!data) {
-      consoleWarn('#' + key + ' is undefined.');
+      return null;
     }
 
-    /** This is where l10n expressions should be processed.
-      * The plan is to support C-style expressions from the l20n project;
-      * until then, only two kinds of simple expressions are supported:
-      *   {[ index ]} and {{ arguments }}.
-      */
+    /**
+     * This is where l10n expressions should be processed.
+     * The plan is to support C-style expressions from the l20n project;
+     * until then, only two kinds of simple expressions are supported:
+     *   {[ index ]} and {{ arguments }}.
+     */
     var rv = {};
     for (var prop in data) {
       var str = data[prop];
@@ -808,12 +960,73 @@
     return rv;
   }
 
+  // return an array of all {{arguments}} found in a string
+  function getL10nArgs(str) {
+    var args = [];
+    var match = reArgs.exec(str);
+    while (match && match.length >= 2) {
+      args.push({
+        name: match[1], // name of the argument
+        subst: match[0] // substring to replace (including braces and spaces)
+      });
+      str = str.substr(match.index + match[0].length);
+      match = reArgs.exec(str);
+    }
+    return args;
+  }
+
+  // return a sub-dictionary sufficient to translate a given fragment
+  function getSubDictionary(fragment) {
+    if (!fragment) { // by default, return a clone of the whole dictionary
+      return JSON.parse(JSON.stringify(gL10nData));
+    }
+
+    var dict = {};
+    var elements = getTranslatableChildren(fragment);
+
+    function checkGlobalArguments(str) {
+      var match = getL10nArgs(str);
+      for (var i = 0; i < match.length; i++) {
+        var arg = match[i].name;
+        if (arg in gL10nData) {
+          dict[arg] = gL10nData[arg];
+        }
+      }
+    }
+
+    for (var i = 0, l = elements.length; i < l; i++) {
+      var id = getL10nAttributes(elements[i]).id;
+      var data = gL10nData[id];
+      if (!id || !data) {
+        continue;
+      }
+
+      dict[id] = data;
+      for (var prop in data) {
+        var str = data[prop];
+        checkGlobalArguments(str);
+
+        if (reIndex.test(str)) { // macro index
+          for (var j = 0; j < kPluralForms.length; j++) {
+            var key = id + '[' + kPluralForms[j] + ']';
+            if (key in gL10nData) {
+              dict[key] = gL10nData[key];
+              checkGlobalArguments(gL10nData[key]);
+            }
+          }
+        }
+      }
+    }
+
+    return dict;
+  }
+
   // replace {[macros]} with their values
   function substIndexes(str, args, key, prop) {
-    var reIndex = /\{\[\s*([a-zA-Z]+)\(([a-zA-Z]+)\)\s*\]\}/;
     var reMatch = reIndex.exec(str);
-    if (!reMatch || !reMatch.length)
+    if (!reMatch || !reMatch.length) {
       return str;
+    }
 
     // an index/macro has been found
     // Note: at the moment, only one parameter is supported
@@ -836,91 +1049,108 @@
 
   // replace {{arguments}} with their values
   function substArguments(str, args, key) {
-    var reArgs = /\{\{\s*(.+?)\s*\}\}/;
-    var match = reArgs.exec(str);
-    while (match) {
-      if (!match || match.length < 2)
-        return str; // argument key not found
-
-      var arg = match[1];
-      var sub = '';
+    var match = getL10nArgs(str);
+    for (var i = 0; i < match.length; i++) {
+      var sub, arg = match[i].name;
       if (args && arg in args) {
         sub = args[arg];
       } else if (arg in gL10nData) {
-        sub = gL10nData[arg][gTextProp];
+        sub = gL10nData[arg]['_'];
       } else {
-        consoleLog('argument {{' + arg + '}} for #' + key + ' is undefined.');
+        consoleLog('argument {{', arg, '}} for #', key, ' is undefined.');
         return str;
       }
-
-      str = str.substring(0, match.index) + sub +
-            str.substr(match.index + match[0].length);
-      match = reArgs.exec(str);
+      if (typeof sub == 'string') {
+        // dollar signs would be interpreted as replacement patterns
+        sub = sub.replace(/\$/g, '$$$$');
+      }
+      str = str.replace(match[i].subst, sub);
     }
     return str;
   }
 
   // translate an HTML element
+  // -- returns true if the element could be translated, false otherwise
   function translateElement(element) {
     var l10n = getL10nAttributes(element);
     if (!l10n.id) {
-        return;
+      return true;
     }
 
     // get the related l10n object
     var data = getL10nData(l10n.id, l10n.args);
     if (!data) {
-      consoleWarn('#' + l10n.id + ' is undefined.');
-      return;
+      return false;
     }
 
     // translate element (TODO: security checks?)
-    if (data[gTextProp]) { // XXX
-      if (element.children.length === 0) {
-        element[gTextProp] = data[gTextProp];
+    for (var k in data) {
+      if (k === '_') {
+        setTextContent(element, data._);
       } else {
-        // this element has element children: replace the content of the first
-        // (non-empty) child textNode and clear other child textNodes
-        var children = element.childNodes;
-        var found = false;
-        for (var i = 0, l = children.length; i < l; i++) {
-          if (children[i].nodeType === 3 && /\S/.test(children[i].nodeValue)) {
-            if (found) {
-              children[i].nodeValue = '';
-            } else {
-              children[i].nodeValue = data[gTextProp];
-              found = true;
-            }
-          }
-        }
-        // if no (non-empty) textNode is found, insert a textNode before the
-        // first element child.
-        if (!found) {
-          var textNode = document.createTextNode(data[gTextProp]);
-          element.insertBefore(textNode, element.firstChild);
+        var idx = k.lastIndexOf('.');
+        var nestedProp = k.substr(0, idx);
+        if (gNestedProps.indexOf(nestedProp) > -1) {
+          element[nestedProp][k.substr(idx + 1)] = data[k];
+        } else if (k === 'ariaLabel') {
+          element.setAttribute('aria-label', data[k]);
+        } else {
+          element[k] = data[k];
         }
       }
-      delete data[gTextProp];
     }
+    return true;
+  }
 
-    for (var k in data) {
-      element[k] = data[k];
+  // translate an array of HTML elements
+  // -- returns an array of elements that could not be translated
+  function translateElements(elements) {
+    var untranslated = [];
+    for (var i = 0, l = elements.length; i < l; i++) {
+      if (!translateElement(elements[i])) {
+        untranslated.push(elements[i]);
+      }
     }
+    return untranslated;
   }
 
   // translate an HTML subtree
+  // -- returns an array of elements that could not be translated
   function translateFragment(element) {
     element = element || document.documentElement;
+    var untranslated = translateElements(getTranslatableChildren(element));
+    if (!translateElement(element)) {
+      untranslated.push(element);
+    }
+    return untranslated;
+  }
 
-    // check all translatable children (= w/ a `data-l10n-id' attribute)
-    var children = getTranslatableChildren(element);
-    var elementCount = children.length;
-    for (var i = 0; i < elementCount; i++) {
-      translateElement(children[i]);
+  // localize an element as soon as mozL10n is ready
+  function localizeElement(element, id, args) {
+    if (!element) {
+      return;
     }
 
-    // translate element itself if necessary
-    translateElement(element);
+    if (!id) {
+      element.removeAttribute('data-l10n-id');
+      element.removeAttribute('data-l10n-args');
+      setTextContent(element, '');
+      return;
+    }
+
+    // set the data-l10n-[id|args] attributes
+    element.setAttribute('data-l10n-id', id);
+    if (args && typeof args === 'object') {
+      element.setAttribute('data-l10n-args', JSON.stringify(args));
+    } else {
+      element.removeAttribute('data-l10n-args');
+    }
+
+    // if l10n resources are ready, translate now;
+    // if not, the element will be translated along with the document anyway.
+    if (gReadyState === 'complete') {
+      translateElement(element);
+    }
   }
 
 
@@ -933,16 +1163,15 @@
 
   // load the default locale on startup
   function l10nStartup() {
+    gDefaultLocale = document.documentElement.lang || gDefaultLocale;
     gReadyState = 'interactive';
-    consoleLog('loading [' + navigator.language + '] resources, ' +
+    consoleLog('loading [', navigator.language, '] resources, ',
         (gAsyncResourceLoading ? 'asynchronously.' : 'synchronously.'));
 
     // load the default locale and translate the document if required
-    if (document.documentElement.lang === navigator.language) {
-      loadLocale(navigator.language);
-    } else {
-      loadLocale(navigator.language, translateFragment);
-    }
+    var translationRequired =
+      (document.documentElement.lang !== navigator.language);
+    loadLocale(navigator.language, translationRequired);
   }
 
   // the B2G build system doesn't expose any `document'...
@@ -958,19 +1187,21 @@
   // load the appropriate locale if the language setting has changed
   if ('mozSettings' in navigator && navigator.mozSettings) {
     navigator.mozSettings.addObserver('language.current', function(event) {
-      loadLocale(event.settingValue, translateFragment);
+      loadLocale(event.settingValue, true);
     });
   }
 
   // public API
   navigator.mozL10n = {
     // get a localized string
-    get: function l10n_get(key, args, fallback) {
-      var data = getL10nData(key, args) || fallback;
-      if (data) {
-        return 'textContent' in data ? data.textContent : '';
+    get: function l10n_get(key, args) {
+      var data = getL10nData(key, args);
+      if (!data) {
+        consoleWarn('#', key, ' is undefined.');
+        return '';
+      } else {
+        return data._;
       }
-      return '{{' + key + '}}';
     },
 
     // get|set the document language and direction
@@ -978,7 +1209,7 @@
       return {
         // get|set the document language (ISO-639-1)
         get code() { return gLanguage; },
-        set code(lang) { loadLocale(lang, translateFragment); },
+        set code(lang) { loadLocale(lang, true); },
 
         // get the direction (ltr|rtl) of the current language
         get direction() {
@@ -993,15 +1224,19 @@
     // translate an element or document fragment
     translate: translateFragment,
 
-    // get (a clone of) the dictionary for the current locale
-    get dictionary() { return JSON.parse(JSON.stringify(gL10nData)); },
+    // localize an element (= set its data-l10n-* attributes and translate it)
+    localize: localizeElement,
+
+    // get (a part of) the dictionary for the current locale
+    getDictionary: getSubDictionary,
 
     // this can be used to prevent race conditions
     get readyState() { return gReadyState; },
     ready: function l10n_ready(callback) {
       if (!callback) {
         return;
-      } else if (gReadyState == 'complete' || gReadyState == 'interactive') {
+      }
+      if (gReadyState == 'complete') {
         window.setTimeout(callback);
       } else {
         window.addEventListener('localized', callback);

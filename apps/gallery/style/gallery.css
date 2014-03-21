@@ -10,16 +10,14 @@ html {
 }
 
 body {
-  background-color: black;
-  color: #fff;
-  font-family: "MozTT", sans-serif;
-  font-size: 10px;
+  width: 100%;
+  height: 100%;
   margin: 0;
   padding: 0;
-  height: 100%;
-  width: 100%;
+  color: #fff;
+  font-size: 1rem;
+  background-color: #0E1214;
   overflow: hidden;
-  padding-bottom: 50px;
 }
 
 section {
@@ -29,21 +27,40 @@ section {
   font-size: 1.4rem;
 }
 
+.large-only {
+  display: none;
+}
+
 .hidden {
+  display: none;
+}
+
+#thumbnails-list-top {
   display: none;
 }
 
 /* All of the main views fill the screen */
 #thumbnail-list-view, #thumbnail-select-view, #fullscreen-view, #pick-view, #edit-view, #crop-view {
   position: absolute;
-  top: 0px;
-  left: 0px;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  padding: 0px;
-  margin: 0px;
+  padding: 0;
+  margin: 0;
   overflow: hidden;
   font-size: 2.1rem;
+  /* display will be determined by LAYOUT_MODE */
+  display: none;
+}
+
+body.thumbnailListView #thumbnail-list-view,
+body.thumbnailSelectView #thumbnail-select-view,
+body.fullscreenView #fullscreen-view,
+body.pickView #pick-view,
+body.editView #edit-view,
+body.cropView #crop-view {
+  display: block;
 }
 
 /*
@@ -52,13 +69,14 @@ section {
  * the issue.  The user can't interact with the app while the overlay
  * is displayed.
  */
-#overlay {
+#overlay,
+#confirm-dialog {
   /* it takes up the whole screen */
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  bottom: 0;
+  right: 0;
 
   /* almost transparent gray */
   background-color: rgba(0, 0, 0, 0.4);
@@ -83,41 +101,58 @@ section {
   left: 0;
   right: 0;
   bottom: 0;
-  font-family: "MozTT", Sans-serif;
   font-size: 0;
   /* Using font-size: 0; we avoid the unwanted visual space (about 3px)
   created by white-spaces and break lines in the code betewen inline-block elements */
   color: #fff;
-  padding: 110px 25px 0px 25px;
+  padding: 11rem 2.5rem 0 2.5rem;
 }
 
 #overlay-title {
   font-weight: normal;
   font-size: 1.9rem;
   color: #fff;
-  margin: 0 5px -10px 5px;
+  margin: 0 0.5rem 0 0.5rem;
+  padding: 0;
 }
 
 #overlay-text {
-  padding: 10px 5px 0 5px;
-  border-top: 1px solid #686868;	
+  padding: 1rem 0.5rem 0 0.5rem;
+  border-top: 0.1rem solid #686868;
   font-weight: 300;
   font-size: 2.5rem;
   color: #ebebeb;
+}
+
+#overlay-menu {
+  z-index: 1;
+}
+
+/* For overriding the style from BB */
+#overlay-menu.hidden {
+  display: none;
+}
+
+#overlay-menu button.hidden {
+  display: none;
+}
+
+#overlay-menu button.full {
+  margin: 0;
 }
 
 /*
  * Thumbnails are implemented as <li> elements in a <ul> with background-image
  * set to display the image. We use background-size: cover to automatically
  * resize the image as needed.
- * The thumbnail list appears in regular browsing mode, in selection mode, 
- * and in pick mode.
  */
 
 #thumbnails {
   position: absolute;
   left: 0;
-  width: calc(100% + 1px); /* one extra pixel for the right margin */
+  width: 100%;
+  top: 0;
+  bottom: 0;
   /* top and bottom are set depending on view below */
   padding: 0;
   margin: 0;
@@ -127,36 +162,71 @@ section {
    * the body background is black, but remind the UA of that here to
    * keep the thumbnail view opaque if possible.
    */
-  background-color: black;
-}
-
-/* thumbnails in regular thumbnail list view */
-#thumbnails.list {
-  top: 0;
-  bottom: 0;
-}
-
-/* thumbnails in thumbnail select view where there is a top bar */
-#thumbnails.select {
-  top: 50px;
-  bottom: 0;
-}
-
-/* thumbnails in pick view where there is a top bar and no bottom */
-#thumbnails.pick {
-  top: 50px;
-  bottom: 0;
-}
-
-#thumbnails.offscreen {
-  top: 0;
-  bottom: 0;
+  background-color: #0E1214;
+  will-change: scroll-position;
+  /*
+   * set it visible/hidden by LAYOUT_MODE
+   */
   visibility: hidden;
+  pointer-events: none;
+}
+
+/*
+ * The thumbnail list appears in regular browsing mode, in selection mode,
+ * and in pick mode.
+ */
+body.thumbnailSelectView #thumbnails,
+body.pickView #thumbnails,
+body.thumbnailListView #thumbnails {
+  visibility: visible;
+  pointer-events: auto;
+  bottom: 0;
+}
+
+body.thumbnailSelectView #thumbnails,
+body.pickView #thumbnails {
+  top: 5rem;
+}
+
+.thumbnail-group-header {
+  font-size: 1.6rem;
+  font-weight: 400;
+  color: #8a9699;
+  padding: 0 0 0 0.5rem;
+  height: 4rem;
+  line-height: 4rem;
+  width:100%;
+  float:left;
+}
+
+/* Bug 968311 - Keep Gallery in scrollable
+ * background color. Need in all four
+ * containers below.
+ */
+#thumbnails > li,
+#thumbnails > li > ul,
+.thumbnail-group-header,
+.thumbnail-group-container {
+  background-color: #0E1214;
+}
+
+.thumbnail-group-container {
+  padding: 0;
+}
+
+#thumbnails>li {
+  /* no list item bullets */
+  list-style-type: none;
+}
+
+#thumbnails>li:first-child .thumbnail-group-header {
+  border-top: 0.1rem solid;
+  border-color:rgba(255,255,255, 0.1);
 }
 
 .thumbnail {
-  margin-right: 1px;
-  margin-bottom: 1px;
+  margin-right: 0.1rem;
+  margin-bottom: 0.1rem;
   padding: 0;
   /* default to left-to-right, but overridden for rtl languages below */
   float: left;
@@ -167,6 +237,7 @@ section {
   /* thumbnail images will be displayed with background-image */
   /* these properties scale and position the images correctly */
   background-position: center;   /* keep the cropping at the edges */
+  background-size: contain;
   background-repeat: no-repeat;
   /*
    * When we have a background image it will cover the whole thumbnail
@@ -175,81 +246,112 @@ section {
    * at least get the effect of a grid rather than a black screen
    */
   background-color: #444;
+
+  /*
+   * Here's the thumbnail size for portrait mode. We have 3 thumbnails
+   * for each row. The size for landscape mode is handled below by
+   * media query.
+   * Padding-bottom is used here in order to set div height with respect
+   * to device width.
+   */
+  width: calc((100% - 0.2rem) / 3 );
+  height: 0;
+  padding-bottom: calc((100% - 0.2rem) / 3 );
+}
+
+/* Favor scrolling performance for the thumbnails list while
+ * scrolling.
+ */
+#thumbnails.scrolling .thumbnail {
+  image-rendering: -moz-crisp-edges;
+}
+
+#thumbnails.scrolling .thumbnail-group-header {
+  text-rendering: optimizeSpeed;
+}
+
+.thumbnail:nth-child(3n) {
+  margin-right: 0;
 }
 
 .thumbnail.selected {
-  outline: solid #00aacc 3px;
-  outline-offset: -3px;
+  outline: solid #00aacc 0.3rem;
+  outline-offset: -0.2rem;
 }
 
 /*
  * give the very last thumbnail a large bottom margin so that it doesn't
  * get stuck hidden behind the overlaid toolbar.
  */
-.thumbnail:last-child {
-  margin-bottom: 40px;
+#thumbnails>li:last-child {
+  margin-bottom: 4.5rem;
 }
 
-
-/* 320x480 phones */
-@media (orientation: portrait) and (width: 320px) {
+@media (orientation: landscape) {
+  /* 4 thumbnails for each row in landscape mode. */
   .thumbnail {
-    width: 106px;
-    height: 106px;
+    width: calc((100% - 0.3rem) / 4);
+    padding-bottom: calc((100%  - 0.3rem) / 4);
+  }
+  .thumbnail:nth-child(3n) {
+    margin-right: 0.1rem;
+  }
+  .thumbnail:nth-child(4n) {
+    margin-right: 0;
   }
 }
 
-@media (orientation: landscape) and (width: 480px) {
-  .thumbnail {
-    width: 119px;
-    height: 119px;
-  }
+#fullscreen-back-button-tiny {
+  /*
+    these particular sizes, positions, and colors are chosen
+    to line up with the focus mode button of the camera app
+  */
+  position: absolute;
+  top: 2rem;
+  left: 1.4rem;
+  width: 5rem;
+  height: 5rem;
+  font-size: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(95, 95, 95, 0.3) url(images/back.png) no-repeat 50% 50%;
+  transition: opacity 0.2s linear;
 }
 
-/* 480x800 phones portrait */
-@media (orientation: portrait) and (width: 480px),
-       (orientation: landscape) and (width: 800px) {
-    .thumbnail {
-        width: 159px;
-        height: 159px;
-    }
-}
-
-/* since fullscreen-view is fullscreen, it needs its own background color */
-#fullscreen-view {
-  background-color: #444;
+#fullscreen-back-button-tiny:active {
+  background-color: #008eab;
 }
 
 #frames {
   position: absolute;
-  top: 0px;
-  left: 0px;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  padding: 0px;
-  margin: 0px;
+  padding: 0;
+  margin: 0;
 }
 
 .frame {
   position: absolute;
-  top: 0px;
-  left: 0px;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  padding: 0px;
-  margin: 0px;
+  padding: 0;
+  margin: 0;
   overflow: hidden;
   -moz-user-select: none;
+  will-change: scroll-position;
 }
 
 .frame > img {
-  top: 0px;  /* javascript modifies this position with a transform */
-  left: 0px;
+  top: 0;  /* javascript modifies this position with a transform */
+  left: 0;
   position: absolute;
-  border-width: 0px;
-  padding: 0px;
-  margin: 0px;
-  transform-origin: 0px 0px;
+  border-width: 0;
+  padding: 0;
+  margin: 0;
   pointer-events: none;
   -moz-user-select: none;
 }
@@ -263,12 +365,12 @@ section {
  */
 .frame > img.swapping {
   opacity: 0.8;
-  outline: dashed #0ac 4px;
-  outline-offset: -4px;
+  outline: dashed #0ac 0.4rem;
+  outline-offset: -0.4rem;
 }
 
 .frame > video {
-  transform-origin: 0px 0px;
+  transform-origin: 0 0;
 }
 
 /* localization */
@@ -286,15 +388,16 @@ body.hidden *[data-l10n-id] {
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 0.3rem;
   border: none;
   overflow: hidden;
-  z-index: 3; /* has to be higher than pick-top */
+  z-index: 10; /* has to be higher than pick-top */
 }
 
 #throbber {
-  height: 24px;
+  height: 2.4rem;
   background-image: url(images/progress.png);
+  background-size: auto 100%;
 }
 
 #throbber.throb {
@@ -303,10 +406,10 @@ body.hidden *[data-l10n-id] {
 
 @keyframes throb {
   from {
-    transform: translateY(0px);
+    transform: translateY(0);
   }
   to {
-    transform: translateY(-21px);
+    transform: translateY(-2.1rem);
   }
 }
 
@@ -318,11 +421,12 @@ a.button {
   border-width: 0;
   background-position: center center;
   background-repeat: no-repeat;
+  background-size: 3rem;
 
   /* for buttons that display text */
   font-size: 1.4rem;
   text-align: center;
-  line-height: 40px;
+  line-height: 4.5rem;
 }
 
 a.button:active, a.button:focus {
@@ -334,15 +438,19 @@ a.button.disabled {
   pointer-events: none;
 }
 
+.icon.icon-done {
+  background: url('images/iconaction_done_30x30.png') no-repeat center center / 3rem !important;
+}
+
 footer {
   background: rgba(0, 0, 0, 0.75);
-  height: 40px;
+  height: 4.5rem;
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 1;
-  box-shadow: 0px -2px 5px rgba(50, 50, 50, 0.75);
+  box-shadow: 0 -0.2rem 0.5rem rgba(50, 50, 50, 0.75);
 }
 
 .icon.icon-done {
@@ -355,7 +463,7 @@ footer {
   height: 100%;
   left: 0;
   background-image: url('images/iconaction_camera_30x30.png');
-  border-right: 1px solid #000;
+  border-right: 0.1rem solid #000;
 }
 
 #thumbnails-select-button {
@@ -372,7 +480,7 @@ footer {
   height: 100%;
   left: 0;
   background-image: url('images/iconaction_delete_30x30.png');
-  border-right: 1px solid #000;
+  border-right: 0.1rem solid #000;
 }
 
 #thumbnails-share-button {
@@ -384,56 +492,35 @@ footer {
 }
 
 #fullscreen-toolbar {
-  height: 40px;
+  height: 4.5rem;
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  transition: transform 100ms linear;
+  font-size: 0;
+  transition: transform 0.2s linear;
+}
+/* only for large screen */
+#fullscreen-toolbar-header {
+  display: none;
 }
 
-#fullscreen-view.toolbarhidden #fullscreen-toolbar {
-  transform: translate(0, 40px);
+#fullscreen-toolbar-header > menu {
+  display: none;
 }
 
-#fullscreen-back-button {
-  position: absolute;
+#fullscreen-toolbar > a {
+  display: inline-block;
   width: 20%;
   height: 100%;
-  left: 0;
-  background-image: url('images/iconaction_camera_gridview_30x30.png');
 }
 
-#fullscreen-camera-button {
-  position: absolute;
-  width: 20%;
-  height: 100%;
-  left: 20%;
-  background-image: url('images/iconaction_camera_30x30.png');
+#fullscreen-view.toolbar-hidden #fullscreen-toolbar {
+  transform: translate(0, 4.5rem);
 }
 
-#fullscreen-edit-button {
-  position: absolute;
-  width: 20%;
-  height: 100%;
-  left: 40%;
-  background-image: url('images/iconaction_camera_editphoto_30x30.png');
-}
-
-#fullscreen-share-button {
-  position: absolute;
-  width: 20%;
-  height: 100%;
-  left: 60%;
-  background-image: url('images/iconaction_share_30x30.png');
-}
-
-#fullscreen-delete-button {
-  position: absolute;
-  width: 20%;
-  height: 100%;
-  left: 80%;
-  background-image: url('images/iconaction_delete_30x30.png');
+#fullscreen-view.toolbar-hidden #fullscreen-back-button-tiny {
+  opacity: 0;
 }
 
 #pick-top {
@@ -448,12 +535,12 @@ footer {
 /* like .frame */
 #crop-frame {
   position: absolute;
-  top: 50px;
-  bottom: 0px;
-  left: 0px;
+  top: 5rem;
+  bottom: 0;
+  left: 0;
   width: 100%;
-  padding: 0px;
-  margin: 0px;
+  padding: 0;
+  margin: 0;
   overflow: hidden;
   -moz-user-select: none;
 }
@@ -461,41 +548,34 @@ footer {
 
 /* copied from .frame > img */
 #crop-image {
-  top: 0px;  /* javascript modifies this position with a transform */
-  left: 0px;
+  top: 0;  /* javascript modifies this position with a transform */
+  left: 0;
   position: relative;
-  border-width: 0px;
-  padding: 0px;
-  margin: 0px;
-  transform-origin: 0px 0px;
+  border-width: 0;
+  padding: 0;
+  margin: 0;
+  transform-origin: 0 0;
   pointer-events: none;
   -moz-user-select: none;
-}
-
-#edit-view {
-  background: #444;
-}
-
-#edit-title {
 }
 
 #edit-preview-area {
   position: absolute;
   left: 0;
   right: 0;
-  top: 50px;
-  bottom: 100px;
+  top: 5rem;
+  bottom: 9.5rem; /* 4.5rem for edit-toolbar, 5rem for edit-options */
 }
 
 #edit-preview-canvas {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 300px;  /* I can't do right: 10px here. Bug? */
-  height: calc(100% - 20px)  /* can't just set bottom: 10px here */
+  top: 1.5rem;
+  left: 1.5rem;
+  width: calc(100% - 3rem);  /* I can't do right: 1.5rem here. Bug? */
+  height: calc(100% - 3rem);  /* can't just set bottom: 1.5rem here */
 }
 
-#edit-crop-canvas { 
+#edit-crop-canvas {
   position: absolute;
   left: 0;
   right: 0;
@@ -507,9 +587,16 @@ footer {
   position: absolute;
   left: 0;
   width: 100%;
-  height: 50px;
-  bottom: 40px;
-  background: #555;
+  height: 5rem;
+  bottom: 4.5rem;
+  background: url(images/options-background.png);
+}
+
+/* The progress has higer selectivity css in progress.css to control display.
+ * The hidden attribute in progress is not working in this case. We need to use
+ * css to override it. */
+#save-progress.hidden {
+  display: none;
 }
 
 /* All the effect options radio buttons share these styles */
@@ -524,13 +611,13 @@ footer {
   margin: 0;
   padding: 0;
   border-width: 0;
-  border-right: solid black 1px;
+  border-right: solid black 0.1rem;
   overflow: hidden;
 }
 
 #edit-effect-options a.selected.radio.button {
-  outline: solid #00aacc 3px;
-  outline-offset: -3px;
+  outline: solid #00aacc 0.2rem;
+  outline-offset: -0.2rem;
 }
 
 #edit-crop-options a.button {
@@ -542,16 +629,16 @@ footer {
   margin: 0;
   padding: 0;
   border-width: 0;
-  border-right: solid black 1px;
+  border-right: solid black 0.1rem;
   overflow: hidden;
-  padding-top: 16px;
+  padding-top: 1.6rem;
   font-size: 1.4rem;
   background-position: center;
 }
 
 #edit-crop-options a.selected.radio.button {
-  outline: solid #00aacc 2px;
-  outline-offset: -2px;
+  outline: solid #00aacc 0.2rem;
+  outline-offset: -0.2rem;
 }
 
 #edit-crop-none {
@@ -577,41 +664,41 @@ footer {
 
 /* instead of using images inside the buttons above, just draw boxes */
 #edit-free-frame {
-  margin-left: 5px;
-  margin-top: 5px;
-  width: 30px;
-  height: 25px;
-  border: dotted white 1px;
+  margin-left: 0.5rem;
+  margin-top: 0.5rem;
+  width: 3rem;
+  height: 2.5rem;
+  border: dotted white 0.1rem;
 }
 
 #edit-portrait-frame {
-  margin-left: 11px;
-  margin-top: 6px;
-  width: 26px;
-  height: 39px;
-  border: solid white 1px;
+  margin-left: 1.1rem;
+  margin-top: 0.6rem;
+  width: 2.6rem;
+  height: 3.9rem;
+  border: solid white 0.1rem;
 }
 
 #edit-landscape-frame {
-  margin-left: 5px;
-  margin-top: 12px;
-  width: 39px;
-  height: 26px;
-  border: solid white 1px;
+  margin-left: 0.5rem;
+  margin-top: 1.2rem;
+  width: 3.9rem;
+  height: 2.6rem;
+  border: solid white 0.1rem;
 }
 
 #edit-square-frame {
-  margin-left: 8px;
-  margin-top: 9px;
-  width: 32px;
-  height: 32px;
-  border: solid white 1px;
+  margin-left: 0.8rem;
+  margin-top: 0.9rem;
+  width: 3.2rem;
+  height: 3.2rem;
+  border: solid white 0.1rem;
 }
 
 /* All the effects radio buttons share these styles */
 #edit-effect-options > a.radio.button {
   width: 20%;
-  padding-top: 15px;
+  padding-top: 1.5rem;
 }
 
 #edit-effect-none {
@@ -642,55 +729,21 @@ a.filter-faded {
   filter: url(../index.html#filter-faded);
 }
 
-/* All the border buttons share these styles */
-#edit-border-options a.radio.button {
+#edit-toolbar {
+  height: 4.5rem;
   position: absolute;
-  width: calc(20% - 6px);
-  height: calc(100% - 6px);
-  top: 3px;
-  padding: 0;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  overflow: hidden;
-}
-
-#edit-border-options a.selected.radio.button {
-  outline: solid #00aacc 3px;
-}
-
-#edit-border-none {
-  left: calc(0% + 3px);
-  border: 2px solid white;  
-}
-#edit-border-thin-white {
-  left: calc(20% + 3px);
-  border: 2px solid white;  
-}
-#edit-border-thick-white {
-  left: calc(40% + 3px);
-  border: 4px solid white;
-}
-#edit-border-thin-black {
-  left: calc(60% + 3px);
-  border: 2px solid black;  
-}
-#edit-border-thick-black {
-  left: calc(80% + 3px);
-  border: 4px solid black;  
+  bottom: 0;
+  left: 0;
+  right: 0;
+  font-size: 0;
+  transition: transform 0.2s linear;
 }
 
 /* all buttons in the toolbar share these styles */
-#edit-toolbar > .button {
-  position: absolute;
+#edit-toolbar > a {
+  display: inline-block;
   width: 25%;
   height: 100%;
-  font-size: 1.4rem;
-}
-
-/* If the button is selected, it has a different background */
-#edit-toolbar > .button.selected {
-  background: #02252C;
 }
 
 #edit-exposure-button {
@@ -698,15 +751,103 @@ a.filter-faded {
 }
 
 #edit-crop-button {
-  left: 25%;
+  left: 20%;
 }
 
 #edit-effect-button {
-  left: 50%
+  left: 40%;
 }
 
 #edit-border-button {
-  left: 75%
+  left: 60%;
+}
+
+#edit-enhance-button {
+  left: 80%;
+}
+
+#edit-enhance-options {
+  line-height: 5.5rem;
+  text-align: center;
+}
+#fullscreen-camera-button-tiny {
+  background-image: url('images/iconaction_camera_30x30.png');
+}
+
+#fullscreen-edit-button-tiny {
+  background-image: url('images/iconaction_camera_editphoto_30x30.png');
+}
+
+#fullscreen-share-button-tiny {
+  background-image: url('images/iconaction_share_30x30.png');
+}
+
+#fullscreen-info-button-tiny {
+  background-image: url('images/iconaction_media_info_30x30.png');
+}
+
+#fullscreen-delete-button-tiny {
+  background-image: url('images/iconaction_delete_30x30.png');
+}
+
+#edit-exposure-button {
+  background-image: url('images/actionicon_gallery_edit_exposure_30x30.png');
+}
+
+#edit-crop-button {
+  background-image: url('images/actionicon_gallery_edit_crop_30x30.png');
+}
+
+#edit-effect-button {
+  background-image: url('images/actionicon_gallery_edit_effects_30x30.png');
+}
+
+#edit-border-button {
+  background-image: url('images/actionicon_gallery_edit_borders_30x30.png');
+}
+
+#edit-enhance-button {
+  background-image: url('images/actionicon_gallery_edit_enhance_30x30.png');
+}
+
+#edit-effect-button.selected{
+  background-image: url('images/actionicon_gallery_edit_effect_selected_30x30.png');
+}
+
+#edit-crop-button.selected {
+  background-image: url('images/actionicon_gallery_edit_crop_selected_30x30.png');
+}
+
+#edit-exposure-button.selected {
+  background-image: url('images/actionicon_gallery_edit_exposure_selected_30x30.png');
+}
+
+#edit-enhance-button.selected {
+  background-image: url('images/actionicon_gallery_edit_enhance_selected_30x30.png');
+}
+
+#edit-enhance-button.on {
+  background-image: url('images/actionicon_gallery_edit_enhance_on_30x30.png');
+}
+
+#edit-enhance-button.selected.on {
+  background-image: url('images/actionicon_gallery_edit_enhance_on_selected_30x30.png');
+}
+
+#edit-enhance-options a.button {
+  position: absolute;
+  display: block;
+  top: 0;
+  bottom: 0;
+  width: 20%;
+  margin: 0;
+  padding: 0;
+  border-width: 0;
+  border-right: solid black 0.1rem;
+  overflow: hidden;
+  padding-top: 1.6rem;
+  font-size: 1.4rem;
+  background-position: center;
 }
 
 /*
@@ -719,87 +860,88 @@ a.filter-faded {
   position: absolute;
   left: 0;
   width: 100%;
-  height: 50px;
-  background-color: #444;
+  height: 5rem;
   font-size: 1.4rem;
 }
 
 #sliderbar {
   position: relative;
-  height: 20px;
+  height: 2.6rem;
   padding: 0;
   margin: 0;
-  overflow: hidden;
+  background: url(images/slider-background.png);
 }
 
 #sliderline {
   position: absolute;
-  height: 2px;
-  top: 50%;
-  left: 10%;
-  right: 10%;
+  height: 0.5rem;
+  top: 1rem;
+  left: 3.5rem;
+  right: 3.5rem;
   margin: 0;
+  border-radius: 3px;
+  background: url(images/slider-line.png) repeat-x;
+  border: none;
 }
 
 #sliderthumb {
   position: absolute;
-  width: 40px;
-  height: 40px;
-  top: -10px;
-  left: calc(10% - 20px);
-  border-radius: 50%;
-  background-color: #eee;
-  text-align: center;
-  padding-top: 12px;
-  font-size: 1.4rem;
-  color: black;
+  width: 3.6rem;
+  height: 2.6rem;
+  left: calc(3.9rem - 1.8rem);
+  background: url(images/slider-scrubber.png) no-repeat center center;
+  font: 0/0 a;
+}
+
+#sliderthumb.active {
+  background-image: url(images/slider-scrubber-active.png);
 }
 
 #sliderlabels {
   position: relative;
-  height: 30px;
+  height: 3rem;
   padding: 0;
   margin: 0;
-  background-color: #222;
   color: white;
-  border-top: solid #eee 1px;
 }
 
 .sliderlabel {
   position: absolute;
-  top: 0;
-  height: 5px;
-  border-left: solid #eee 1px;
+  top: -0.2rem;
+  height: 0.8rem;
+  background: url(images/slider-marker.png) no-repeat top left;
+  color: #8a9699;
+  font-size: 1.5rem;
 }
 
 .sliderlabel:after {
   content: attr(data-label);
   position: relative;
-  display: block;
   text-align: center;
-  top: 5px;
-  width: 100px;
-  left: -50px;
+  top: 0.9rem;
+  width: 1rem;
+  left: calc(-50%  + 0.1rem);
 }
 
 #slider-3 {
-  left: calc(10% + 0 * 80%/6);
+  left: 3.9rem;
 }
 #slider-2 {
-  left: calc(10% + 1 * 80%/6);
+  left: calc(3.9rem + (100% - 2 * 3.9rem) / 6);
 }
 #slider-1 {
-  left: calc(10% + 2 * 80%/6);
+  left: calc(3.9rem + (100% - 2 * 3.9rem) * 2 / 6);
 }
 #slider0 {
-  left: calc(10% + 3 * 80%/6);
+  left: calc(3.9rem + (100% - 2 * 3.9rem) * 3 / 6);
+  color: #fff;
 }
 #slider1 {
-  left: calc(10% + 4 * 80%/6);
+  left: calc(3.9rem + (100% - 2 * 3.9rem) * 4 / 6);
 }
 #slider2 {
-  left: calc(10% + 5 * 80%/6);
+  left: calc(3.9rem + (100% - 2 * 3.9rem) * 5 / 6);
 }
 #slider3 {
-  left: calc(10% + 6 * 80%/6);
+  left: calc(3.9rem + (100% - 2 * 3.9rem));
 }

@@ -1,8 +1,3 @@
-/* Device Layouts */
-
-@media screen and (max-width: 480px) {
-}
-
 /* loading */
 
 body.loading {
@@ -27,30 +22,74 @@ menu[type="toolbar"] a {
 ol.link-list label,
 ol.link-list a {
   display: block;
-  width: 100%;
-  line-height: 150%;
-  font-size: 1.8rem;
-  padding: 1.5rem 1rem;
-  border-bottom: 1px solid #C5C5C5;
+  min-height: 5.5rem;
+  line-height: 5.5rem;
+  font-size: 1.7rem;
+  padding: 0 1.5rem;
+  border-bottom: 0.1rem solid #C5C5C5;
   text-decoration: none;
-  color: #333;
-  margin: 0 2rem 1rem;
+  color: #000;
+  margin: 0 1.5rem;
 }
 
-ol.link-list a {
-  background: transparent url('icons/ActionIcons_30x30_forward_nav.png') no-repeat right;
+ol.link-list li:last-child label,
+ol.link-list li:only-child label,
+ol.link-list li:last-child a,
+ol.link-list li:only-child a {
+  border-bottom: 0;
+}
+
+body[data-path="/month/"] #view-selector > .month > a,
+body[data-path="/week/"] #view-selector > .week > a,
+body[data-path="/day/"] #view-selector > .day > a {
+  color: #00aacc;
+  font-weight: 500;
+}
+
+body[data-path="/month/"] #view-selector > .month a:after,
+body[data-path="/week/"] #view-selector > .week a:after,
+body[data-path="/day/"] #view-selector > .day > a:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 0.3rem);
+  border-bottom: 0.3rem solid #00aacc;
+}
+
+body[data-path="/month/"] #view-selector > .month a:active,
+body[data-path="/week/"] #view-selector > .week a:active,
+body[data-path="/day/"] #view-selector > .day > a:active {
+  color: #5f5f5f;
+}
+
+[role="tablist"] > [role="tab"] > a:after,
+[role="tablist"] > [role="tab"] > button:after {
+  display: block !important;
 }
 
 /* view management */
 
+.fullscreen-view {
+  display: none;
+}
+
+.fullscreen-view.active {
+  display: block;
+}
+
 #time-views {
+  display: flex;
+  flex-direction: column;
   height: 100%;
 }
 
 #time-views > section {
   display: none;
-  background: white;
-  height: calc(100% - 8.33rem);
+  position: relative;
+  height: calc(100% - 9.6rem);
+  background: #fff;
 }
 
 #time-views > section.active {
@@ -80,23 +119,18 @@ ol.link-list a {
 /* view heights */
 
 #time-views > #month-view {
-  height: calc(65% - 5rem);
+  height: auto;
 }
 
 #time-views > #months-day-view {
-  height: calc(35% - 3.33rem);
-}
-
-#time-header h1 {
-  max-width: calc(100% - 5rem);
+  flex: 1;
 }
 
 #progress-indicator {
   position: absolute;
-  top: 10%;
-  left: 0px;
+  left: 0;
   width: 100%;
-  height: 3px;
+  height: 0.3rem;
   border: none;
   overflow: hidden;
   z-index: 1000;
@@ -108,51 +142,76 @@ ol.link-list a {
 }
 
 #throbber {
+  height: 5.2rem;
+  background: url('ui/progress.png') repeat-x left bottom / 32rem !important;
   animation: .5s throb infinite steps(12);
 }
 
 @keyframes throb {
   from {
-    transform: translate(0px, 0px);
+    transform: translate(0, 0);
   }
   to {
-    transform: translate(0px, -48px);
+    transform: translate(0, -4.8rem);
   }
 }
 
-#advanced-settings-view .settings-list label select {
-  display: block;
-  float: left;
-  width: 40%;
-  padding: 0.5rem;
-  background-color: #E1E1E1;
-  border: 1px solid #8F8F8C;
-  box-shadow: 1px 1px 1px 0px #8F8F8C;
+#advanced-settings-view .content {
+  height: calc(100% - 5rem);
+  overflow-y: scroll;
+}
+
+#advanced-settings-view .settings-list label {
+  height: auto;
+  margin: 0 1.5rem;
+  padding: 0.5rem 0 1.5rem;
+  line-height: 100%;
 }
 
 #advanced-settings-view .settings-list label span {
-  width: 60%;
-  overflow: hidden;
-  height: 3rem;
-  float: left;
   display: block;
-  padding-right: 2rem;
+  position: relative;
+  margin-bottom: 0;
+  font-size: 1.9rem;
+  line-height: 3.3rem;
 }
 
-#advanced-settings-view .settings-list,
-#advanced-settings-view .account-list {
-  overflow-y: scroll;
-  height: calc(50% - 2.5rem);
+#advanced-settings-view .settings-list label .button {
+  height: 4rem;
+}
+
+#advanced-settings-view .settings-list label select {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(100% + 3rem);
+  padding: 0.8rem 1rem 0;
+  font-size: 1.7rem;
+  font-weight: 500;
+}
+
+#advanced-settings-view .settings-list label span:first-child {
+  padding-left: 1.5rem;
 }
 
 #advanced-settings-view .settings-list label,
 #advanced-settings-view .account-list a {
   text-transform: none;
-  padding-right: 4rem;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   width: calc(100% - 3rem);
+}
+
+#advanced-settings-view .account-list a {
+  padding-right: 4rem;
+}
+
+#advanced-settings-view .account-list .error a {
+  background: transparent url('icons/accountwarning.png') no-repeat left;
+  padding-left: 3.5rem;
 }
 
 #advanced-settings-view .preset:after {
@@ -163,9 +222,15 @@ ol.link-list a {
   width: 50%;
 }
 
-/* create account view */
+#advanced-settings-view header.account-list-header.active {
+  display: block;
+}
 
-#create-account-view > ol,
+#advanced-settings-view header.account-list-header {
+  display: none;
+}
+
+/* create account view */
 #create-account-view > p {
   margin: 0 2rem;
 }
@@ -179,20 +244,12 @@ ol.link-list a {
   overflow: hidden;
   visibility: hidden;
   /* completely override other views */
-  background: #E6E6E0;
+  background-color: #f4f4f4;
   position: absolute;
-  top: 0px;
+  top: 0;
   width: 100%;
   height: 100%
 }
-
-body[role="application"] section[role="region"] > header h1 {
-  margin-left: 0 !important;
-}
-
-
-
-/* sub: day rows */
 
 /* sub common: day headers, day boxes */
 
@@ -232,8 +289,8 @@ body[role="application"] section[role="region"] > header h1 {
   text-transform: uppercase;
   font-size: 1.3rem;
   padding: 0.185rem 0;
-  border-right: 1px solid #131314;
-  border-left: 1px solid #515051;
+  border-right: 0.1rem solid #131314;
+  border-left: 0.1rem solid #515051;
 }
 
 #month-days li:first-child {
@@ -250,14 +307,10 @@ body[data-path^="/month/"] section.month.previous {
 }
 
 section.month {
-  z-index: 200;
-  top: 4.9rem;
-  height: calc(65% - 5rem);
-  position: absolute;
+  height: 100%;
   color: #484848;
-  width: 100%;
-  border-left: 1px solid #AAA;
-  border-right: 1px solid #AAA;
+  border-left: 0.1rem solid #AAA;
+  border-right: 0.1rem solid #AAA;
   display: none;
 }
 
@@ -289,15 +342,25 @@ section.month li > .day {
 }
 
 section.month ol {
-  height: calc(20% - (2rem / 5));
+  height: 4.5rem;
 }
 
-section.month.weeks-4 ol {
-  height: calc(25% - (2rem / 4));
+section.month #month-days ol {
+  height: auto;
 }
 
-section.month.weeks-6 ol {
-  height: calc(16.7% - (2rem / 6));
+/* Make the rows a bit taller for larger resolutions */
+/* use min-height instead of min-device-width because of b2g Bug 979924 */
+@media (min-height: 640px) {
+  section.month ol {
+    height: 6rem;
+  }
+}
+
+section.month ol:last-child {
+  box-shadow: 0 5px 5px 0 rgba(1, 1, 1, 0.2);
+  position: relative;
+  z-index: 200;
 }
 
 section.month li:first-child {
@@ -311,10 +374,10 @@ section.month li:last-child {
 section.month li {
   padding-top: 0.3%;
 
-  border-right: 1px solid #A4A4A4;
-  border-left: 1px solid #FDFDFD;
-  border-top: 1px solid white;
-  border-bottom: 1px solid #9D9D9D;
+  border-right: 0.1rem solid #A4A4A4;
+  border-left: 0.1rem solid #FDFDFD;
+  border-top: 0.1rem solid white;
+  border-bottom: 0.1rem solid #9D9D9D;
   height: 100%;
   position: relative;
   background-color: white;
@@ -331,7 +394,7 @@ section.month li.past {
 
 section.month li.present {
   background-color: #525963;
-  box-shadow: inset 1px 2px 3px 0px #333;
+  box-shadow: inset 0.1rem 0.2rem 0.3rem 0 #333;
   color: white;
   border-left: none;
   border-top: none;
@@ -367,7 +430,7 @@ section.month li .busy-indicator > span{
 section.month li .busy-indicator {
   overflow: hidden;
   clear: both;
-  bottom: 0px;
+  bottom: 0;
   position: absolute;
   width: 100%;
 }
@@ -378,7 +441,7 @@ section.month li .busy-indicator:before {
 }
 
 section.month li .busy-indicator > span {
-  top: 0px;
+  top: 0;
   position: absolute;
   text-indent: -1000em;
 }
@@ -400,7 +463,7 @@ Indicators are in units of 12
 .busy-length-12 { width: 100%; }
 
 /* ltr busy units */
-.ltr .busy-indicator .busy-1 { left: 0%; }
+.ltr .busy-indicator .busy-1 { left: 0; }
 .ltr .busy-indicator .busy-2 { left: 8.33%; }
 .ltr .busy-indicator .busy-3 { left: 16.66%; }
 .ltr .busy-indicator .busy-4 { left: 24.990000000000002%; }
@@ -415,7 +478,7 @@ Indicators are in units of 12
 
 
 /* rtl busy units */
-.rtl .busy-indicator .busy-1 { right: 0%; }
+.rtl .busy-indicator .busy-1 { right: 0; }
 .rtl .busy-indicator .busy-2 { right: 8.33%; }
 .rtl .busy-indicator .busy-3 { right: 16.66%; }
 .rtl .busy-indicator .busy-4 { right: 24.990000000000002%; }
@@ -429,100 +492,24 @@ Indicators are in units of 12
 .rtl .busy-indicator .busy-12 { right: 91.63%; }
 
 /* sub: months day view */
-
 #months-day-view  h1 {
-  letter-spacing: 0.05rem;
-  font-size: 1.15rem;
-  padding: 1.2rem 1.2rem 0.7rem;
-  text-transform: uppercase;
+  padding: 0.2rem 1.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 500;
+  line-height: 2.8rem;
   color: #F93700;
-  border-bottom: 1px solid #F93700;
-  box-shadow: 0px 4px 5px -1px #888 inset;
+  border-bottom: 0.1rem solid #F93700;
 }
 
-/** sub: view selector **/
-
-#view-selector menu {
-  padding: 0;
-  height: 3.33rem;
-}
-
+/* [BB][tabs]*/
 #view-selector {
-  padding: 0px;
-  margin: 0px;
-  width: 100%;
-  background: #949494;
-  line-height: 2.1rem;
-  overflow: hidden;
-  box-shadow: 0px 0 0.5px 0.5px #6F7070;
+  position: absolute;
+  bottom: 0;
+  height: 4.5rem;
 }
 
-#view-selector a {
-  text-decoration: none;
-  color: #444;
-}
-
-.rtl #view-selector li {
-  float: right;
-}
-
-.ltr #view-selector li {
-  float: left;
-}
-
-#view-selector > li.today {
-  width: 25%;
-  height: 3.33rem;
-  background-image: -moz-linear-gradient(#D9D9D9, #969696);
-  border-right: 1px solid black;
-}
-
-.rtl #view-selector > li.today {
-  border-left: 1px solid #666;
-}
-
-
-.ltr #view-selector > li.today {
-  border-right: 1px solid #666;
-}
-
-#view-selector > li.time-selection {
-  width: 75%;
-}
-
-/**  Selected items */
-body[data-path="/day/"] #view-selector .day,
-body[data-path="/week/"] .time-selection .week,
-body[data-path="/month/"] .time-selection .month {
-  background-color: white;
-  color: black;
-}
-
-body[data-path="/day/"] #view-selector .day a,
-body[data-path="/week/"] #view-selector .week a,
-body[data-path="/month/"] #view-selector .month a {
-  color: black;
-}
-
-#view-selector > li a {
-  padding: 0.55rem 0.74rem;
-  display: block;
-}
-
-#view-selector > li {
-  text-align: center;
-  font-weight: bold;
-  color: black;
-  display: block;
-  font-size: 1.2rem;
-}
-
-#view-selector menu li {
-  width: 33%;
-}
-
-#view-selector menu li:last-child {
-  width: 34%;
+#view-selector > li > a {
+  outline: none;
 }
 
 @keyframes fade-status {
@@ -546,19 +533,8 @@ section[role="status"].active {
   animation-duration: 1.5s;
 }
 
-@media screen and (min-width: 481px) {
-  html, body {
-    font-size: 12px;
-  }
-}
-
-@media screen and (max-width: 480px) {
-  html, body {
-    font-size: 10px;
-  }
-}
-
 /* Hide on initial render to prevent flashing */
 #settings {
   visibility: hidden;
 }
+

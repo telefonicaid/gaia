@@ -1,0 +1,135 @@
+#timer-view {
+  width: 100%;
+  height: calc(100% - 4rem);
+}
+
+#timer-time {
+  letter-spacing: -0.5rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: lighter;
+  font-size: 8.6rem;
+  color: #CFE2E6;
+  pointer-events: none;
+  margin-top: 14rem;
+}
+
+#timer-time-display {
+  text-align: center;
+  position: absolute;
+  height: 11rem;
+  width: 100%;
+  margin: auto;
+}
+
+#timer-dialog {
+  position: absolute;
+  width: 100%;
+  overflow-y: auto;
+}
+
+#timer-active {
+  z-index: 1;
+  background-size: 100% 100%;
+}
+
+#timer-controls {
+  display: flex;
+  margin: 2rem 1rem 0;
+  padding: 0;
+}
+
+#timer-controls button {
+  height: 3.8rem;
+  margin: 0 0.5rem;
+  flex: auto;
+}
+
+#timer-edit {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  font-size: 1.5rem;
+  color: #CFE2E5;
+}
+
+ul#timer-edit li {
+  border-bottom: 1px solid rgba(115, 125, 128, 0.2);
+  position: relative;
+  padding-top: 4.5rem;
+  padding-bottom: 1.5rem;
+}
+
+ul#timer-edit li:first-child {
+  padding-top: 0;
+  padding-bottom: 0.25rem;
+}
+
+#timer-edit li {
+  border-color: #999;
+}
+
+#timer-create {
+  text-align: center;
+}
+
+#timer-edit li > span {
+  vertical-align: middle;
+  position: absolute;
+  top: 1.5rem;
+  left: 0;
+}
+
+ul li > label.pack-switch {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+ul li > label.pack-switch > input + span {
+  left: auto !important;
+  right: 0 !important;
+}
+
+#timer-sound {
+  position: absolute;
+  opacity: 0;
+}
+
+#timer-sound-menu:before {
+  background: url("/shared/style/buttons/images/icons/dialog.png") no-repeat scroll 1.6rem -6rem / 1rem 9rem transparent;
+}
+
+#timer-sound-menu {
+  border-width: 0;
+
+  color: #FFF;
+  text-align: left;
+  background-color: #4D4D4D;
+}
+
+#timer-plus-time {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+
+  margin-right: 3rem;
+  margin-bottom: 3rem;
+}
+
+#timer-plus-time a {
+  color: #CFE2E6;
+  font: 2.5rem sans-serif;
+  font-weight: normal;
+  text-decoration: none;
+}
+
+@media (min-width: 768px) {
+  #timer-controls {
+    width: auto;
+  }
+
+  #timer-controls button {
+    float: none;
+  }
+}

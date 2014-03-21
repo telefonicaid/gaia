@@ -5,9 +5,16 @@ html, body {
   padding: 0;
   overflow: hidden !important;
   font-size: 10px;
-  font-family: "MozTT","Moz",sans-serif;
   font-weight: 400;
-  user-select: none;
+  -moz-user-select: none;
+}
+
+a {
+  font-size: 1.35rem;
+  line-height: 1.8rem;
+  color: #000;
+  text-decoration: underline;
+  font-weight: 500;
 }
 
 /*
@@ -18,21 +25,18 @@ html, body {
 /* Basics */
 
 [role=region] {
-  visibility: hidden;
+  display: none;
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   overflow-x: auto;
-  background: url(images/bg_top.png) top left no-repeat,
-              url(images/bg_bottom.png) bottom left no-repeat,
-              url(images/bg_1px.png) repeat-y;
-  background-size: 100% auto;
-}
+  background-color: #f4f4f4;
+ }
 
 [role=region].show {
-  visibility: visible;
+  display: block;
 }
 
 [role=main] {
@@ -48,15 +52,15 @@ html, body {
 }
 
 [role=region]:target {
-  visibility: visible;
+  display: block;
 }
 
 [role=navigation] {
   white-space: nowrap;
   margin: 0;
   padding: 1.5rem;
-  border-top: 1px solid #a6a6a6;
-  background: rgba(0,0,0,0.05);
+  border-top: 0.1rem solid #e7e7e7;
+  background: none;
   display: block;
   overflow: hidden;
   position: absolute;
@@ -72,7 +76,7 @@ html, body {
 }
 
 [role=navigation] button {
-  width: calc((100% - 1rem) / 2);
+  width: calc((100% / 2) - 0.5rem);
   float: left;
   margin-right: 1rem;
   position: relative;
@@ -87,15 +91,16 @@ html, body {
 [role=navigation] button span {
   width: 3rem;
   height: 100%;
-  left: 0;
+  left: 0.5rem;
   position: absolute;
   pointer-events: none;
-  background: url(images/prev.png) no-repeat center center;
+  background: url(images/prev.png) no-repeat center center / 1.1rem;
 }
 
 [role=navigation] button.recommend span {
-  left: calc(100% - 3rem);
-  background: url(images/next.png) no-repeat center center;
+  left: auto;
+  right: 0.5rem;
+  background-image: url(images/next.png);
 }
 
 [role=navigation] #wifi-join-button {
@@ -140,49 +145,15 @@ html, body {
   z-index: 100;
 }
 
-.step-state:before {
+.step-state-bar {
   content: "";
   height: 0.3rem;
-  width: calc(100% / 7);
   position: absolute;
   top: 50%;
   left: 0;
   margin-top: -0.2rem;
   background: #858585;
   transition: all 0.35s cubic-bezier(0.000, 1.000, 0.535, 1.110);
-}
-
-.less-steps.step-state:before {
-  width: calc(100% / 6) !important;
-}
-
-/* STATES */
-.step-1.step-state:before {
-  transform: translateX(0);
-}
-
-.step-2.step-state:before {
-  transform: translateX(100%);
-}
-
-.step-3.step-state:before {
-  transform: translateX(200%);
-}
-
-.step-4.step-state:before {
-  transform: translateX(300%);
-}
-
-.step-5.step-state:before {
-  transform: translateX(400%);
-}
-
-.step-6.step-state:before {
-  transform: translateX(500%);
-}
-
-.step-7.step-state:before {
-  transform: translateX(600%);
 }
 
 /*
@@ -202,12 +173,87 @@ html, body {
   z-index: 3000;
   transition: all 1s ease;
   background-image: url(/shared/resources/branding/powered.png);
-  background-size: 100% auto;
+  background-size: cover;
+  background-position: center center;
 }
 
 #splash-screen.show {
   opacity: 1;
 }
+
+/*
+ SIM info screen
+*/
+#sim-info-screen {
+  z-index: 2000;
+}
+
+#sim-info-screen .sim-info {
+  margin: 0 1.6rem;
+  height: 7rem;
+  border-bottom: 0.1rem solid #dddddd;
+}
+
+#sim-info-screen .sim-image {
+  height: 100%;
+  width: 3rem;
+  background-position: center center;
+  background-repeat: no-repeat;
+  float: left;
+  margin-right: 1rem;
+}
+#sim-info-1 .sim-image {
+  background-image: url(images/sim01.png);
+}
+#sim-info-1.locked .sim-image {
+  background-image: url(images/simlock01.png);
+}
+#sim-info-2 .sim-image {
+  background-image: url(images/sim02.png);
+}
+#sim-info-2.locked .sim-image {
+  background-image: url(images/simlock02.png);
+}
+
+.sim-info .sim-title {
+  margin: 0 0 0.5rem;
+  padding-top: 1rem;
+  font-size: 1.6rem;
+  color: #333333;
+}
+.sim-info.locked .sim-title {
+  padding-top: 1.6rem;
+  color: #949494;
+}
+.sim-info.no-number .sim-title {
+  padding-top: 2.1rem;
+}
+
+.sim-info .sim-number,
+.sim-info .sim-carrier {
+  margin: 0.5rem;
+  font-size: 1.2rem;
+  color: #6b6b6b;
+}
+.sim-info.locked .sim-number,
+.sim-info.locked .sim-carrier {
+  color: #949494;
+}
+
+#sim-info-screen #sim-info-messages {
+  padding: 1.8rem 2.3rem 0 3rem;
+  font-size: 1.4rem;
+  line-height: 1.8rem;
+}
+#sim-default-message {
+  margin: 0;
+  color: #333333;
+}
+#sim-settings-message {
+  margin: 0.5rem 0;
+  color: #b90000;
+}
+
 /*
   Pin code screen
 */
@@ -220,15 +266,21 @@ html, body {
 }
 
 #unlock-sim-screen section label {
-  padding: 1.5rem 3rem 0.5rem 3rem;
+  display: inline-block;
+  padding: 1.8rem 0 1.4rem 3rem;
   color: black;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   width: auto;
-  height: 2rem;
+  pointer-events: none;
+}
+#unlock-sim-screen section label.retries {
+  padding-left: 0.7rem;
+  font-size: 1.4rem;
+  color: #00aacc
 }
 
 #unlock-sim-screen .input-wrapper {
-  padding: 0 1.5rem;
+  padding: 0 1.6rem;
   position: relative;
 }
 
@@ -238,8 +290,9 @@ html, body {
 }
 
 #unlock-sim-screen .error {
-  padding: 1rem 2rem;
+  padding: 1.4rem;
   font-size: 1.5rem;
+  line-height: 1.9rem;
   color: red;
 }
 
@@ -252,13 +305,7 @@ html, body {
   padding-left: 1.5rem;
 }
 
-#unlock-sim-screen .fake-input {
-  margin-top: -4rem;
-  opacity: 0;
-
-}
-
-#unlock-sim-screen input[type="number"] {
+#unlock-sim-screen input[type="password"] {
     -moz-box-sizing: border-box;
     display: block;
     overflow: hidden;
@@ -266,44 +313,201 @@ html, body {
     height: 4rem;
     resize: none;
     padding: 0 0.8rem;
-    pointer-events: auto;
 }
 
-#unlock-sim-screen input[type="password"] {
-  pointer-events: none;
+#hidden-wifi-authentication input[type="password"] {
+  pointer-events: auto;
+}
+#unlock-sim-screen [role=navigation] button,
+#unlock-sim-screen [role=navigation] .recommend {
+  text-align: center;
 }
 
 /*
   Languages Styles
 */
 
-#languages [data-type="list"] {
-  background: url(images/bg_bubbles.png) 0 -4.5rem no-repeat;
+#languages {
+  background: url(images/bg_bubbles.png) fixed no-repeat;
   background-size: 100% auto;
-  padding-top: 14rem;
+  overflow: hidden;
+}
+
+#languages [data-type="list"] {
+  position: relative;
+  top: 15.5rem;
+  height: calc(100% - 15.5rem);
+  overflow-y: scroll;
+  overflow-x: hidden;
+  padding-top: 0;
+}
+/*
+  #SIM_mandatory
+*/
+#SIM_mandatory {
+  background: url(images/bg_nosim.png) no-repeat center center / 20rem;
+  padding: 7rem 2rem 0;
+  overflow: hidden;
+}
+
+#SIM_mandatory p {
+  margin: 0;
+  color: #606060;
+  font-weight: lighter;
+  padding: 0 1rem 1rem;
+  font-size: 2.2rem;
+  line-height: 3rem;
+  border-bottom: 0.1rem solid rgba(96, 96, 96, 0.5);
 }
 
 /*
-  Wifi
-*/
+ * Wifi
+ */
+
+#wifi {
+  top: 1.5rem;
+}
+
 #wifi [data-type="list"] li > p {
   pointer-events: none;
 }
+
+#wifi li {
+  padding: 0 1.5rem;
+}
+#wifi li.connected p {
+  color: #00AACC;
+}
+
+#wifi li:after {
+  content: "";
+  transition: opacity 0.2s ease;
+  background: #b1f1ff;
+  opacity: 0;
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+}
+
+#wifi li:active:after {
+  opacity: 0.6;
+}
+
+#wifi-refresh-button:not(:disabled):hover{
+  background-color: rgba(0, 0,0,0.0) !important;
+}
+
+#wifi-refresh-button:not(:disabled):active{
+  background-color: rgb(170, 225, 233) !important;
+}
+
+/*
+  No result container
+*/
+
+#wifi-wrapper {
+  top: -1rem;
+  bottom: 5.5rem;
+}
+
+#networks-list:first-child {
+  padding-top: 0;
+}
+
+#join-hidden-button {
+  bottom: 0;
+  margin-top: 1.5rem;
+  width: calc(100% - 3rem);
+  margin-left: 1.5rem;
+}
+
+#wifi #no-result-container {
+  position: absolute;
+  background: url('images/wifi_icon.png') no-repeat fixed center / 23.6rem;
+  height: 100%;
+  width: 100%;
+  pointer-events: none;
+}
+
+#wifi #no-result-message {
+  text-align: left;
+  line-height: 3rem;
+  position: relative;
+  top: 50%;
+  border-top: .1rem solid rgba(96,96,96,.5);
+  padding: 0;
+  width: 27rem;
+  margin: -3rem auto;
+  color: #606060;
+  font-weight: 300;
+  font-size: 2.26rem;
+}
+
+/*
+ * States of Wifi signal
+ */
+aside.wifi-icon {
+  background-repeat: no-repeat;
+  background-position: 0 center;
+  background-size: 16rem;
+  width: 3.2rem;
+}
+aside.wifi-signal       { background-image: url(images/wifi_disconnected_sprite.png);}
+aside.connected         { background-image: url(images/wifi_connected_sprite.png);}
+aside.secured           { background-image: url(images/wifi_disconnected_locked_sprite.png);}
+aside.secured.connected { background-image: url(images/wifi_connected_locked_sprite.png);}
+aside.level-0 { background-position:     0    center;}
+aside.level-1 { background-position:  -3.2rem center;}
+aside.level-2 { background-position:  -6.4rem center;}
+aside.level-3 { background-position:  -9.6rem center;}
+aside.level-4 { background-position: -12.8rem center;}
+
+aside.secured.connecting { background-image: url(images/wifi_connected_locked_sprite.png);}
+aside.connecting {
+  background-image: url(images/wifi_connected_sprite.png);
+  animation-duration: 1s;
+  animation-iteration-count: infinite;
+  animation-timing-function: step-start;
+  animation-name: wifi-signal;
+}
+@keyframes wifi-signal {
+ 0%     { background-position:     0    center; }
+ 25%    { background-position:  -3.2rem center; }
+ 50%    { background-position:  -6.4rem center; }
+ 75%    { background-position:  -9.6rem center; }
+ 100%   { background-position: -12.8rem center; }
+}
+
 
 /*
   Wifi configuration
 */
 
+#hidden-wifi-authentication form,
 #configure_network_params form {
   padding: 1rem 1.5rem;
 }
 
+#hidden-wifi-authentication form label,
 #configure_network_params form label {
   display: block;
-  padding: 1.5rem 1.5rem 0.5rem 1.5rem ;
+  width: 100%;
+  -moz-box-sizing: border-box;
+  padding: 1.5rem 1.5rem 0.5rem 1.5rem;
   font-size: 1.5rem;
 }
 
+#hidden-wifi-authentication form select {
+  width: 100%;
+  padding: 0.5rem 1.5rem 0.5rem 1.5rem;
+  font-size: 1.5rem;
+}
+
+#hidden-wifi-authentication form select,
+#hidden-wifi-authentication form input,
 #configure_network_params form input {
   padding-left: 1.5rem;
 }
@@ -319,10 +523,19 @@ html, body {
   width: auto;
   height: auto;
 }
-#configure_network_params label span {
+
+#hidden-wifi-authentication label span:after,
+#configure_network_params label span:after {
   top: 2rem;
   left: 3rem;
 }
+
+#hidden-wifi-authentication label p {
+  width: calc(100% - 2rem);
+  bottom: 0.4rem;
+  left: 3rem;
+}
+
 #configure_network_params label p {
   width: auto;
   float: right;
@@ -334,18 +547,18 @@ html, body {
   Finish process
 */
 
-#finish-screen, #tutorialFinish {
+.finish-screen-base, .tutorial-finish-base {
   opacity: 0;
   z-index: 3010;
   transition: all 1s ease;
-  background: #3b4547;
+  background: url(images/bg_grey-noise.png);
 }
 
-#finish-screen.show, #tutorialFinish.show {
+.finish-screen-base.show, .tutorial-finish-base.show {
   opacity: 1;
 }
 
-#finish-screen h1, #tutorialFinish h1 {
+.finish-screen-base h1, .tutorial-finish-base h1 {
   margin: 0;
   color: white;
   font-size: 3rem;
@@ -354,7 +567,7 @@ html, body {
   line-height: 4rem;
 }
 
-#finish-screen h2, #tutorialFinish h2 {
+.finish-screen-base h2, .tutorial-finish-base h2 {
   margin: 0;
   color: white;
   font-size: 1.9rem;
@@ -363,33 +576,49 @@ html, body {
   line-height: 2rem;
 }
 
-#finish-screen p, #tutorialFinish p {
+.finish-screen-base p, .tutorial-finish-base p {
   margin: 0;
   color: white;
   font-size: 1.4rem;
   font-weight: normal;
 }
 
-#finish-screen .content {
-  background: url(images/icon_tour.png) no-repeat center 95%;
+.finish-screen-base .content {
+  background: url(images/icon_tour.png) no-repeat center 95% / 16.9rem;
 }
 
-#tutorialFinish .content {
-  background: url(images/thumb_up.png) no-repeat center 70%;
+.finish-screen-base .content .for-tiny {
+  display: block;
 }
 
-#finish-screen .content, #tutorialFinish .content {
+.finish-screen-base .content .for-large {
+  display: none;
+}
+
+.tutorial-finish-base .content {
+  background: url(images/thumb_up.png) no-repeat center 70% / 14.4rem;
+}
+
+.finish-screen-base .content, .tutorial-finish-base .content {
   height: calc(100% - 6rem);
   padding: 0 3rem;
   width: calc(100% - 6rem);
+  background-size: 17.6rem;
 }
 
-#finish-screen [role=navigation],#tutorialFinish [role=navigation] {
+.finish-screen-base [role=navigation],.tutorial-finish-base [role=navigation] {
   border-top: .1rem solid #697476;
 }
 
-#finish-screen [role=navigation] button,#tutorialFinish [role=navigation] button {
+.finish-screen-base [role=navigation] button,.tutorial-finish-base [role=navigation] button {
   text-align: center;
+}
+
+.step-img-base {
+  width: 28.9rem;
+}
+.step-img-base.hide {
+  visibility: hidden;
 }
 
 /*
@@ -399,17 +628,20 @@ html, body {
 .change {
   float: right;
   width: 8rem;
+  white-space: nowrap;
 }
 
 #time_zone_overlay {
-  background-position: bottom;
+  background-position: center top;
   background-repeat: no-repeat;
+  background-size: 100%;
   position: relative;
   position: absolute;
-  z-index: 10;
+  z-index: 2;
   width: 100%;
-  height: 21.5rem;
-  margin-top: 0.5rem;
+  height: 100%;
+  padding-top: 0.5rem;
+  -moz-box-sizing: border-box;
 }
 
 #time_zone_overlay.UTC0000 { background-image: url('images/timezone/+0000.png'); }
@@ -456,12 +688,14 @@ html, body {
 
 #time_zone_map {
   background-image: url('images/timezone/map.png') ;
-  background-position: bottom;
+  background-position: center top;
   background-repeat: no-repeat;
-  position: relative;
-  height: 21.5rem;
+  background-size: 100%;
+  /*position: relative;*/
+  height: 100%;
   width: 100%;
-  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  -moz-box-sizing: border-box;
   z-index: 1;
 }
 
@@ -474,6 +708,8 @@ html, body {
   line-height: 1.8rem;
   padding: 2rem 1.5rem 0 1.5rem;
   font-weight: 500;
+  z-index: 10;
+  position: relative;
 }
 
 #date_and_time h2 {
@@ -484,6 +720,8 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  z-index: 10;
+  position: relative;
 }
 
 #date_and_time h1,h2 {
@@ -539,11 +777,11 @@ html, body {
   background-color: #008aaa !important;
 }
 
-#no-sim, #no-network, #fb_after_import2 p {
+#no-sim, #no-memorycard, #no-network, #fb_after_import2 p {
   color: #5B5B5B;
   font-size: 1.5rem;
   line-height: 2rem;
-  margin: -0.2rem 0 0.6rem;
+  margin: -0.5rem 0 1.5rem 0;
   padding: 0;
   white-space: normal;
 }
@@ -555,13 +793,22 @@ html, body {
 
 /* Extending icon types*/
 #import_contacts [data-type="list"] li button.icon-fb:before {
-  background-image: url('images/import_fb.png');
+  background-image: url('/contacts/style/images/f_logo.png');
 }
 
-/* Extending icon types*/
 #import_contacts [data-type="list"] li button.icon-sim:before {
-  background-image: url(/contacts/style/images/import_SIM.png);
-  background-size: 1.6rem;
+  background-image: url('/contacts/style/images/import_SIM.png');
+}
+#import_contacts [data-type="list"] li button.icon-sd:before {
+  background-image: url('/contacts/style/images/import_sd.png');
+}
+
+#import_contacts [data-type="list"] li button.icon-wlive:before {
+  background-image: url('/contacts/style/images/outlook_icon.png');
+}
+
+#import_contacts [data-type="list"] li button.icon-gmail:before {
+  background-image: url('/contacts/style/images/gmail_icon.png');
 }
 
 #import_contacts li button.icon {
@@ -572,6 +819,11 @@ html, body {
 #import_contacts li button.icon:before {
   right: auto;
   left: 0.5rem;
+  background-size: 3rem;
+}
+
+#import_contacts li button[disabled="disabled"].icon:before {
+  opacity: 0.2;
 }
 
 #import_contacts article:first-child ul {
@@ -580,7 +832,7 @@ html, body {
 
 
 #fb_after_import1 {
-  background: url('images/import_fb.png') center left no-repeat;
+  background: url('images/import_fb.png') no-repeat center left / 3rem;
 }
 
 #statusMsg.ftu {
@@ -592,28 +844,6 @@ html, body {
 #statusMsg.ftu.bannerStart {
   z-index: 2;
   opacity: 1;
-}
-
-
-#wifi li {
-  padding: 0 1.5rem;
-}
-
-#wifi li:after {
-  content: "";
-  transition: opacity 0.2s ease;
-  background: #b1f1ff;
-  opacity: 0;
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 0;
-}
-
-#wifi li:active:after {
-  opacity: 0.6;
 }
 
 /*
@@ -631,8 +861,13 @@ html, body {
   font-size: 1.35rem;
   line-height: 1.8rem;
 }
+
 #welcome_browser #browser_logo_horizontal {
   margin: 1rem 0;
+}
+
+#welcome_browser #browser_logo_horizontal img {
+  width: 20rem;
 }
 
 #welcome_browser label {
@@ -640,13 +875,6 @@ html, body {
   margin: -1.5rem 0 0 -1.5rem;
 }
 
-#welcome_browser section a {
-  font-size: 1.35rem;
-  line-height: 1.8rem;
-  color: #000;
-  text-decoration: underline;
-  font-weight: 500;
-}
 #welcome_browser section p a {
   margin-left: 0.3rem;
 }
@@ -677,7 +905,7 @@ html, body {
   margin: 0 3rem 0 0;
 }
 
-#welcome_browser #form_share_statistics span {
+#welcome_browser #form_share_statistics span:after {
   top: 1rem;
   left: 1rem;
 }
@@ -712,7 +940,6 @@ html, body {
 
 
 #browser_privacy p a {
-  margin-left: 0.3rem;
   font-size: 1.35rem;
   line-height: 1.8rem;
   color: #000;
@@ -748,22 +975,13 @@ html, body {
   margin-top: 2rem;
 }
 
-#about-your-rights p a ,#about-your-privacy p a, #sharing-performance-data p a {
-  margin-left: 0.3rem;
+#about-your-privacy p a,
+#sharing-performance-data p a {
   font-size: 1.35rem;
   line-height: 1.8rem;
   color: #000;
   text-decoration: underline;
   font-weight: 500;
-}
-
-/* external url loader */
-iframe.external {
-  width: 100%;
-  height: 100%;
-  /* using position absolute makes the container not overflowing */
-  position: absolute;
-  border: none;
 }
 
 /* your privacy */
@@ -794,20 +1012,28 @@ i.hack-first-child {
 
 #about-your-privacy .privacy-menuitem {
   padding-left: 5.5rem;
-  background-repeat: no-repeat;
-  background-position: 1.4rem center;
 }
 
-.privacy-browserOS {
-  background-image: -moz-image-rect(url(/shared/resources/branding/privacy_sprite.png), 0, 32, 32, 0);
+.privacy-menuitem:before {
+  content: ' ';
+  width: 3.2rem;
+  height: 3.2rem;
+  position: absolute;
+  left: 1.4rem;
+  top: calc(50% - 1.6rem);
+  background: url(/shared/resources/branding/privacy_sprite.png) no-repeat 0 0 / 9.6rem;
 }
 
-.privacy-everythingME {
-  background-image: -moz-image-rect(url(/shared/resources/branding/privacy_sprite.png), 0, 64, 32, 32);
+.privacy-browserOS:before {
+  background-position: 0 0;
 }
 
-.privacy-marketPlace {
-  background-image: -moz-image-rect(url(/shared/resources/branding/privacy_sprite.png), 0, 96, 32, 64);
+.privacy-everythingME:before {
+  background-position: -3.2rem 0;
+}
+
+.privacy-marketPlace:before {
+  background-position: -6.4rem 0;
 }
 
 #newsletter-form.hidden,
@@ -842,10 +1068,6 @@ i.hack-first-child {
 /* .pack-value-selector should be part of "BB lists" */
 [data-type="list"] li {
   transition: none;
-}
-
-[data-type="list"].pack-value-selector li:first-child {
-  border-top: 0.1rem solid rgb(219, 217, 217);
 }
 
 [data-type="list"].pack-value-selector li:after {
@@ -885,14 +1107,20 @@ i.hack-first-child {
   height: 100%
 }
 
-[data-type="list"].pack-value-selector li label:not([for]) input + span {
+[data-type="list"].pack-value-selector li label:not([for]) input + span:after {
   background: none;
   left: 100%;
   margin-left: -2.2rem;
 }
 
-[data-type="list"].pack-value-selector li label:not([for]) input:checked + span {
-  background: url("images/checked.png") no-repeat right center;
+[data-type="list"].pack-value-selector li label:not([for]) input:checked + span:after {
+  background: url("images/checked.png") no-repeat right center / 100%;
+}
+
+/* Right to left: position the check mark to the left */
+html[dir="rtl"] [data-type="list"].pack-value-selector li label:not([for]) input + span:after {
+  left: 0;
+  margin-left: auto;
 }
 
 [data-type="list"].pack-value-selector li label:not([for]) input + span + p {
@@ -913,59 +1141,37 @@ i.hack-first-child {
   height: 100%;
 }
 
-/*
-  States of Wifi
-*/
-
-.wifi-signal0 {
-  background-image: -moz-image-rect(url(images/wifi_sprite.png), 0, 32, 32, 0) !important;
-}
-
-.wifi-signal1 {
-  background-image: -moz-image-rect(url(images/wifi_sprite.png), 0, 64, 32, 32) !important;
-}
-
-.wifi-signal2 {
-  background-image: -moz-image-rect(url(images/wifi_sprite.png), 0, 96, 32, 64) !important;
-}
-
-.wifi-signal3 {
-  background-image: -moz-image-rect(url(images/wifi_sprite.png), 0, 128, 32, 96) !important;
-}
-
-.wifi-signal4 {
-  background-image: -moz-image-rect(url(images/wifi_sprite.png), 0, 160, 32, 128) !important;
-}
-
-
 .icon {
-  background-color: transparent !important;
-  background-repeat: no-repeat !important;
-  background-position: center center !important;
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
+#time-form .icon {
+  background-color: transparent;
 }
 
 /*
-  3G
+  3G & geolocation
 */
 
-#data_3g [data-type="list"] li {
-  padding: 0 1.5rem;
+#data_3g [data-type="list"] li,
+#geolocation [data-type="list"] li {
+  padding-left: 1.5rem;
 }
 
-#data_3g label:not([for]) {
-  width: 6rem;
-}
-
-#data_3g .content {
+#data_3g .content,
+#geolocation .content {
   padding: 0 3rem 1rem 3rem;
 }
 
-#data_3g .content p {
+#data_3g .content p,
+#geolocation .content p {
   font-size: 1.4rem;
 }
 
-[data-type="list"] aside {
-  margin: 0 0.5rem 0 0 !important;
+#data_3g .pack-switch,
+#geolocation .pack-switch {
+  height: 100%;
 }
 
 
@@ -973,34 +1179,81 @@ i.hack-first-child {
   Tutorial
 */
 
-#tutorial-screen [role=main] > [role=region] {
-  background-color: #474747;
+.tutorial-screen-base [role=main] > [role=region] {
+  background: url(images/bg_grey-noise.png);
   color: white;
 }
 
-#tutorial-screen [role=main] {
+.tutorial-screen-base [role=main] {
   top: 0;
   bottom: 0;
 }
 
-#tutorial-screen header {
+.tutorial-screen-base header {
   height: 5rem;
   font-size: 1.4rem;
   padding: 3rem 1.5rem 1rem 1.5rem;
   text-align: left;
 }
 
-#tutorial-screen section {
+.tutorial-screen-base section {
   text-align: center;
 }
 
 /* Tutorial Steps state */
-#tutorial-screen .step-state {
+.tutorial-screen-base .step-state {
   border-bottom: none;
   top: 1.5rem;
 }
 
-#tutorial-screen .step-state:before {
+/* if you want to add your steps, you have to change the denominator */
+.tutorial-screen-base .step-state:before {
   width: calc(100% / 5);
   background: #FFFFFF;
 }
+
+#tutorial-progress.step-1.step-state:before {
+  transform: translateX(0);
+}
+
+#tutorial-progress.step-2.step-state:before {
+  transform: translateX(100%);
+}
+
+#tutorial-progress.step-3.step-state:before {
+  transform: translateX(200%);
+}
+
+#tutorial-progress.step-4.step-state:before {
+  transform: translateX(300%);
+}
+
+#tutorial-progress.step-5.step-state:before {
+  transform: translateX(400%);
+}
+
+#tutorial-progress.step-6.step-state:before {
+  transform: translateX(500%);
+}
+
+#tutorial-progress.step-7.step-state:before {
+  transform: translateX(600%);
+}
+
+#tutorial-progress.step-8.step-state:before {
+  transform: translateX(700%);
+}
+
+.fxa-logo {
+  background-image: url('images/fxa_logo.png');
+  background-size: 100% auto;
+  margin: 0 auto;
+  width: 28rem;
+  height: 19.4rem;
+}
+
+#firefox_accounts {
+  padding: 1rem 1rem 0;
+  font-size: 1.5rem;
+}
+

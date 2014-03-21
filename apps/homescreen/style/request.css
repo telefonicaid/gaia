@@ -1,13 +1,22 @@
-form[role="dialog"][data-type="confirm"] {
+/* Confirm dialog is hidden by default */
+#confirm-dialog {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
   z-index: 20001; /* just below the sleep menu */
 }
 
-#confirm-dialog {
-  visibility: hidden;
-  pointer-events: none;
+#confirm-dialog.visible {
+  display: block;
 }
 
-#confirm-dialog.visible {
-  visibility: visible;
-  pointer-events: auto;
+#confirm-dialog-title {
+  width: calc(100% - 3rem); /* BB defines padding: 0 1.5rem; */
+  overflow: hidden;
+  mask: url('app_name_mask.svg#fade_right_mask');
+  text-overflow: '';
+  white-space: nowrap;
 }

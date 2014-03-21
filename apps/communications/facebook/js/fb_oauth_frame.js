@@ -6,14 +6,19 @@ if (typeof window.oauthFrame === 'undefined') {
     var targetService;
     var oauthFrame = window.oauthFrame = {};
     var oauthParams = oauthflow.params;
+    var CONTACTS_APP_ORIGIN = location.origin;
+
+    function notifyParent(message, origin) {
+      parent.postMessage({
+        type: message.type || '',
+        data: message.data || ''
+      }, origin);
+    }
 
     function cancelCb() {
-      Curtain.hide();
-
-      parent.postMessage({
-        type: 'abort',
-        data: ''
-      }, oauthParams[targetService].appOrigin);
+      Curtain.hide(notifyParent.bind(null, {
+        type: 'abort'
+      }, CONTACTS_APP_ORIGIN));
     }
 
     oauthFrame.start = function(from, service) {
@@ -28,13 +33,15 @@ if (typeof window.oauthFrame === 'undefined') {
         parent.postMessage({
           type: 'authenticated',
           data: access_token
-        }, oauthParams[service].appOrigin);
+        }, CONTACTS_APP_ORIGIN);
       }, from, service);
-    }
+    };
 
     window.addEventListener('message', function messageHandler(e) {
+      if (e.origin !== CONTACTS_APP_ORIGIN) {
+        return;
+      }
       var data = e.data;
-
       if (data && data.type === 'start') {
         oauthFrame.start(data.data.from, data.data.service);
       }

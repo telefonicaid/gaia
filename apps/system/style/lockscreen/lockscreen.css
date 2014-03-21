@@ -4,13 +4,13 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #000;
   -moz-user-select: none;
   opacity: 1;
+  /* Utilzing a cubic bezier timing function to hide the fact
+     that we might be slow at the beginning of the transition. */
   transition:
-    transform 0.5s ease,
-    opacity 0.5s ease,
-    visibility 0.5s ease;
+    transform 0.5s cubic-bezier(0.7, 0.0, 1.0, 1.0),
+    opacity 0.5s cubic-bezier(0.7, 0.0, 1.0, 1.0);
 }
 
 #screen.active-statusbar > #lockscreen {
@@ -18,14 +18,40 @@
   height: calc(100% - 4rem);
 }
 
-#screen:not(.locked) > #lockscreen,
-#screen.lockscreen-camera > #lockscreen {
-  transform: scale(2);
+#lockscreen.unlocked {
+  /* Workaround specifically targetting Gecko:
+     The transform here is equal to scale(2),
+     however this will stop Gecko from creating a 2x big layer (4x the memory),
+     resulting super-smooth transition. */
+  transform: perspective(1000px) translateZ(500px);
   opacity: 0;
-  visibility: hidden;
   pointer-events: none;
+}
 
-  transition-delay: 0.3s;
+/**
+ * Because of performance issue, we need to use an individual
+ * background element instead of setting the background inside the container.
+ *
+ * This would be a step toward removing the overhead while a large container
+ * contains children and do the opacity animation, which would cost lot on
+ * temporary surfaces.
+ **/
+#lockscreen-background {
+  position: absolute;
+  top: 0;
+  overflow: hidden;
+
+  /* Must match the CSS background rule of #screen in system.css */
+  width: 100%;
+  height: 100%;
+  background-color: #000;
+  background-size: cover; /* Possible memory over-consumption with huge images, it should be removed for improving stability*/
+  background-repeat: no-repeat;
+  background-position: 50% 50%;
+
+  -moz-user-select: none;
+  opacity: 1;
+  z-index: 1;
 }
 
 #screen.screenoff > #lockscreen,
@@ -88,44 +114,57 @@
   opacity: 0.99;
 }
 
-.lockscreen-wallpaper {
-  position: absolute;
-}
-
 .lockscreen-panel {
   position: absolute;
   width: 100%;
   height: 100%;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: 50% 50%;
   visibility: hidden;
   transition: visibility 0.5s ease, transform 0.5s ease;
 }
 
+.lockscreen-background::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Replace this with radical gradient */
+  background: transparent url('./images/mask.png') 50% 50% no-repeat;
+  background-size: cover;
+}
+
+/**
+ * Because of the individual background element, the slide would appear
+ * after the passcode pad got invoked, so we need to hide it here.
+ */
+[data-panel="passcode"] #notifications-lockscreen-container,
+[data-panel="passcode"] #lockscreen-media-container,
+[data-panel="passcode"] #lockscreen-icon-container {
+  visibility: hidden;
+}
+
 [data-panel="main"] #lockscreen-panel-main,
+[data-panel="passcode"] #lockscreen-panel-main,
 [data-panel="passcode"] #lockscreen-panel-passcode,
 [data-panel="emergency-call"] #lockscreen-panel-emergency-call {
   visibility: inherit;
 }
 
-[data-panel="emergency-call"] #lockscreen-panel-main {
-  transform: translateX(-100%);
+[data-panel="main"] #lockscreen-alt-camera {
+  visibility: hidden;
 }
 
-#lockscreen h2 {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 10rem;
-  margin: 0;
-  padding: 2.5rem 2.8rem;
-  -moz-box-sizing: border-box;
-  font-size: 3.2rem;
-  font-weight: normal;
-  line-height: 3.2rem;
-  text-shadow: 0 0 0.3rem #333;
+[data-panel="passcode"] #lockscreen-alt-camera {
+  opacity: 1;
+}
 
-  transform: translateY(-10rem);
-  transition: transform 0.3s ease;
+[data-panel="emergency-call"] #lockscreen-panel-main {
+  transform: translateX(-100%);
 }
 
 #lockscreen-header {
@@ -138,14 +177,8 @@
   padding: 1.8rem 2.5rem 1.2rem 2.5rem;
   color: #fff;
   text-shadow: 0 0 0.3rem #333;
-  transform: translateY(-10rem);
   transition: transform 0.2s ease, opacity 0.2s ease;
   opacity: 1;
-}
-
-[data-panel="passcode"] #lockscreen-header {
-  transform: translateY(0);
-  opacity: 0;
 }
 
 [data-panel="main"] #lockscreen-header {
@@ -158,62 +191,46 @@
   transition: none;
 }
 
-#lockscreen-connstate {
+#lockscreen-conn-states {
   width: 100%;
   display: inline-block;
-  font-family: 'MozTT', sans-serif;
   font-weight: 400;
   font-size: calc(6 * 0.226rem);
   text-shadow: 0.1rem 0.1rem 0.3rem #000000;
+  padding-bottom: 1rem;
+  border-bottom: solid 0.1rem rgba(256,256,256,.4);
 
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-#lockscreen-connstate > span {
-  display: block;
-  padding-bottom: 1rem;
-  border-bottom: solid 0.1rem rgba(256,256,256,.4);
-}
-
-#lockscreen-connstate > span:empty {
+#lockscreen-conn-states span:empty {
   display: none;
 }
 
-#lockscreen-connstate.twolines > span:first-child {
-  border-bottom: none;
-  padding-bottom: 0;
+#lockscreen-conn-states span:first-child {
+  display: inline-block;
+  width: 4rem;
+}
+
+#lockscreen-conn-states span:last-child {
+  display: block;
 }
 
 /* For some reason display: inline-block disregards hidden attribute */
-#lockscreen-connstate[hidden] {
+#lockscreen-conn-states span[hidden],
+#lockscreen-conn-states[hidden] {
   display: none;
 }
 
-#lockscreen-mute {
-  float: right;
-  width: 4rem;
-  height: 4rem;
-  margin-top: 3.5rem;
-
-  background: transparent url('./images/mute.png') center center no-repeat;
-}
-
-#lockscreen-mute.vibration {
-  background: transparent url('./images/vibration.png') center center no-repeat;
-}
-
-.lockscreen-clock {
+#lockscreen-clock-time {
   margin: -0.8rem 0 -1rem -0.4rem;
   font-weight: 300;
+  font-size: calc(26 * 0.226rem);
 }
 
-#lockscreen-clock-numbers {
-  font-size: calc(28 * 0.226rem);
-}
-
-#lockscreen-clock-meridiem {
+#lockscreen-clock-time span { /* optional meridiem */
   font-size: calc(17 * 0.226rem);
 }
 
@@ -222,8 +239,7 @@
   font-size: calc(7 * 0.226rem);
 }
 
-.lockscreen-clock, #lockscreen-date {
-  font-family: 'MozTT', sans-serif;
+#lockscreen-clock-time, #lockscreen-date {
   text-shadow: 0.1rem 0.1rem 0.3rem #000000;
   color: #fff;
 }
@@ -234,82 +250,74 @@
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 4;
 }
 
 .lockscreen-icon-area {
-  width: calc(50%);
-  height: 12rem;
+  height: 10rem;
   position: absolute;
   border-style: none;
-  opacity: 0.1;
   transition: opacity 0.5s ease;
 }
 
 .lockscreen-icon {
   margin-top: 2rem;
-  border-radius: 3rem;
   width: 6rem;
   height: 6rem;
-  background-color: rgba(0, 0, 0, 0.3);
-  -moz-box-sizing: border-box;
-  border: 0.2rem solid rgba(255, 255, 255, 0.8);
+
   pointer-events: none;
 }
 
-.lockscreen-icon-area:active > .lockscreen-icon {
-  background-color: rgb(0, 138, 170);
+.lockscreen-icon-area.dark .lockscreen-icon{
+  opacity: 0.65;
+}
+
+#lockscreen-area-slide {
+  text-align: center;
+  width: calc(100%);
 }
 
 .touched .lockscreen-icon {
   transition: none;
 }
 
-.lockscreen-icon-a11y-button {
-  width: 100%;
-  height: 100%;
-  border-width: inherit;
-  border-radius: inherit;
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: -1;
-}
-
-.lockscreen-icon-a11y-button * {
-  display: none;
-}
-
-.lockscreen-icon.triggered {
-  background-color: #52b6cc !important;
-  border-color: #52b6cc;
-}
-
 .lockscreen-icon-right {
-  right: 0;
+  right: calc(50% - 14rem);
 }
 
 .lockscreen-icon-left {
-  left: 0;
+  left: calc(50% - 14rem);
+}
+
+@media (min-width:768px) {
+  .lockscreen-icon-right {
+    right: calc(50% - 20.5rem);
+  }
+
+  .lockscreen-icon-left {
+    left: calc(50% - 20.5rem);
+  }
+
+  #lockscreen-header {
+    text-shadow: 0 0 0.5rem #111111;
+    padding-left: 6rem;
+    font-weight: lighter;
+  }
+
+  #lockscreen-date {
+    padding-top: 0.5rem;
+    font-size: 2.4rem;
+  }
 }
 
 button::-moz-focus-inner {
   border: 0;
 }
 
-:-moz-any(.touched, .triggered, #screen:not(.locked), #screen.attention, #lockscreen:not([data-panel="main"]))
+:-moz-any(.touched, #screen:not(.locked), #screen.attention, #lockscreen:not([data-panel="main"]))
 :-moz-any(#lockscreen-left-arrow, #lockscreen-right-arrow) {
   display: none;
   animation: none;
-}
-
-.lockscreen-icon-right > .lockscreen-icon {
-  margin-right: 4rem;
-  margin-left: auto;
-}
-
-.lockscreen-icon-left > .lockscreen-icon {
-  margin-left: 4rem;
-  margin-right: auto;
 }
 
 #lockscreen-area-unlock > div {
@@ -319,6 +327,17 @@ button::-moz-focus-inner {
   background-size: 3rem;
 }
 
+.lockscreen-icon-left, .lockscreen-icon-right {
+  z-index: 16;
+  pointer-events: auto;
+}
+
+/* Compensation for the effects after enabling the pointer-event attribute. */
+.lockscreen-icon-left:active, .lockscreen-icon-right:active {
+  background: none;
+}
+
+#lockscreen-alt-camera-button,
 #lockscreen-area-camera > div {
   background-image: url('./images/icon-camera.png');
   background-position: center;
@@ -326,17 +345,39 @@ button::-moz-focus-inner {
   background-size: 2.4rem;
 }
 
+#lockscreen-alt-camera {
+  border-radius: 3rem;
+  background-color: rgba(0, 0, 0, 0.3);
+  -moz-box-sizing: border-box;
+  border: 0.2rem solid rgba(255, 255, 255, 0.8);
+
+  float: right;
+  pointer-events: auto;
+  opacity: 0.1;
+  transition: opacity 0.5s ease;
+}
+
+#lockscreen-alt-camera-button {
+  width: 100%;
+  height: 100%;
+
+  border-radius: 50%;
+
+  pointer-events: auto;
+}
+
 [data-panel="emergency-call"] #lockscreen-panel-passcode {
   transform: translateX(-100%);
 }
 
-[data-panel="passcode"] h2#lockscreen-passcode-status {
-  visibility: inherit;
-  transform: none;
+#lockscreen-panel-passcode {
+  /* > camera, unlock icons > canvas */
+  z-index: 32;
 }
 
-[data-panel="emergency-call"] h2#lockscreen-passcode-status {
-  transition-delay: 0.5s;
+#lockscreen-panel-emergency-call {
+  /* > camera, unlock icons > canvas */
+  z-index: 32;
 }
 
 #lockscreen-passcode-code {
@@ -357,10 +398,6 @@ button::-moz-focus-inner {
 [data-passcode-status="success"] #lockscreen-passcode-pad,
 [data-passcode-status="success"] #lockscreen-passcode-code {
   transform: translateY(calc(21.4rem + 7.2rem)) !important;
-}
-
-[data-passcode-status="success"] #lockscreen-passcode-status {
-  transform: translateY(-10rem) !important;
 }
 
 [data-panel="passcode"] #lockscreen-passcode-code {
@@ -493,13 +530,38 @@ button::-moz-focus-inner {
   text-shadow: none;
 }
 
+
 #lockscreen-passcode-pad > a.lockscreen-passcode-pad-func {
-  font-size: 1.2rem;
+  padding: 0 1rem;
+  text-align: center;
+}
+
+#lockscreen-passcode-pad > a.lockscreen-passcode-pad-func:after {
+  display: inline-block;
+  width: 0;
+  height: 100%;
+  overflow: hidden;
+  content: '';
+  vertical-align: middle;
+}
+
+#lockscreen-passcode-pad > a.lockscreen-passcode-pad-func > span {
+  display: inline-block;
+  padding: 0;
+  color: #fff;
+  font-size: 1.5rem;
   font-weight: 500;
   line-height: 1.6rem;
-  padding: 1rem;
-  text-align: center;
   text-transform: uppercase;
+  vertical-align: middle;
+}
+
+#lockscreen-passcode-pad > a.disabled {
+  pointer-events: none;
+}
+
+#lockscreen-passcode-pad > a.disabled > span {
+  color: #4d4d4d;
 }
 
 #lockscreen-panel-emergency-call {
@@ -526,7 +588,7 @@ button::-moz-focus-inner {
   background-repeat: no-repeat;
   background-position: center;
   background-size: 2rem;
-  border-top: 1px solid transparent;
+  border-top: 0.1rem solid transparent;
   top: -2rem;
   height: 0.9rem;
   width: 100%;
@@ -537,22 +599,16 @@ button::-moz-focus-inner {
 
 #lockscreen-icon-container {
   position: absolute;
+  bottom: 0;
   width: 100%;
-  bottom: -8rem;
   height: 10rem;
   pointer-events: none;
-  border-top: 1px solid #989898;
+  border-top: 0.1rem solid #989898;
   background-image: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.2) 20%);
-  transition:
-    transform 0.5s ease,
-    opacity 0.5s ease;
+  z-index: 2;
 }
 
 .touched #lockscreen-icon-container {
-  transition: none;
-}
-
-.touched #lockscreen-area-handle {
   transition: none;
 }
 
@@ -560,63 +616,9 @@ button::-moz-focus-inner {
   transition: none;
 }
 
-.triggered #lockscreen-icon-container {
-  transform: translateY(-8rem);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.triggered #lockscreen-area-handle {
-  transform: translateY(-1rem);
-  opacity: 0;
-}
-
-.triggered .lockscreen-icon-area {
-  opacity: 1;
-}
-
-@keyframes lockscreen-elastic {
-  0%, 40%, 75%, 97% {
-    transform: translateY(0);
-    animation-timing-function: ease-out;
-  }
-  20% {
-    transform: translateY(-5rem);
-    animation-timing-function: ease-in;
-  }
-  55% {
-    transform: translateY(-2.3rem);
-    animation-timing-function: ease-in;
-  }
-  85% {
-    transform: translateY(-0.5rem);
-    animation-timing-function: ease-in;
-  }
-}
-
-@keyframes lockscreen-elastic-icon {
-  0%, 40%, 75%, 97% {
-    opacity: 0.1;
-    animation-timing-function: ease-out;
-  }
-  20% {
-    opacity: 0.5;
-    animation-timing-function: ease-in;
-  }
-  55% {
-    opacity: 0.4;
-    animation-timing-function: ease-in;
-  }
-  85% {
-    opacity: 0.3;
-    animation-timing-function: ease-in;
-  }
-}
-
-.elastic .lockscreen-icon-area {
-  animation: lockscreen-elastic-icon 2.5s 1;
-}
-
-.elastic #lockscreen-icon-container {
-  animation: lockscreen-elastic 2.5s 1;
+#lockscreen-canvas-wrapper {
+  position: absolute;
+  bottom: 0.75rem;
+  z-index: 8;
+  width: 100%;
 }

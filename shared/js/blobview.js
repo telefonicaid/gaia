@@ -8,7 +8,7 @@ var BlobView = (function() {
   // This constructor is for internal use only.
   // Use the BlobView.get() factory function or the getMore instance method
   // to obtain a BlobView object.
-  function BlobView(blob, sliceOffset, sliceLength, slice, 
+  function BlobView(blob, sliceOffset, sliceLength, slice,
                     viewOffset, viewLength, littleEndian)
   {
     this.blob = blob;                  // The parent blob that the data is from
@@ -53,7 +53,7 @@ var BlobView = (function() {
                               0, length, littleEndian || false);
       }
       callback(result, reader.error);
-    }
+    };
   };
 
   BlobView.prototype = {
@@ -168,10 +168,13 @@ var BlobView = (function() {
     tell: function() {
       return this.index;
     },
+    remaining: function() {
+      return this.byteLength - this.index;
+    },
     seek: function(index) {
       if (index < 0)
         fail('negative index');
-      if (index >= this.byteLength)
+      if (index > this.byteLength)
         fail('index greater than buffer size');
       this.index = index;
     },
@@ -179,7 +182,12 @@ var BlobView = (function() {
       var index = this.index + n;
       if (index < 0)
         fail('advance past beginning of buffer');
-      if (index >= this.byteLength)
+      // It's usual that when we finished reading one target view,
+      // the index is advanced to the start(previous end + 1) of next view,
+      // and the new index will be equal to byte length(the last index + 1),
+      // we will not fail on it because it means the reading is finished,
+      // or do we have to warn here?
+      if (index > this.byteLength)
         fail('advance past end of buffer');
       this.index = index;
     },
@@ -276,7 +284,7 @@ var BlobView = (function() {
         }
         else if (b1 < 240) {
           // 3-byte sequence
-          if (pos + 3 >= end)
+          if (pos + 2 >= end)
             fail();
           b2 = this.view.getUint8(pos + 1);
           if (b2 < 128 || b2 > 191)

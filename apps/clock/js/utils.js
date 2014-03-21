@@ -1,119 +1,237 @@
+define(function(require) {
 'use strict';
 
-function escapeHTML(str, escapeQuotes) {
+var mozL10n = require('l10n');
+
+var Utils = {};
+// Maintain references to millisecond multipliers
+var dateMultipliers = {
+  days: 1000 * 60 * 60 * 24,
+  hours: 1000 * 60 * 60,
+  minutes: 1000 * 60,
+  seconds: 1000,
+  milliseconds: 1
+};
+var units = Object.keys(dateMultipliers);
+
+/**
+ * Define a singleton method that returns a unified instance
+ * based on arguments.
+ *
+ * @param {function} constructor - A constructor function used
+ *        to create a new instance.
+ * @param {function} [getKey] - A function called with (arguments),
+ *        and returns a lookup key for this singleton.
+ * @return {object} - returns the instance either created or retrieved
+ *        from the singleton-map by the key.
+ */
+Utils.singleton = function(constructor, getKey) {
+  var singletonMap = new Map();
+  return function() {
+    var arglist = Array.prototype.slice.call(arguments);
+    var key = (typeof getKey === 'function') ? getKey(arglist) : constructor;
+    var instance = singletonMap.get(key);
+    if (!instance) {
+      instance = Object.create(constructor.prototype);
+      constructor.apply(instance, arglist);
+      singletonMap.set(key, instance);
+    }
+    return instance;
+  };
+};
+
+Utils.memoizedDomPropertyDescriptor = function(selector) {
+  var memoizedValue = null;
+  return {
+    get: function() {
+      if (memoizedValue === null) {
+        memoizedValue = document.querySelectorAll(selector)[0];
+      }
+      return memoizedValue;
+    },
+    set: function(value) {
+      memoizedValue = value;
+    }
+  };
+};
+
+Utils.dateMath = {
+  /**
+   * Convert object literals containing interval length to milliseconds
+   *
+   * @param {Object|Date|Number} interval An object literal containing days,
+   *                                      hours, minutes etc.
+   *                                      Optionally a number or date object.
+   * @param {Object} opts Options object with a unitsPartial property containing
+   *                      (if desired) a restriction on which properties will be
+   *                      searched on the interval.
+   * @return {Number} Millisecond value for interval length.
+   */
+  toMS: function(interval, opts) {
+    var converted, sign, unitsPartial;
+
+    // if a millisecond interval or a Date is passed in, return that
+    if (interval instanceof Date || typeof interval === 'number') {
+      return +interval;
+    }
+
+    opts = opts || {};
+    unitsPartial = opts.unitsPartial || units;
+    // Allow for 'hours' or 'hour'
+    unitsPartial = unitsPartial.map(function(unit) {
+      // String.prototype.endsWith is available in FF17+
+      return unit.endsWith('s') ? unit : unit.concat('s');
+    });
+
+    // some will exit early when it returns a truthy value
+    sign = unitsPartial.some(function(unit) {
+      return interval[unit] < 0;
+    });
+    // Using as a multiplier later
+    sign = sign ? -1 : 1;
+    // collect passed in units and multiply by their millisecond/unit count
+    converted = unitsPartial.map(function(unit) {
+      var partial;
+      // we're storing the sign out of the iterator
+      partial = Math.abs(interval[unit]);
+      // A missing property and 0 should be treated the same
+      return partial ? partial * dateMultipliers[unit] : 0;
+    });
+
+    // add up each millisecond-converted term and multiply total by sign
+    return sign * converted.reduce(function(a, b) { return a + b; });
+  },
+  /**
+   * Convert millisecond values to object literals conformable to toMS()
+   *
+   * @param {Number} interval A millisecond value.
+   * @param {Object} [opts] Options object with a unitsPartial property
+   *                        containing (if desired) a restriction on which
+   *                        properties will be reated for the return value.
+   * @return {Object} Object literal with properties as deliniated by opts.
+   */
+  fromMS: function(interval, opts) {
+    var times, sign, unitsPartial;
+
+    opts = opts || {};
+    unitsPartial = opts.unitsPartial || units;
+    // Allow for 'hours' or 'hour'
+    unitsPartial = unitsPartial.map(function(unit) {
+      // String.prototype.endsWith is available in FF17+
+      return unit.endsWith('s') ? unit : unit.concat('s');
+    });
+    // For negative intervals (time previous to now)
+    // update interval to absolute value and store the sign
+    // to apply to all units
+    if (interval < 0) {
+      sign = -1;
+      interval = Math.abs(interval);
+    } else {
+      sign = 1;
+    }
+
+    // divide the time interval by the highest millisecond multiplier
+    // store the truncated result and subtract that from the interval
+    // update the interval to be the remainder
+    times = unitsPartial.map(function(unit, index) {
+      var truncated, mult;
+      mult = dateMultipliers[unit];
+      truncated = Math.floor(interval / mult);
+      interval = interval - (truncated * mult);
+      // units are either all positive or negative
+      // only iterate to needed specificity
+      return sign * truncated;
+    });
+
+    // Populate the returned object using units as property names
+    // and times for values
+    return times.reduce(function(out, unitTime, index) {
+      out[unitsPartial[index]] = unitTime;
+      return out;
+    }, {});
+  }
+};
+
+Utils.extend = function(initialObject, extensions) {
+  // extend({}, a, b, c ... d) -> {...}
+  // rightmost properties (on 'd') take precedence
+  extensions = Array.prototype.slice.call(arguments, 1);
+  for (var i = 0; i < extensions.length; i++) {
+    var extender = extensions[i];
+    for (var prop in extender) {
+      if (Object.prototype.hasOwnProperty.call(extender, prop)) {
+        initialObject[prop] = extender[prop];
+      }
+    }
+  }
+  return initialObject;
+};
+
+/**
+ * RequestAnimationFrame after a delay.
+ *
+ * @param {function} fn - The function to evaluate
+ *        in a future delayed animation frame.
+ * @param {number} time - The number of milliseconds
+ *        to delay (using setTimeout) before we
+ *        request an animation frame.
+ *
+ * @return {object} an object that can be passed to
+ *         `Utils.cancelAnimationAfter`.
+ */
+Utils.requestAnimationAfter = function(fn, time) {
+  var ret = {};
+  if (time <= 0) {
+    ret.raf = requestAnimationFrame(fn);
+  } else {
+    ret.timeout = setTimeout(function() {
+      delete this.timeout;
+      this.raf = requestAnimationFrame(fn);
+    }.bind(ret), time);
+  }
+  return ret;
+};
+
+/**
+ * Cancel a scheduled requestAnimationAfter.
+ *
+ * @param {object} id - the value returned from `requestAnimationAfter`.
+ */
+Utils.cancelAnimationAfter = function(id) {
+  if (id && typeof id.raf !== 'undefined') {
+    cancelAnimationFrame(id.raf);
+  }
+  if (id && typeof id.timeout !== 'undefined') {
+    clearTimeout(id.timeout);
+  }
+};
+
+Utils.escapeHTML = function(str, escapeQuotes) {
   var span = document.createElement('span');
   span.textContent = str;
 
-  if (escapeQuotes)
+  if (escapeQuotes) {
     return span.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
-  return span.innerHTML;
-}
-
-function summarizeDaysOfWeek(bitStr) {
-  var _ = navigator.mozL10n.get;
-
-  if (bitStr == '')
-    return _('never');
-
-  // Format bits: 0123456(0000000)
-  // Case: Everyday:  1111111
-  // Case: Weekdays:  1111100
-  // Case: Weekends:  0000011
-  // Case: Never:     0000000
-  // Case: Specific:  other case  (Mon, Tue, Thu)
-
-  var summary = '';
-  switch (bitStr) {
-  case '1111111':
-    summary = _('everyday');
-    break;
-  case '1111100':
-    summary = _('weekdays');
-    break;
-  case '0000011':
-    summary = _('weekends');
-    break;
-  case '0000000':
-    summary = _('never');
-    break;
-  default:
-    var weekdays = [];
-    for (var i = 0; i < bitStr.length; i++) {
-      if (bitStr.substr(i, 1) == '1') {
-        // Note: here, Monday is the first day of the week
-        // whereas in JS Date(), it's Sunday -- hence the (+1) here.
-        weekdays.push(_('weekday-' + ((i + 1) % 7) + '-short'));
-      }
-    }
-    summary = weekdays.join('<span class="comma">,</span> ');
   }
-  return summary;
-}
+  return span.innerHTML;
+};
 
-function is12hFormat() {
-  var localeTimeFormat = navigator.mozL10n.get('dateTimeFormat_%X');
+Utils.is12hFormat = function() {
+  var localeTimeFormat = mozL10n.get('dateTimeFormat_%X');
   var is12h = (localeTimeFormat.indexOf('%p') >= 0);
   return is12h;
-}
+};
 
-function getLocaleTime(d) {
-  var f = new navigator.mozL10n.DateTimeFormat();
-  var is12h = is12hFormat();
+Utils.getLocaleTime = function(d) {
+  var f = new mozL10n.DateTimeFormat();
+  var is12h = Utils.is12hFormat();
   return {
     t: f.localeFormat(d, (is12h ? '%I:%M' : '%H:%M')).replace(/^0/, ''),
     p: is12h ? f.localeFormat(d, '%p') : ''
   };
-}
+};
 
-function isAlarmPassToday(hour, minute) { // check alarm has passed or not
-  var now = new Date();
-  if (hour > now.getHours() ||
-      (hour == now.getHours() && minute > now.getMinutes())) {
-    return false;
-  }
-  return true;
-}
-
-function getNextAlarmFireTime(alarm) { // get the next alarm fire time
-  var repeat = alarm.repeat;
-  var hour = alarm.hour;
-  var minute = alarm.minute;
-  var now = new Date();
-  var nextAlarmFireTime = new Date();
-  var diffDays = 0; // calculate the diff days from now
-  if (repeat == '0000000') { // one time only and alarm within 24 hours
-    if (isAlarmPassToday(hour, minute)) // if alarm has passed already
-      diffDays = 1; // alarm tomorrow
-  } else { // find out the first alarm day from the repeat info.
-    var weekDayFormatRepeat =
-      repeat.slice(-1).concat(repeat.slice(0, repeat.length - 1));
-    var weekDayOfToday = now.getDay();
-    var index = 0;
-    for (var i = 0; i < weekDayFormatRepeat.length; i++) {
-      index = (i + weekDayOfToday) % 7;
-      if (weekDayFormatRepeat.charAt(index) == '1') {
-        if (diffDays == 0) {
-          if (!isAlarmPassToday(hour, minute)) // if alarm has passed already
-            break;
-
-          diffDays++;
-          continue;
-        }
-        break;
-      }
-      diffDays++;
-    }
-  }
-
-  nextAlarmFireTime.setDate(nextAlarmFireTime.getDate() + diffDays);
-  nextAlarmFireTime.setHours(hour);
-  nextAlarmFireTime.setMinutes(minute);
-  nextAlarmFireTime.setSeconds(0, 0);
-
-  return nextAlarmFireTime;
-}
-
-function changeSelectByValue(selectElement, value) {
+Utils.changeSelectByValue = function(selectElement, value) {
   var options = selectElement.options;
   for (var i = 0; i < options.length; i++) {
     if (options[i].value == value) {
@@ -123,229 +241,391 @@ function changeSelectByValue(selectElement, value) {
       break;
     }
   }
-}
+};
 
-function getSelectedValue(selectElement) {
+Utils.getSelectedValueByIndex = function(selectElement) {
   return selectElement.options[selectElement.selectedIndex].value;
+};
+
+Utils.parseTime = function(time) {
+  var parsed = time.split(':');
+  var hour = +parsed[0]; // cast hour to int, but not minute yet
+  var minute = parsed[1];
+
+  // account for 'AM' or 'PM' vs 24 hour clock
+  var periodIndex = minute.indexOf('M') - 1;
+  if (periodIndex >= 0) {
+    hour = (hour == 12) ? 0 : hour;
+    hour += (minute.slice(periodIndex) == 'PM') ? 12 : 0;
+    minute = minute.slice(0, periodIndex);
+  }
+
+  return {
+    hour: hour,
+    minute: +minute // now cast minute to int
+  };
+};
+
+var wakeTarget = {
+  requests: {
+    cpu: new Map(), screen: new Map(), wifi: new Map()
+  },
+  locks: {
+    cpu: null, screen: null, wifi: null
+  },
+  timeouts: {
+    cpu: null, screen: null, wifi: null
+  }
+};
+function getLongestLock(type) {
+  var max = 0;
+  for (var i of wakeTarget.requests[type]) {
+    var request = i[1];
+    if (request.time > max) {
+      max = request.time;
+    }
+  }
+  return {
+    time: max,
+    lock: wakeTarget.locks[type],
+    timeout: wakeTarget.timeouts[type]
+  };
 }
-
-var ValuePicker = (function() {
-
-  //
-  // Constructor
-  //
-  function VP(e, unitStyle) {
-    this.element = e;
-    this._valueDisplayedText = unitStyle.valueDisplayedText;
-    this._unitClassName = unitStyle.className;
-    this._lower = 0;
-    this._upper = unitStyle.valueDisplayedText.length - 1;
-    this._range = unitStyle.valueDisplayedText.length;
-    this._currentIndex = 0;
-    this.init();
-  }
-
-  //
-  // Public methods
-  //
-  VP.prototype.getSelectedIndex = function() {
-    var selectedIndex = this._currentIndex;
-    return selectedIndex;
-  };
-
-  VP.prototype.getSelectedDisplayedText = function() {
-    var displayedText = this._valueDisplayedText[this._currentIndex];
-    return displayedText;
-  };
-
-  VP.prototype.setSelectedIndex = function(tunedIndex, ignorePicker) {
-    if ((tunedIndex % 1) > 0.5) {
-      tunedIndex = Math.floor(tunedIndex) + 1;
+Utils.safeWakeLock = function(opts, fn) {
+    /*
+     * safeWakeLock
+     *
+     * Create a Wake lock that is automatically released after
+     * timeoutMs. Locks are reentrant, and have no meaningful mutual
+     * exclusion behavior.
+     *
+     * @param {Object} options - an object containing
+     *                 [type] {string} a string passed to requestWakeLock
+     *                                 default = 'cpu'. This string can be any
+     *                                 resource exposed by the environment that
+     *                                 this application was designed to run in.
+     *                                 Gaia exposes three of them: 'cpu',
+     *                                 'screen', and 'wifi'. Certified apps may
+     *                                 expose more.
+     *                 timeoutMs {number} number of milliseconds to hold
+     *                                    the lock.
+     * @param {Function} callback - a function to be called after all other
+     *                              generated callbacks have been called.
+     *                              function ([err]) -> undefined.
+     */
+  opts = opts || {};
+  var type = opts.type || 'cpu';
+  var timeoutMs = opts.timeoutMs | 0;
+  var now = Date.now();
+  var myKey = {};
+  wakeTarget.requests[type].set(myKey, {
+    time: now + timeoutMs
+  });
+  var max = getLongestLock(type);
+  var unlockFn = function() {
+    if (!myKey) {
+      return;
+    }
+    wakeTarget.requests[type]. delete(myKey);
+    var now = Date.now();
+    var max = getLongestLock(type);
+    if (max.time > now) {
+      clearTimeout(wakeTarget.timeouts[type]);
+      wakeTarget.timeouts[type] = setTimeout(unlockFn, max.time - now);
     } else {
-      tunedIndex = Math.floor(tunedIndex);
+      if (wakeTarget.locks[type]) {
+        wakeTarget.locks[type].unlock();
+      }
+      wakeTarget.locks[type] = null;
+      clearTimeout(wakeTarget.timeouts[type]);
+      wakeTarget.timeouts[type] = null;
+    }
+    myKey = null;
+  };
+  clearTimeout(wakeTarget.timeouts[type]);
+  wakeTarget.timeouts[type] = setTimeout(unlockFn, max.time - now);
+  try {
+    if (!wakeTarget.locks[type] && max.time > now) {
+      wakeTarget.locks[type] = navigator.requestWakeLock(type);
+    }
+    fn(unlockFn);
+  } catch (err) {
+    unlockFn();
+    throw err;
+  }
+};
+
+Utils.repeatString = function rep(str, times) {
+  var built = [], cur = str;
+  for (var i = 0, j = 1; j <= times; i++) {
+    if ((times & j) > 0) {
+      built.push(cur);
+    }
+    cur = cur + cur;
+    j = j << 1;
+  }
+  return built.join('');
+};
+
+Utils.format = {
+  time: function(hour, minute, opts) {
+    var period = '';
+    opts = opts || {};
+    opts.meridian = typeof opts.meridian === 'undefined' ? true : opts.meridian;
+    var padHours = typeof opts.padHours === 'undefined' ? false : opts.padHours;
+    opts.padHours = padHours;
+
+    if (opts.meridian && Utils.is12hFormat()) {
+      period = hour < 12 ? 'AM' : 'PM';
+      hour = hour % 12;
+      hour = (hour === 0) ? 12 : hour;
     }
 
-    if (tunedIndex < this._lower) {
-      tunedIndex = this._lower;
+    if (opts.padHours && hour < 10) {
+      hour = '0' + hour;
     }
 
-    if (tunedIndex > this._upper) {
-      tunedIndex = this._upper;
+    if (hour === 0) {
+      hour = '00';
     }
 
-    this._currentIndex = tunedIndex;
-    this.updateUI(tunedIndex, ignorePicker);
-
-    return tunedIndex;
-  };
-
-  VP.prototype.setSelectedIndexByDisplayedText = function(displayedText) {
-    var newIndex = this._valueDisplayedText.indexOf(displayedText);
-    if (newIndex != -1) {
-      this._currentIndex = newIndex;
-      this.updateUI(newIndex);
+    if (minute < 10) {
+      minute = '0' + minute;
     }
-  };
 
-  //
-  // Internal methods
-  //
-  VP.prototype.init = function() {
-    this.initUI();
-    this.setSelectedIndex(0); // Default Index is zero
-    this.mousedownHandler = vp_mousedown.bind(this);
-    this.mousemoveHandler = vp_mousemove.bind(this);
-    this.mouseupHandler = vp_mouseup.bind(this);
-    this.transitionendHandler = vp_transitionend.bind(this);
-    this.addEventListeners();
-  };
+    return hour + ':' + minute + period;
+  },
+  hms: function(sec, format) {
+    var hour = 0;
+    var min = 0;
 
-  VP.prototype.initUI = function() {
-    var lower = this._lower;
-    var upper = this._upper;
-    var unitCount = this._valueDisplayedText.length;
-    for (var i = 0; i < unitCount; ++i) {
-      this.addPickerUnit(i);
+    if (sec >= 3600) {
+      hour = Math.floor(sec / 3600);
+      sec -= hour * 3600;
     }
-    // cache the size of picker
-    this._pickerUnits = this.element.children;
-    this._pickerUnitsHeight = this._pickerUnits[0].clientHeight;
-    this._pickerHeight = this._pickerUnits[0].clientHeight *
-                                     this._pickerUnits.length;
-    this._space = this._pickerHeight / this._range;
-  };
 
-  VP.prototype.addPickerUnit = function(index) {
-    var html = this._valueDisplayedText[index];
-    var unit = document.createElement('div');
-    unit.className = this._unitClassName;
-    unit.innerHTML = html;
-    this.element.appendChild(unit);
-  };
-
-  VP.prototype.updateUI = function(index, ignorePicker) {
-    this.resetUI();
-    if (true !== ignorePicker) {
-      this.element.style.top =
-            (this._lower - index) * this._space + 'px';
+    if (sec >= 60) {
+      min = Math.floor(sec / 60);
+      sec -= min * 60;
     }
-  };
 
-  VP.prototype.addEventListeners = function() {
-    this.element.addEventListener('mousedown', this.mousedownHandler, false);
-  };
+    hour = (hour < 10) ? '0' + hour : hour;
+    min = (min < 10) ? '0' + min : min;
+    sec = (sec < 10) ? '0' + sec : sec;
 
-  VP.prototype.removeEventListeners = function() {
-    this.element.removeEventListener('mouseup', this.mouseupHandler, false);
-    this.element.removeEventListener('mousemove', this.mousemoveHandler, false);
-  };
+    if (typeof format !== 'undefined') {
+      format = format.replace('hh', hour);
+      format = format.replace('mm', min);
+      format = format.replace('ss', sec);
 
-  VP.prototype.resetUI = function() {
-    var actives = this.element.querySelectorAll('.active');
-    for (var i = 0; i < actives.length; i++) {
-      actives[i].classList.remove('active');
+      return format;
     }
-    this._pickerUnits[this._currentIndex].classList.add('active');
-  };
+    return hour + ':' + min + ':' + sec;
+  },
+  durationMs: function(ms) {
+    var dm = Utils.dateMath.fromMS(ms, {
+      unitsPartial: ['minutes', 'seconds', 'milliseconds']
+    });
+    var puts = function(x, n) {
+      x = String(x);
+      return Utils.repeatString('0', Math.max(0, n - x.length)) + x;
+    };
+    return [
+      puts(dm.minutes, 2), ':',
+      puts(dm.seconds, 2), '.',
+      puts((dm.milliseconds / 10) | 0, 2)
+    ].join('');
+  }
+};
 
-  function cloneEvent(evt) {
-    if ('touches' in evt) {
-      evt = evt.touches[0];
+
+Utils.async = {
+
+  generator: function(latchCallback) {
+    /*
+     * Generator
+     *
+     * Create an async generator. Each time the generator is
+     * called, it will return a new callback. When all issued
+     * callbacks have been called, the latchCallback is called.
+     *
+     * If any of the callbacks are called with and error as
+     * the first argument, the latchCallback will be called
+     * immediately with that error.
+     *
+     * @latchCallback {Function} a function to be called after
+     *           all other generated callbacks have been
+     *           called
+     *           function ([err]) -> undefined
+     */
+    var tracker = new Map();
+    var issuedCallbackCount = 0;
+    var disabled = false;
+    var testFn = function(err) {
+      var trackerSize;
+      if (!disabled) {
+        // FF18 defines size to be a method, so we need to test here:
+        // Remove with FF18 support
+        if (typeof tracker.size === 'function') {
+          trackerSize = tracker.size();
+        } else {
+          trackerSize = tracker.size;
+        }
+        if (err || trackerSize === issuedCallbackCount) {
+          disabled = true;
+          latchCallback && latchCallback(err);
+        }
+      }
+    };
+    return function() {
+      return (function() {
+        var i = issuedCallbackCount++;
+        return function(err) {
+          tracker.set(i, true);
+          testFn(err);
+        };
+      })();
+    };
+  },
+
+  namedParallel: function(names, latchCallback) {
+    /*
+     * namedParallel
+     *
+     * Create an async namedParallel.
+     *
+     * The return value is an object containing the parameters
+     * specified in the names array. Each parameter is set to
+     * a callback. When all callbacks have been called, latchCallback
+     * is called.
+     *
+     * If any named callback is called with an error as the first
+     * parameter, latchCallback is immediately called with that
+     * error. Future calls to callbacks are then no-ops.
+     *
+     * @names {List<String>} - A list of strings to be used as
+     *        parameter names for callbacks on the returned object.
+     */
+    var generator = Utils.async.generator(latchCallback);
+    var done = generator();
+    var ret = {};
+    for (var i = 0; i < names.length; i++) {
+      ret[names[i]] = generator();
     }
-    return { x: evt.pageX, y: evt.pageY,
-             timestamp: MouseEventShim.getEventTimestamp(evt) };
+    done();
+    return ret;
   }
 
-  //
-  // Tuneable parameters
-  //
-  var SPEED_THRESHOLD = 0.1;
-  var currentEvent, startEvent, currentSpeed;
-  var tunedIndex = 0;
+};
 
-  function toFixed(value) {
-    return parseFloat(value.toFixed(1));
-  }
+Utils.data = {
 
-  function calcSpeed() {
-    var movingSpace = startEvent.y - currentEvent.y;
-    var deltaTime = currentEvent.timestamp - startEvent.timestamp;
-    var speed = movingSpace / deltaTime;
-    currentSpeed = parseFloat(speed.toFixed(2));
-  }
-
-  function calcTargetIndex(space) {
-    return tunedIndex - getMovingSpace() / space;
-  }
-
-  // If the user swap really slow, narrow down the moving space
-  // So the user can fine tune value.
-  function getMovingSpace() {
-    var movingSpace = currentEvent.y - startEvent.y;
-    var reValue = Math.abs(currentSpeed) > SPEED_THRESHOLD ?
-                                movingSpace : movingSpace / 4;
-    return reValue;
-  }
-
-  function vp_transitionend() {
-    this.element.classList.remove('animation-on');
-    this.element.removeEventListener('transitionend',
-                                     this.transitionendHandler);
-  }
-
-  function vp_mousemove(event) {
-    event.stopPropagation();
-    currentEvent = cloneEvent(event);
-
-    calcSpeed();
-
-    // move selected index
-    this.element.style.top = parseFloat(this.element.style.top) +
-                              getMovingSpace() + 'px';
-
-    tunedIndex = calcTargetIndex(this._space);
-    var roundedIndex = Math.round(tunedIndex * 10) / 10;
-
-    if (roundedIndex != this._currentIndex) {
-      this.setSelectedIndex(toFixed(roundedIndex), true);
+  defaultCompare: function ud_defaultCompare(a, b) {
+    if (typeof a === 'number' && typeof b === 'number') {
+      var diff = a - b;
+      return diff !== 0 ? diff / Math.abs(diff) : diff;
+    } else if ((typeof a === 'string' || a instanceof String) &&
+               (typeof b === 'string' || b instanceof String)) {
+      return (a < b) ? -1 : ((a > b) ? 1 : 0);
+    } else if (Array.isArray(a) && Array.isArray(b)) {
+      var commonLength = Math.min(a.length, b.length);
+      for (var i = 0; i < commonLength; i++) {
+        var compareResult = Utils.data.defaultCompare(a[i], b[i]);
+        if (compareResult !== 0) {
+          return compareResult;
+        }
+      }
+      return b.length - a.length;
+    } else {
+      throw new Error('Cannot compare ' + JSON.stringify([a, b]));
     }
+  },
 
-    startEvent = currentEvent;
-  }
+  keyedCompare: function ud_keyedCompare(key) {
+    return function internal_keyedCompare(a, b) {
+      return Utils.data.defaultCompare(a[key], b[key]);
+    };
+  },
 
-  function vp_mouseup(event) {
-    event.stopPropagation();
-    this.removeEventListeners();
-
-    // Add animation back
-    this.element.addEventListener('transitionend', this.transitionendHandler);
-    this.element.classList.add('animation-on');
-
-    // Add momentum if speed is higher than a given threshold.
-    if (Math.abs(currentSpeed) > SPEED_THRESHOLD) {
-      var direction = currentSpeed > 0 ? 1 : -1;
-      tunedIndex += Math.min(Math.abs(currentSpeed) * 5, 5) * direction;
+  binarySearch: function ud_binarySearch(key, list, compare) {
+    compare = compare || Utils.data.defaultCompare;
+    var botI = 0;
+    var topI = list.length;
+    var midI, comp, value;
+    if (list.length > 0) {
+      do {
+        midI = botI + ((topI - botI) / 2) | 0;
+        value = list[midI];
+        comp = compare(value, key);
+        if (comp < 0) {
+          botI = midI + 1;
+        } else if (comp > 0) {
+          topI = midI - 1;
+        }
+      } while (comp !== 0 && botI < topI);
     }
-    tunedIndex = this.setSelectedIndex(toFixed(tunedIndex));
-    currentSpeed = 0;
+    midI = comp === 0 ? midI : topI;
+    value = list[midI];
+    if (comp === 0 || value && compare(value, key) === 0) {
+      return { match: true, index: midI, value: value };
+    } else {
+      var index;
+      if (0 > midI) {
+        index = 0;
+      } else if (midI >= list.length) {
+        index = list.length;
+      } else {
+        index = midI + (compare(value, key) < 0 ? 1 : 0);
+      }
+      return {
+        match: false,
+        index: index
+      };
+    }
+  },
+
+  sortedInsert: function ud_sortedInsert(item, list, compare, unique) {
+    compare = compare || Utils.data.defaultCompare;
+    var bs = Utils.data.binarySearch(item, list, compare);
+    var inserted = !bs.match || !unique;
+    if (inserted) {
+      list.splice(bs.index, 0, item);
+    }
+    return (inserted) ? bs.index : null;
+  },
+
+  sortedRemove: function ud_sortedRemove(item, list, compare, multiple) {
+    compare = compare || Utils.data.defaultCompare;
+    var removed = false;
+    if (!multiple) {
+      var bs = Utils.data.binarySearch(item, list, compare);
+      if (bs.match) {
+        list.splice(bs.index, 1);
+        removed = true;
+      }
+    } else {
+      var biasedCompare = function(target, result, ic) {
+        return function(a, b) {
+          if (ic(a, target) === 0) {
+            return result;
+          } else {
+            return ic(a, b);
+          }
+        };
+      };
+      var leftBound = Utils.data.binarySearch(item, list,
+        biasedCompare(item, 1, compare));
+      var rightBound = Utils.data.binarySearch(item, list,
+        biasedCompare(item, -1, compare));
+      if (leftBound.index < rightBound.index) {
+        list.splice(leftBound.index, rightBound.index - leftBound.index);
+        removed = true;
+      }
+    }
+    return removed;
   }
+};
 
-  function vp_mousedown(event) {
-    event.stopPropagation();
-    event.target.setCapture(true);
-    MouseEventShim.setCapture();
+return Utils;
 
-    // Stop animation
-    this.element.classList.remove('animation-on');
-
-    startEvent = currentEvent = cloneEvent(event);
-    tunedIndex = this._currentIndex;
-
-    this.removeEventListeners();
-    this.element.addEventListener('mousemove', this.mousemoveHandler, false);
-    this.element.addEventListener('mouseup', this.mouseupHandler, false);
-  }
-
-  return VP;
-}());
-
+});

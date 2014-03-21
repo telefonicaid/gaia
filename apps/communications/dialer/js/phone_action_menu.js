@@ -1,8 +1,8 @@
-var PhoneNumberActionMenu = (function () {
+var PhoneNumberActionMenu = (function() {
 
   var _initiated, _newPhoneNumber, _addContactActionMenu, _callMenuItem,
-    _createNewContactMenuItem, _addToExistingContactMenuItem,
-    _cancelActionMenuItem;
+    _createNewContactMenuItem, _addToExistingContactMenuItem, _sendSmsMenuItem,
+    _cancelActionMenuItem, _addContactActionTitle, _optionToMenuItem;
 
   var _formSubmit = function _formSubmit(event) {
     return false;
@@ -33,9 +33,6 @@ var PhoneNumberActionMenu = (function () {
 
     try {
       var activity = new MozActivity(options);
-      activity.onsuccess = function() {
-        Recents.refresh();
-      }
     } catch (e) {
       console.error('Error while creating activity');
     }
@@ -45,7 +42,39 @@ var PhoneNumberActionMenu = (function () {
   var _call = function _call() {
     if (_newPhoneNumber) {
       _updateLatestVisit();
-      CallHandler.call(_newPhoneNumber);
+      if (navigator.mozIccManager.iccIds.length <= 1) {
+        CallHandler.call(_newPhoneNumber, 0);
+      } else {
+        var callFn = CallHandler.call.bind(CallHandler, _newPhoneNumber);
+
+        var key = 'ril.voicemail.defaultServiceId';
+        var req = navigator.mozSettings.createLock().get(key);
+        req.onsuccess = function() {
+          LazyLoader.load(['/shared/js/sim_picker.js'], function() {
+            LazyL10n.get(function(_) {
+              SimPicker.show(req.result[key], _newPhoneNumber, callFn);
+            });
+          });
+        };
+      }
+    }
+    _addContactActionMenu.classList.remove('visible');
+  };
+
+  var _sendSms = function _sendSms() {
+    if (_newPhoneNumber) {
+      _updateLatestVisit();
+      try {
+        var activity = new MozActivity({
+          name: 'new',
+          data: {
+            type: 'websms/sms',
+            number: _newPhoneNumber
+          }
+        });
+      } catch (e) {
+        console.error('Error while creating activity: ' + e);
+      }
     }
     _addContactActionMenu.classList.remove('visible');
   };
@@ -60,38 +89,35 @@ var PhoneNumberActionMenu = (function () {
   */
   var _show = function _show(contactId, phoneNumber, options) {
     if (options) {
-      if (options.indexOf('call') >= 0) {
-        _callMenuItem.classList.remove('hide');
-      } else {
-        _callMenuItem.classList.add('hide');
-      }
-      if (options.indexOf('new-contact') >= 0) {
-        _createNewContactMenuItem.classList.remove('hide');
-      } else {
-        _createNewContactMenuItem.classList.add('hide');
-      }
-      if (options.indexOf('add-to-existent') >= 0) {
-        _addToExistingContactMenuItem.classList.remove('hide');
-      } else {
-        _addToExistingContactMenuItem.classList.add('hide');
+      for (opt in _optionToMenuItem) {
+        var item = _optionToMenuItem[opt];
+        if (options.indexOf(opt) >= 0) {
+          item.classList.remove('hide');
+        } else {
+          item.classList.add('hide');
+        }
       }
     } else {
-      _callMenuItem.classList.remove('hide');
-      _createNewContactMenuItem.classList.remove('hide');
-      _addToExistingContactMenuItem.classList.remove('hide');
+      for (var opt in _optionToMenuItem)
+        _optionToMenuItem[opt].classList.remove('hide');
     }
     if (contactId) {
-      var contactsIframe = document.getElementById('iframe-contacts');
-      var src = '/contacts/index.html';
-      src += '#view-contact-details?id=' + contactId;
-      src += '&tel=' + phoneNumber;
-      // Enable the function of receiving the messages posted from the iframe.
-      src += '&back_to_previous_tab=1';
-      var timestamp = new Date().getTime();
-      contactsIframe.src = src + '&timestamp=' + timestamp;
       window.location.hash = '#contacts-view';
+
+      setTimeout(function nextTick() { /* we'll have the iframe by then */
+        var contactsIframe = document.getElementById('iframe-contacts');
+        var src = '/contacts/index.html';
+        src += '#view-contact-details?id=' + contactId;
+        src += '&tel=' + phoneNumber;
+        // Enable the function of receiving the messages posted from the iframe.
+        src += '&back_to_previous_tab=1';
+        var timestamp = new Date().getTime();
+        contactsIframe.src = src + '&timestamp=' + timestamp;
+      });
     } else {
+      _addContactActionTitle.textContent = phoneNumber;
       _newPhoneNumber = phoneNumber;
+      _addContactActionMenu.hidden = false;
       _addContactActionMenu.classList.add('visible');
     }
   };
@@ -100,11 +126,14 @@ var PhoneNumberActionMenu = (function () {
     if (_initiated) {
       return;
     }
+    _addContactActionTitle = document.getElementById(
+      'add-contact-action-title');
     _addContactActionMenu = document.getElementById('add-contact-action-menu');
-    _addContactActionMenu.hidden = false;
     _addContactActionMenu.addEventListener('submit', _formSubmit);
     _callMenuItem = document.getElementById('call-menuitem');
     _callMenuItem.addEventListener('click', _call);
+    _sendSmsMenuItem = document.getElementById('send-sms-menuitem');
+    _sendSmsMenuItem.addEventListener('click', _sendSms);
     _createNewContactMenuItem = document.getElementById(
       'create-new-contact-menuitem');
     _createNewContactMenuItem.addEventListener('click', _createNewContact);
@@ -112,6 +141,14 @@ var PhoneNumberActionMenu = (function () {
       'add-to-existing-contact-menuitem');
     _addToExistingContactMenuItem.addEventListener('click',
       _addToExistingContact);
+
+    _optionToMenuItem = {
+      'call': _callMenuItem,
+      'send-sms': _sendSmsMenuItem,
+      'new-contact': _createNewContactMenuItem,
+      'add-to-existent': _addToExistingContactMenuItem
+    };
+
     _cancelActionMenuItem = document.getElementById('cancel-action-menu');
     _cancelActionMenuItem.addEventListener('click', _cancelActionMenu);
     _initiated = true;

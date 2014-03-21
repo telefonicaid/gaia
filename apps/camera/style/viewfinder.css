@@ -1,0 +1,12 @@
+
+.viewfinder {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 1;
+  transition: opacity 25ms ease-in-out;
+}
+
+.viewfinder.fade-out {
+  opacity: 0;
+}

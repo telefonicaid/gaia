@@ -26,18 +26,18 @@ var Utils = {
   },
 
   getDayDate: function re_getDayDate(timestamp) {
-    var date = new Date(timestamp),
-      startDate = new Date(date.getFullYear(),
+    var date = new Date(timestamp);
+    var startDate = new Date(date.getFullYear(),
                              date.getMonth(), date.getDate());
     return startDate.getTime();
   },
 
   getPhoneNumberPrimaryInfo: function ut_getPhoneNumberPrimaryInfo(matchingTel,
-    contact) {
+                                                                   contact) {
     if (contact) {
-      if (contact.name && String(contact.name) !== '') {
+      if (contact.name && contact.name.length && contact.name[0] !== '') {
         return contact.name;
-      } else if (contact.org && String(contact.org) !== '') {
+      } else if (contact.org && contact.org.length && contact.org[0] !== '') {
         return contact.org;
       }
     }
@@ -47,46 +47,128 @@ var Utils = {
     return null;
   },
 
-  // XXX: this is way too complex for the task accomplished
-  getPhoneNumberAdditionalInfo: function ut_getPhoneNumberAdditionalInfo(
-    matchingTel, associatedContact) {
-    var additionalInfo, phoneType, phoneCarrier,
-        contactPhoneEntry, contactPhoneNumber, contactPhoneType,
-        contactPhoneCarrier, multipleNumbersSameCarrier,
-        length = associatedContact.tel.length;
+  toCamelCase: function ut_toCamelCase(str) {
+    return str.replace(/\-(.)/g, function replacer(str, p1) {
+      return p1.toUpperCase();
+    });
+  },
 
-    // Phone type is a mandatory field.
-    contactPhoneNumber = matchingTel.value;
-    additionalInfo = matchingTel.type;
-    phoneType = matchingTel.type;
-    if (matchingTel.carrier) {
-      phoneCarrier = matchingTel.carrier;
-    } else {
-      additionalInfo = additionalInfo + ', ' + contactPhoneNumber;
+  /**
+   * In case of a call linked to a contact, the additional information of the
+   * phone number subject of the call consists in the type and carrier
+   * associated with this phone number.
+   *
+   * Each call is associated with an *unique number* and this phone number can
+   * belong to n specific contact(s). We don't care about the contact having
+   * more than one phone number, as we are only interested in the additional
+   * information of the current call that is associated with *one and only one*
+   * phone number.
+   *
+   * The type of the phone number will be localized if we have a matching key.
+   */
+  getPhoneNumberAdditionalInfo:
+    function ut_getPhoneNumberAdditionalInfo(matchingTel) {
+    var number = matchingTel.number || matchingTel.value;
+    if (!number) {
+      return;
+    }
+    var carrier = matchingTel.carrier;
+    // In case that there is no stored type for this number, we default to
+    // "Mobile".
+    var type = matchingTel.type;
+    if (Array.isArray(type)) {
+      type = type[0];
     }
 
-    if (phoneType && phoneCarrier) {
-      var multipleNumbersSameCarrier = false;
-      for (var j = 0; j < length; j++) {
-        contactPhoneEntry = associatedContact.tel[j];
-        contactPhoneType = contactPhoneEntry.type;
-        contactPhoneCarrier = contactPhoneEntry.carrier;
+    var _ = navigator.mozL10n.get;
 
-        if ((contactPhoneEntry.value != contactPhoneNumber) &&
-            (phoneType == contactPhoneType) &&
-            (phoneCarrier == contactPhoneCarrier)) {
-          multipleNumbersSameCarrier = true;
-          break;
+    var result = type ? _(type) : _('mobile');
+    result = result ? result : type; // no translation found for this type
+
+    if (carrier) {
+      result += ', ' + carrier;
+    } else {
+      result += ', ' + number;
+    }
+
+    return result;
+  },
+
+  addEllipsis: function ut_addEllipsis(view, fakeView, ellipsisSide) {
+    var side = ellipsisSide || 'begin';
+    LazyL10n.get(function localized(_) {
+      var localizedSide;
+      if (navigator.mozL10n.language.direction === 'rtl') {
+        localizedSide = (side === 'begin' ? 'right' : 'left');
+      } else {
+        localizedSide = (side === 'begin' ? 'left' : 'right');
+      }
+      var computedStyle = window.getComputedStyle(view, null);
+      var currentFontSize = parseInt(
+        computedStyle.getPropertyValue('font-size')
+      );
+      var viewWidth = view.getBoundingClientRect().width;
+      fakeView.style.fontSize = currentFontSize + 'px';
+      fakeView.style.fontWeight = computedStyle.getPropertyValue('font-weight');
+      fakeView.innerHTML = view.value ? view.value : view.innerHTML;
+
+      var value = fakeView.innerHTML;
+
+      // Guess the possible position of the ellipsis in order to minimize
+      // the following while loop iterations:
+      var counter = value.length -
+        (viewWidth *
+         (fakeView.textContent.length /
+           fakeView.getBoundingClientRect().width));
+
+      var newPhoneNumber;
+      while (fakeView.getBoundingClientRect().width > viewWidth) {
+
+        if (localizedSide == 'left') {
+          newPhoneNumber = '\u2026' + value.substr(-value.length + counter);
+        } else if (localizedSide == 'right') {
+          newPhoneNumber = value.substr(0, value.length - counter) + '\u2026';
+        }
+
+        fakeView.innerHTML = newPhoneNumber;
+        counter++;
+      }
+
+      if (newPhoneNumber) {
+        if (view.value) {
+          view.value = newPhoneNumber;
+        } else {
+          view.innerHTML = newPhoneNumber;
         }
       }
+    });
+  },
 
-      if (multipleNumbersSameCarrier) {
-        additionalInfo = additionalInfo + ', ' + contactPhoneNumber;
-      } else {
-        additionalInfo = additionalInfo + ', ' + phoneCarrier;
-      }
-    }
-    return additionalInfo;
+  getNextFontSize:
+    function ut_getNextFontSize(view, fakeView, maxFontSize,
+      minFontSize, fontStep) {
+        var computedStyle = window.getComputedStyle(view, null);
+        var fontSize = parseInt(computedStyle.getPropertyValue('font-size'));
+        var viewWidth = view.getBoundingClientRect().width;
+        var viewHeight = view.getBoundingClientRect().height;
+        fakeView.style.fontSize = fontSize + 'px';
+        fakeView.innerHTML = (view.value ? view.value : view.innerHTML);
+
+        var rect = fakeView.getBoundingClientRect();
+
+        while ((rect.width < viewWidth) && (fontSize < maxFontSize)) {
+          fontSize = Math.min(fontSize + fontStep, maxFontSize);
+          fakeView.style.fontSize = fontSize + 'px';
+          rect = fakeView.getBoundingClientRect();
+        }
+
+        while ((rect.width > viewWidth) && (fontSize > minFontSize)) {
+          fontSize = Math.max(fontSize - fontStep, minFontSize);
+          fakeView.style.fontSize = fontSize + 'px';
+          rect = fakeView.getBoundingClientRect();
+        }
+
+        return fontSize;
   }
 };
 

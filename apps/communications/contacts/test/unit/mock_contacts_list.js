@@ -1,4 +1,5 @@
 'use strict';
+/* exported MockContactsList */
 
  function MockContactsList() {
   return [
@@ -30,8 +31,8 @@
       'org': ['Test'],
       'tel': [
         {
-          'value': '+346578888888',
-          'type': 'Mobile',
+          'value': '+346578888881',
+          'type': 'mobile',
           'carrier': 'TEF'
         }
       ],
@@ -69,8 +70,8 @@
       'org': ['Test'],
       'tel': [
         {
-          'value': '+346578888888',
-          'type': 'Mobile',
+          'value': '+346578888882',
+          'type': 'mobile',
           'carrier': 'TEF'
         }
       ],
@@ -108,8 +109,8 @@
       'org': ['Test'],
       'tel': [
         {
-          'value': '+346578888888',
-          'type': 'Mobile',
+          'value': '+346578888883',
+          'type': 'mobile',
           'carrier': 'TEF'
         }
       ],

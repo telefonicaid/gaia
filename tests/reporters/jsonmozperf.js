@@ -7,41 +7,54 @@
 
 'use strict';
 
-(function(global) {
+exports = module.exports = JSONMozPerfReporter;
+
+var Mocha = require('mocha'),
+    util = require('util');
 
 function JSONMozPerfReporter(runner) {
-  global.Mocha.reporters.Base.call(this, runner);
-
-  // "mocha" is the Mocha instance
-  // by default mocha report if any test leaks a variable in the global scope.
-  // We don't need this here because we're really running tests on the device,
-  // so this ignores leaks in our tests, and make it easier to use a global
-  // variable to save our test resuls.
-  global.mocha.options.ignoreLeaks = true;
+  Mocha.reporters.Base.call(this, runner);
 
   var failures = [];
   var passes = [];
+  var mozPerfDurations;
+  var mozPerfMemory = [];
 
   runner.on('test', function(test) {
-    global.mozPerfDurations = null;
+    mozPerfDurations = {};
+  });
+
+  runner.on('mozPerfDuration', function(content) {
+    mozPerfDurations[content.title] = content.values;
+  });
+
+  runner.on('mozPerfMemory', function(content) {
+    mozPerfMemory = content;
   });
 
   runner.on('pass', function(test) {
-    if (global.mozPerfDurations === null) {
-      test.err = new Error('No perf data was reported');
-      failures.push(test);
+
+    if (mozPerfDurations === null || Object.keys(mozPerfDurations).length == 0) {
+      // this stuff is specific to mocha implementation. It might break.
+      --self.stats.passes;
+
+      var err = new Error('No perf data was reported');
+
+      this.emit('fail', test, err);
       return;
     }
 
-    for (var title in global.mozPerfDurations) {
+    for (var title in mozPerfDurations) {
       // we can have several measurements for one test, that's why we're
       // rewriting the title (each measurement has a title)
       passes.push({
         title: test.title + ' ' + title,
         fullTitle: test.fullTitle() + ' ' + title,
         duration: test.duration,
-        mozPerfDurations: global.mozPerfDurations[title],
-        mozPerfDurationsAverage: average(global.mozPerfDurations[title])
+        mozPerfDurations: mozPerfDurations[title],
+        mozPerfDurationsAverage: average(mozPerfDurations[title]),
+        mozPerfMemory: mozPerfMemory[title],
+        mozPerfMemoryAverage: averageObjects(mozPerfMemory[title])
       });
     }
   });
@@ -52,7 +65,7 @@ function JSONMozPerfReporter(runner) {
 
   var self = this;
   runner.on('end', function() {
-    self.stats.application = window.mozTestInfo.appPath;
+    self.stats.application = process.env.CURRENT_APP;
     var obj = {
       stats: self.stats,
       failures: failures.map(cleanErr),
@@ -66,7 +79,7 @@ function JSONMozPerfReporter(runner) {
 function cleanErr(test) {
   var err = test.err;
   var message = err.message || '';
-  var stack = window.xpcError.format(err);
+  var stack = util.format(err);
   var index = stack.indexOf(message) + message.length;
   var msg = stack.slice(0, index);
   var actual = err.actual;
@@ -81,16 +94,58 @@ function cleanErr(test) {
     msg: msg,
     actual: actual,
     expected: expected
-  }
-};
+  };
+}
 
 function average(arr) {
+  if (arr.length == 0) {
+    return 0;
+  }
   var sum = arr.reduce(function(i, j) {
     return i + j;
   });
 
   return sum / arr.length;
-};
+}
 
-global.Mocha.reporters.JSONMozPerf = JSONMozPerfReporter;
-})(this);
+function averageObjects(arr) {
+  if (!arr) {
+    return undefined;
+  }
+  if (arr.length === 0) {
+    return null;
+  }
+  var total = arr.reduce(function(cur, nxt) {
+    for (var part in nxt) {
+      for (var type in nxt[part]) {
+        if (typeof nxt[part][type] === 'number') {
+          cur[part][type] += nxt[part][type];
+        }
+      }
+    }
+    return cur;
+  }, {
+    app: {
+      uss: 0,
+      pss: 0,
+      rss: 0,
+      vsize: 0
+    },
+    system: {
+      uss: 0,
+      pss: 0,
+      rss: 0,
+      vsize: 0
+    }
+  });
+
+  for (var part in total) {
+    for (var type in total[part]) {
+      total[part][type] = (total[part][type] / arr.length).toFixed(3);
+    }
+  }
+
+  return total;
+}
+
+JSONMozPerfReporter.prototype.__proto__ = Mocha.reporters.Base.prototype;

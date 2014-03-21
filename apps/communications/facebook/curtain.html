@@ -3,17 +3,16 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
 
     <title>Facebook</title>
-
-    <link rel="stylesheet" href="/contacts/style/shared/core/css/root.css">
 
     <!-- Building Blocks -->
     <link href="/shared/style/headers.css" rel="stylesheet">
     <link href="/shared/style/confirm.css" rel="stylesheet">
-    <link href="/shared/style_unstable/progress_activity.css" rel="stylesheet">
+    <link href="/shared/style/progress_activity.css" rel="stylesheet">
 
+    <link rel="stylesheet" href="/contacts/style/root.css">
     <link rel="stylesheet" href="style/curtain.css">
 
     <link rel="resource" type="application/l10n" href="/contacts/locales/fb/locales.ini">
@@ -63,9 +62,16 @@
           <p data-l10n-id="timeout2">Do you want to retry?</p>
         </section>
 
+        <!-- Alert card -->
+        <section id="alert">
+          <h1 id="alertMsg"></h1>
+          <p>&nbsp;</p>
+        </section>
+
         <menu>
           <button data-l10n-id="curtainCancel" id="cancel">Cancel</button>
           <button data-l10n-id="curtainRetry" id="retry" class="recommend">Retry</button>
+          <button data-l10n-id="curtainOK" id="ok" class="recommend">OK</button>
         </menu>
       </form>
 

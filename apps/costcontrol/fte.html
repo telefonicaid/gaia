@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
   <meta charset="utf-8">
-  <meta http-equiv="pragma" content="no-cache">
   <title data-l10n-id="fte">Usage First Time Experience</title>
 
   <!-- Building blocks Temporal -->
@@ -12,7 +12,6 @@
   <link rel="stylesheet" type="text/css" href="style/bb/menus-dialogues/prompt/style.css">
   <link rel="stylesheet" type="text/css" href="style/bb/menus-dialogues/valueselector/style.css">
   <link rel="stylesheet" type="text/css" href="style/bb/menus-dialogues/valueselector/date/style.css">
-  <link rel="stylesheet" type="text/css" href="style/bb/progress-activity/style.css">
 
   <!-- Building blocks -->
   <link rel="stylesheet" type="text/css" href="shared/style/headers.css">
@@ -21,6 +20,7 @@
 
   <!-- App and Views -->
   <link rel="stylesheet" type="text/css" href="style/app.css">
+  <link rel="stylesheet" type="text/css" href="style/views/settings.css">
   <link rel="stylesheet" type="text/css" href="style/views/firsttime.css">
   <link rel="stylesheet" type="text/css" href="style/views/datalimits.css">
 
@@ -33,18 +33,9 @@
   <script type="text/javascript" src="shared/js/l10n_date.js"></script>
   <script type="text/javascript" src="shared/js/async_storage.js"></script>
   <script type="text/javascript" src="shared/js/settings_listener.js"></script>
+  <script type="text/javascript" src="shared/js/lazy_loader.js"></script>
 
   <!-- Specific code -->
-  <script type="text/javascript" src="js/utils/debug.js"></script>
-  <script type="text/javascript" src="js/utils/formatting.js"></script>
-
-  <script type="text/javascript" defer src="js/utils/toolkit.js"></script>
-  <script type="text/javascript" defer src="js/common.js"></script>
-  <script type="text/javascript" defer src="js/costcontrol.js"></script>
-  <script type="text/javascript" defer src="js/config_manager.js"></script>
-  <script type="text/javascript" defer src="js/view_manager.js"></script>
-  <script type="text/javascript" defer src="js/settings/limitdialog.js"></script>
-  <script type="text/javascript" defer src="js/settings/autosettings.js"></script>
   <script type="text/javascript" defer src="js/fte.js"></script>
 </head>
 
@@ -73,7 +64,7 @@
         <div class="no-sim" aria-hidden="true">
           <h2 data-l10n-id="fte-no-sim">Get clear information about how much internet you're using.</h2>
         </div>
-        <p data-l10n-id="fte-sim-info" class="info">Information shown on usage comes directly from this device. Check with your mobile service provider for detailed account information.</p>
+        <p data-l10n-id="fte-sim-info2" class="info">Information shown on usage comes directly from this device. Check with your mobile service provider for detailed account information.</p>
       </section>
       <menu>
         <button class="recommend" data-navigation="next">
@@ -120,23 +111,25 @@
       <header>
         <h1 data-l10n-id="fte-prepaid2-title">Low balance alert</h1>
       </header>
-      <ul class="content settings">
-        <li>
-          <label class="end">
-            <input id="low-limit" class="settings-option" data-option="lowLimit" type="checkbox" checked="checked" data-type="switch">
-            <span></span>
-          </label>
-          <p data-l10n-id="low-balance-alert">Low Balance alert</p>
-        </li>
-        <li>
-          <label class="end" for="low-limit-input">
-            <span id="currency"></span>
-            <input id="low-limit-input" class="settings-option" data-option="lowLimitThreshold" data-disable-on="lowLimit=false" type="number">
-          </label>
-          <p data-l10n-id="low-balance-explanation">Alert me when I’m under</p>
-        </li>
-      </ul>
-      <p class="step-hint" data-l10n-id="fte-prepaid2-hint">Set an alert to avoid running out of credit.</p>
+      <section class="content">
+        <ul class="settings">
+          <li>
+            <label class="pack-switch end">
+              <input id="low-limit" class="settings-option" data-option="lowLimit" type="checkbox" checked="checked">
+              <span></span>
+            </label>
+            <p data-l10n-id="low-balance-alert">Low Balance alert</p>
+          </li>
+          <li>
+            <label class="end" for="low-limit-input">
+              <span id="currency"></span>
+              <input id="low-limit-input" class="settings-option" data-option="lowLimitThreshold" data-disable-on="lowLimit=false" type="number">
+            </label>
+            <p data-l10n-id="low-balance-explanation2">When balance is below</p>
+          </li>
+        </ul>
+        <p class="step-hint" data-l10n-id="fte-prepaid2-hint">Set an alert to avoid running out of credit.</p>
+      </section>
       <menu data-items="2">
         <button data-navigation="back">
           <span></span>
@@ -154,9 +147,10 @@
       <header>
         <h1 data-l10n-id="fte-prepaid3-title">Data Report and Alert</h1>
       </header>
-      <ul class="content settings">
-        <li>
-          <div class="end buttons-list">
+      <section class="content">
+        <ul class="settings">
+          <li>
+            <p data-l10n-id="reset-report">Reset report</p>
             <span class="button icon icon-dialog fake-select">
               <select class="settings-option" data-option="trackingPeriod">
                 <option value="monthly" data-l10n-id="monthly">Monthly</option>
@@ -164,11 +158,9 @@
                 <option value="never" data-l10n-id="never">Never</option>
               </select>
             </span>
-          </div>
-          <p data-l10n-id="reset-tracking">Reset tracking</p>
-        </li>
-        <li>
-          <div class="end buttons-list">
+          </li>
+          <li>
+            <p data-l10n-id="starting-on">Starting on</p>
             <span class="button icon icon-dialog fake-select">
               <select id="pre3-select-weekday" class="settings-option" data-option="resetTime" data-hide-on="trackingPeriod!=weekly" data-disable-on="trackingPeriod!=weekly">
                 <option class="monday" value="1" data-l10n-id="monday">Monday</option>
@@ -180,66 +172,63 @@
                 <option class="sunday" value="0" data-l10n-id="sunday">Sunday</option>
               </select>
             </span>
-          </div>
-          <p data-l10n-id="starting-on">Starting on</p>
-        </li>
-        <li>
-          <div class="end buttons-list">
-            <span class="button icon icon-dialog fake-select">
-              <select class="settings-option icon icon-dialog" data-option="resetTime" data-hide-on="trackingPeriod!=monthly" data-disable-on="trackingPeriod!=monthly">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-                <option value="6">6</option>
-                <option value="7">7</option>
-                <option value="8">8</option>
-                <option value="9">9</option>
-                <option value="10">10</option>
-                <option value="11">11</option>
-                <option value="12">12</option>
-                <option value="13">13</option>
-                <option value="14">14</option>
-                <option value="15">15</option>
-                <option value="16">16</option>
-                <option value="17">17</option>
-                <option value="18">18</option>
-                <option value="19">19</option>
-                <option value="20">20</option>
-                <option value="21">21</option>
-                <option value="22">22</option>
-                <option value="23">23</option>
-                <option value="24">24</option>
-                <option value="25">25</option>
-                <option value="26">26</option>
-                <option value="27">27</option>
-                <option value="28">28</option>
-                <option value="29">29</option>
-                <option value="30">30</option>
-                <option value="31">31</option>
-              </select>
-            </span>
-          </div>
-          <p data-l10n-id="starting-on">Starting on</p>
-        </li>
-        <li>
-          <label class="end">
-            <input class="settings-option" data-option="dataLimit" type="checkbox" data-type="switch">
-            <span></span>
-          </label>
-          <p data-l10n-id="data-limit-alert">Data use alert</p>
-        </li>
-        <li>
-          <div class="end buttons-list">
+          </li>
+          <li>
+            <div class="end buttons-list">
+              <span class="button icon icon-dialog fake-select">
+                <select class="settings-option icon icon-dialog" data-option="resetTime" data-hide-on="trackingPeriod!=monthly" data-disable-on="trackingPeriod!=monthly">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="10">10</option>
+                  <option value="11">11</option>
+                  <option value="12">12</option>
+                  <option value="13">13</option>
+                  <option value="14">14</option>
+                  <option value="15">15</option>
+                  <option value="16">16</option>
+                  <option value="17">17</option>
+                  <option value="18">18</option>
+                  <option value="19">19</option>
+                  <option value="20">20</option>
+                  <option value="21">21</option>
+                  <option value="22">22</option>
+                  <option value="23">23</option>
+                  <option value="24">24</option>
+                  <option value="25">25</option>
+                  <option value="26">26</option>
+                  <option value="27">27</option>
+                  <option value="28">28</option>
+                  <option value="29">29</option>
+                  <option value="30">30</option>
+                  <option value="31">31</option>
+                </select>
+              </span>
+            </div>
+            <p data-l10n-id="starting-on">Starting on</p>
+          </li>
+          <li>
+            <label class="pack-switch end">
+              <input class="settings-option" data-option="dataLimit" type="checkbox">
+              <span></span>
+            </label>
+            <p data-l10n-id="data-limit-alert">Data use alert</p>
+          </li>
+          <li>
+            <p data-l10n-id="data-limit-value2">When use is above</p>
             <button class="settings-option icon icon-dialog" data-widget-type="data-limit"  data-disable-on="dataLimit=false" data-hide-on="dataLimit=false">
               <span class="tag"></span>
             </button>
-          </div>
-          <p data-l10n-id="data-limit-value">Alert me when used</p>
-        </li>
-      </ul>
-      <p class="step-hint" data-l10n-id="fte-prepaid3-hint">Receive reports about your Internet usage and set an alert to avoid using too much.</p>
+          </li>
+        </ul>
+        <p class="step-hint" data-l10n-id="fte-prepaid3-hint">Receive reports about your Internet usage and set an alert to avoid using too much.</p>
+      </section>
       <menu data-items="2">
         <button data-navigation="back">
           <span></span>
@@ -259,32 +248,28 @@
       </header>
        <ul class="content settings">
         <li>
-          <div class="end buttons-list">
-            <span class="button icon icon-dialog fake-select">
-              <select class="settings-option" data-option="trackingPeriod">
-                <option value="monthly" data-l10n-id="monthly">Monthly</option>
-                <option value="weekly" data-l10n-id="weekly">Weekly</option>
-                <option value="never" data-l10n-id="never">Never</option>
-              </select>
-            </span>
-          </div>
-          <p data-l10n-id="reset-tracking">Reset tracking</p>
+          <p data-l10n-id="reset-report">Reset report</p>
+          <span class="button icon icon-dialog fake-select">
+            <select class="settings-option" data-option="trackingPeriod">
+              <option value="monthly" data-l10n-id="monthly">Monthly</option>
+              <option value="weekly" data-l10n-id="weekly">Weekly</option>
+              <option value="never" data-l10n-id="never">Never</option>
+            </select>
+          </span>
         </li>
         <li>
-          <div class="end buttons-list">
-            <span class="button icon icon-dialog fake-select">
-              <select id="post2-select-weekday" class="settings-option" data-option="resetTime" data-hide-on="trackingPeriod!=weekly" data-disable-on="trackingPeriod!=weekly">
-                <option class="monday" value="1" data-l10n-id="monday">Monday</option>
-                <option value="2" data-l10n-id="tuesday">Tuesday</option>
-                <option value="3" data-l10n-id="wednesday">Wednesday</option>
-                <option value="4" data-l10n-id="thursday">Thursday</option>
-                <option value="5" data-l10n-id="friday">Friday</option>
-                <option value="6" data-l10n-id="saturday">Saturday</option>
-                <option class="sunday" value="0" data-l10n-id="sunday">Sunday</option>
-              </select>
-            </span>
-          </div>
           <p data-l10n-id="starting-on">Starting on</p>
+          <span class="button icon icon-dialog fake-select">
+            <select id="post2-select-weekday" class="settings-option" data-option="resetTime" data-hide-on="trackingPeriod!=weekly" data-disable-on="trackingPeriod!=weekly">
+              <option class="monday" value="1" data-l10n-id="monday">Monday</option>
+              <option value="2" data-l10n-id="tuesday">Tuesday</option>
+              <option value="3" data-l10n-id="wednesday">Wednesday</option>
+              <option value="4" data-l10n-id="thursday">Thursday</option>
+              <option value="5" data-l10n-id="friday">Friday</option>
+              <option value="6" data-l10n-id="saturday">Saturday</option>
+              <option class="sunday" value="0" data-l10n-id="sunday">Sunday</option>
+            </select>
+          </span>
         </li>
         <li>
           <div class="end buttons-list">
@@ -345,24 +330,24 @@
       <header>
         <h1 data-l10n-id="fte-postpaid3-title">Data Alert</h1>
       </header>
-      <ul class="content settings">
-        <li>
-          <label class="end">
-            <input class="settings-option" data-option="dataLimit" type="checkbox" data-type="switch">
-            <span></span>
-          </label>
-          <p data-l10n-id="data-limit-alert">Data use alert</p>
-        </li>
-        <li>
-          <div class="end buttons-list">
+      <section class="content">
+        <ul class="settings">
+          <li>
+            <label class="pack-switch end">
+              <input class="settings-option" data-option="dataLimit" type="checkbox">
+              <span></span>
+            </label>
+            <p data-l10n-id="data-limit-alert">Data use alert</p>
+          </li>
+          <li>
+            <p data-l10n-id="data-limit-value2">When use is above</p>
             <button class="settings-option icon icon-dialog" data-widget-type="data-limit" data-disable-on="dataLimit=false" data-hide-on="dataLimit=false">
               <span class="tag"></span>
             </button>
-          </div>
-          <p data-l10n-id="data-limit-value">Alert me when used</p>
-        </li>
-      </ul>
-      <p class="step-hint" data-l10n-id="fte-postpaid3-hint">Set an alert to avoid using too much data.</p>
+          </li>
+        </ul>
+        <p class="step-hint" data-l10n-id="fte-postpaid3-hint">Set an alert to avoid using too much data.</p>
+      </section>
       <menu data-items="2">
         <button data-navigation="back">
           <span></span>
@@ -382,32 +367,28 @@
       </header>
       <ul class="content settings">
         <li>
-          <div class="end buttons-list">
-            <span class="button icon icon-dialog fake-select">
-              <select class="settings-option" data-option="trackingPeriod">
-                <option value="monthly" data-l10n-id="monthly">Monthly</option>
-                <option value="weekly" data-l10n-id="weekly">Weekly</option>
-                <option value="never" data-l10n-id="never">Never</option>
-              </select>
-            </span>
-          </div>
           <p data-l10n-id="reset-report">Reset report</p>
+          <span class="button icon icon-dialog fake-select">
+            <select class="settings-option" data-option="trackingPeriod">
+              <option value="monthly" data-l10n-id="monthly">Monthly</option>
+              <option value="weekly" data-l10n-id="weekly">Weekly</option>
+              <option value="never" data-l10n-id="never">Never</option>
+            </select>
+          </span>
         </li>
         <li>
-          <div class="end buttons-list">
-            <span class="button icon icon-dialog fake-select">
-              <select id="non2-select-weekday" class="settings-option" data-option="resetTime" data-hide-on="trackingPeriod!=weekly" data-disable-on="trackingPeriod!=weekly">
-                <option class="monday" value="1" data-l10n-id="monday">Monday</option>
-                <option value="2" data-l10n-id="tuesday">Tuesday</option>
-                <option value="3" data-l10n-id="wednesday">Wednesday</option>
-                <option value="4" data-l10n-id="thursday">Thursday</option>
-                <option value="5" data-l10n-id="friday">Friday</option>
-                <option value="6" data-l10n-id="saturday">Saturday</option>
-                <option class="sunday" value="0" data-l10n-id="sunday">Sunday</option>
-              </select>
-            </span>
-          </div>
           <p data-l10n-id="starting-on">Starting on</p>
+          <span class="button icon icon-dialog fake-select">
+            <select id="non2-select-weekday" class="settings-option" data-option="resetTime" data-hide-on="trackingPeriod!=weekly" data-disable-on="trackingPeriod!=weekly">
+              <option class="monday" value="1" data-l10n-id="monday">Monday</option>
+              <option value="2" data-l10n-id="tuesday">Tuesday</option>
+              <option value="3" data-l10n-id="wednesday">Wednesday</option>
+              <option value="4" data-l10n-id="thursday">Thursday</option>
+              <option value="5" data-l10n-id="friday">Friday</option>
+              <option value="6" data-l10n-id="saturday">Saturday</option>
+              <option class="sunday" value="0" data-l10n-id="sunday">Sunday</option>
+            </select>
+          </span>
         </li>
         <li>
           <div class="end buttons-list">
@@ -470,19 +451,17 @@
       </header>
       <ul class="content settings">
         <li>
-          <label class="end">
-            <input class="settings-option" data-option="dataLimit" type="checkbox" data-type="switch">
+          <label class="pack-switch end">
+            <input class="settings-option" data-option="dataLimit" type="checkbox">
             <span></span>
           </label>
           <p data-l10n-id="data-limit-alert">Data use alert</p>
         </li>
         <li>
-          <div class="end buttons-list">
-            <button class="settings-option icon icon-dialog" data-widget-type="data-limit" data-disable-on="dataLimit=false" data-hide-on="dataLimit=false">
-              <span class="tag"></span>
-            </button>
-          </div>
-          <p data-l10n-id="data-limit-value">Alert me when used</p>
+          <p data-l10n-id="data-limit-value2">When use is above</p>
+          <button class="settings-option icon icon-dialog" data-widget-type="data-limit" data-disable-on="dataLimit=false" data-hide-on="dataLimit=false">
+            <span class="tag"></span>
+          </button>
         </li>
       </ul>
       <p class="step-hint" data-l10n-id="fte-onlydata3-hint">Set an alert to avoid using too much data.</p>

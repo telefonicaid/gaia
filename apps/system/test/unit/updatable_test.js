@@ -5,29 +5,22 @@ requireApp('system/js/updatable.js');
 requireApp('system/test/unit/mock_app.js');
 requireApp('system/test/unit/mock_asyncStorage.js');
 requireApp('system/test/unit/mock_update_manager.js');
-requireApp('system/test/unit/mock_window_manager.js');
+requireApp('system/test/unit/mock_app_window_manager.js');
 requireApp('system/test/unit/mock_apps_mgmt.js');
 requireApp('system/test/unit/mock_chrome_event.js');
 requireApp('system/test/unit/mock_custom_dialog.js');
 requireApp('system/test/unit/mock_utility_tray.js');
-requireApp('system/test/unit/mock_manifest_helper.js');
-requireApp('system/test/unit/mocks_helper.js');
+requireApp('system/shared/test/unit/mocks/mock_manifest_helper.js');
 
 
-var mocksForUpdatable = [
+var mocksHelperForUpdatable = new MocksHelper([
   'CustomDialog',
   'UpdateManager',
-  'WindowManager',
+  'AppWindowManager',
   'UtilityTray',
   'ManifestHelper',
   'asyncStorage'
-];
-
-mocksForUpdatable.forEach(function(mockName) {
-  if (!window[mockName]) {
-    window[mockName] = null;
-  }
-});
+]).init();
 
 suite('system/Updatable', function() {
   var subject;
@@ -35,12 +28,12 @@ suite('system/Updatable', function() {
 
   var realDispatchEvent;
   var realL10n;
-
-  var mocksHelper;
+  var realMozApps;
 
   var lastDispatchedEvent = null;
   var fakeDispatchEvent;
 
+  mocksHelperForUpdatable.attachTestHelpers();
   suiteSetup(function() {
     realL10n = navigator.mozL10n;
     navigator.mozL10n = {
@@ -49,19 +42,20 @@ suite('system/Updatable', function() {
       }
     };
 
-    mocksHelper = new MocksHelper(mocksForUpdatable);
-    mocksHelper.suiteSetup();
+    // we used to set subject._mgmt in setup
+    // but now, this seems to work and feels cleaner
+    realMozApps = navigator.mozApps;
+    navigator.mozApps = { mgmt: MockAppsMgmt };
   });
 
   suiteTeardown(function() {
     navigator.mozL10n = realL10n;
-    mocksHelper.suiteTeardown();
+    navigator.mozApps = realMozApps;
   });
 
   setup(function() {
     mockApp = new MockApp();
     subject = new AppUpdatable(mockApp);
-    subject._mgmt = MockAppsMgmt;
 
     fakeDispatchEvent = function(type, value) {
       lastDispatchedEvent = {
@@ -70,13 +64,10 @@ suite('system/Updatable', function() {
       };
     };
     subject._dispatchEvent = fakeDispatchEvent;
-
-    mocksHelper.setup();
   });
 
   teardown(function() {
     MockAppsMgmt.mTeardown();
-    mocksHelper.teardown();
 
     subject._dispatchEvent = realDispatchEvent;
     lastDispatchedEvent = null;
@@ -137,19 +128,21 @@ suite('system/Updatable', function() {
       subject = new AppUpdatable(mockApp);
     });
 
-/*
-// These tests are currently failing and have been temporarily disabled as per
-// Bug 838993. They should be fixed and re-enabled as soon as possible as per
-// Bug 840500.
-    test('should apply update if downloaded', function() {
-      mockApp.readyToApplyDownload = true;
-      subject = new AppUpdatable(mockApp);
-      // We cannot test for this._mgmt methods because it's created in
-      // a constructor, so we check if the window is killed because
-      // WindowManager.kill() is also called in applyUpdate() method
-      assert.equal(MockWindowManager.mLastKilledOrigin, subject.app.origin);
+    suite('applyDownload', function() {
+      setup(function() {
+        mockApp.readyToApplyDownload = true;
+        subject = new AppUpdatable(mockApp);
+      });
+
+      test('should apply update if downloaded', function() {
+        assert.equal(MockAppsMgmt.mLastAppApplied, mockApp);
+      });
+
+      test('should kill the app if downloaded', function() {
+        assert.equal(MockAppWindowManager.mLastKilledOrigin, mockApp.origin);
+      });
     });
-*/
+
   });
 
   suite('infos', function() {
@@ -327,6 +320,13 @@ suite('system/Updatable', function() {
                        mockApp.mId);
         });
 
+        test('should call downloaded of UpdateManager', function() {
+          mockApp.mTriggerDownloadAvailable();
+          mockApp.mTriggerDownloadProgress(42);
+          mockApp.mTriggerDownloadSuccess();
+          assert.isTrue(MockUpdateManager.mDownloadedCalled);
+        });
+
         test('should not remove self if not downloading', function() {
           mockApp.mTriggerDownloadSuccess();
           assert.isNull(MockUpdateManager.mLastDownloadsRemoval);
@@ -344,7 +344,7 @@ suite('system/Updatable', function() {
         suite('application of the download', function() {
           test('should apply if the app is not in foreground', function() {
             mockApp.mTriggerDownloadAvailable();
-            MockWindowManager.mDisplayedApp =
+            MockAppWindowManager.mDisplayedApp =
               'http://homescreen.gaiamobile.org';
             mockApp.mTriggerDownloadSuccess();
             assert.isNotNull(MockAppsMgmt.mLastAppApplied);
@@ -354,7 +354,7 @@ suite('system/Updatable', function() {
           test('should wait for appwillclose if it is', function() {
             var origin = 'http://testapp.gaiamobile.org';
             mockApp.origin = origin;
-            MockWindowManager.mDisplayedApp = origin;
+            MockAppWindowManager.mDisplayedApp = origin;
 
             mockApp.mTriggerDownloadAvailable();
             mockApp.mTriggerDownloadSuccess();
@@ -373,7 +373,7 @@ suite('system/Updatable', function() {
             mockApp.mTriggerDownloadAvailable();
             mockApp.mTriggerDownloadSuccess();
             assert.equal('https://testapp.gaiamobile.org',
-                         MockWindowManager.mLastKilledOrigin);
+                         MockAppWindowManager.mLastKilledOrigin);
           });
         });
       });
@@ -401,6 +401,18 @@ suite('system/Updatable', function() {
         test('should still answer to progress events', function() {
           mockApp.mTriggerDownloadProgress(42);
           assert.equal(42, subject.progress);
+        });
+      });
+
+      suite('ondownloaderror, downloadAvailable = false', function() {
+        setup(function() {
+          mockApp.mTriggerDownloadAvailable();
+          mockApp.downloadAvailable = false;
+          mockApp.mTriggerDownloadError();
+        });
+
+        test('should remove self from available updates', function() {
+          assert.equal(MockUpdateManager.mLastUpdatesRemoval, subject);
         });
       });
 
@@ -451,8 +463,13 @@ suite('system/Updatable', function() {
           assert.isFalse(subject.downloading);
         });
 
+        test('should signal the UpdateManager', function() {
+          assert.isTrue(MockUpdateManager.mDownloadedCalled);
+        });
+
         test('should reset SystemUpdatable.KNOWN_UPDATE_FLAG', function() {
-          assert.isUndefined(asyncStorage.mItems[SystemUpdatable.KNOWN_UPDATE_FLAG]);
+          assert.isUndefined(
+            asyncStorage.mItems[SystemUpdatable.KNOWN_UPDATE_FLAG]);
         });
 
         testSystemApplyPrompt();
@@ -469,7 +486,8 @@ suite('system/Updatable', function() {
         });
 
         test('should reset SystemUpdatable.KNOWN_UPDATE_FLAG', function() {
-          assert.isUndefined(asyncStorage.mItems[SystemUpdatable.KNOWN_UPDATE_FLAG]);
+          assert.isUndefined(
+            asyncStorage.mItems[SystemUpdatable.KNOWN_UPDATE_FLAG]);
         });
 
         testSystemApplyPrompt();
@@ -558,8 +576,10 @@ suite('system/Updatable', function() {
           test('shouldn\'t signal "started uncompressing"', function() {
             assert.isFalse(MockUpdateManager.mStartedUncompressingCalled);
           });
-          test('should not reset SystemUpdatable.KNOWN_UPDATE_FLAG', function() {
-            assert.isTrue(asyncStorage.mItems[SystemUpdatable.KNOWN_UPDATE_FLAG]);
+          test('should not reset SystemUpdatable.KNOWN_UPDATE_FLAG',
+              function() {
+            assert.isTrue(
+              asyncStorage.mItems[SystemUpdatable.KNOWN_UPDATE_FLAG]);
           });
         });
 
@@ -580,8 +600,10 @@ suite('system/Updatable', function() {
           test('should signal the UpdateManager', function() {
             assert.isTrue(MockUpdateManager.mStartedUncompressingCalled);
           });
-          test('should not reset SystemUpdatable.KNOWN_UPDATE_FLAG', function() {
-            assert.isTrue(asyncStorage.mItems[SystemUpdatable.KNOWN_UPDATE_FLAG]);
+          test('should not reset SystemUpdatable.KNOWN_UPDATE_FLAG',
+              function() {
+            assert.isTrue(
+              asyncStorage.mItems[SystemUpdatable.KNOWN_UPDATE_FLAG]);
           });
         });
 
@@ -589,12 +611,13 @@ suite('system/Updatable', function() {
           setup(function() {
             MockUpdateManager.mTeardown();
             subject = new SystemUpdatable(98734);
-            subject._dispatchEvent = function errorDuringDispatch(type, result) {
-              fakeDispatchEvent.call(subject, type, result);
-              subject.handleEvent(new MockChromeEvent({
-                type: 'update-error'
-              }));
-            };
+            subject._dispatchEvent =
+              function errorDuringDispatch(type, result) {
+                fakeDispatchEvent.call(subject, type, result);
+                subject.handleEvent(new MockChromeEvent({
+                  type: 'update-error'
+                }));
+              };
             subject.download();
             subject._dispatchEvent = fakeDispatchEvent;
           });

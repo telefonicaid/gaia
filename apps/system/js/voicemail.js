@@ -7,8 +7,6 @@ var Voicemail = {
 
   icon: null,
   notification: null,
-  // A random starting point that is unlikely to be used by other notifications
-  notificationId: 3000 + Math.floor(Math.random() * 999),
 
   init: function vm_init() {
     var voicemail = window.navigator.mozVoicemail;
@@ -19,20 +17,24 @@ var Voicemail = {
 
     this.icon = window.location.protocol + '//' +
       window.location.hostname + '/style/icons/voicemail.png';
+    this.voiceMailNumberHelper = SettingsHelper('ril.iccInfo.mbdn', null);
   },
 
   handleEvent: function vm_handleEvent(evt) {
     var voicemail = window.navigator.mozVoicemail;
-    if (!voicemail.status)
+    var status = evt.status;
+
+    if (!status)
       return;
 
-    this.updateNotification(voicemail.status);
+    this.updateNotification(status);
   },
 
   updateNotification: function vm_updateNotification(status) {
     var _ = window.navigator.mozL10n.get;
     var title = status.returnMessage;
     var showCount = status.hasMessages && status.messageCount > 0;
+    var simIndex = status.serviceId + 1;
 
     if (!title) {
       title = showCount ? _('newVoicemails', { n: status.messageCount }) :
@@ -40,40 +42,65 @@ var Voicemail = {
     }
 
     var text = title;
-    var voicemailNumber = navigator.mozVoicemail.number;
-    if (voicemailNumber) {
-      text = _('dialNumber', { number: voicemailNumber });
+
+    var settings = navigator.mozSettings;
+    if (!settings) {
+      return;
     }
 
-    this.hideNotification();
-    if (status.hasMessages) {
-      this.showNotification(title, text, voicemailNumber);
-    }
+    // Fetch voicemail number from 'ril.iccInfo.mbdn' settings before
+    // looking up |navigator.mozVoicemail.number|.
+    // Some SIM card may not provide MBDN info
+    // but we could still use settings to overload that.
+    this.voiceMailNumberHelper.get(function gotVMNumbers(numbers) {
+      var voicemail = navigator.mozVoicemail;
+      var number = numbers && numbers[simIndex];
+
+      if (!number && voicemail) {
+       number = voicemail.getNumber(status.serviceId);
+      }
+
+      if (number) {
+        text = _('dialNumber', { number: number });
+      }
+
+      if (status.hasMessages) {
+        if (SIMSlotManager.isMultiSIM()) {
+          title = 'SIM ' + simIndex + ' - ' + title;
+        }
+        Voicemail.showNotification(title, text, number);
+      } else {
+        Voicemail.hideNotification();
+      }
+    });
   },
 
   showNotification: function vm_showNotification(title, text, voicemailNumber) {
-    this.notificationId++;
-    this.notification = NotificationScreen.addNotification({
-      id: this.notificationId, title: title, text: text, icon: this.icon
-    });
+    if (!('Notification' in window)) {
+      return;
+    }
+
+    var notifOptions = {
+      body: text,
+      icon: this.icon,
+      tag: 'voicemailNotification'
+    };
+
+    this.notification = new Notification(title, notifOptions);
 
     if (!voicemailNumber) {
       return;
     }
 
-    var self = this;
-    function vmNotification_onTap(event) {
-      self.notification.removeEventListener('tap', vmNotification_onTap);
-
-      var telephony = window.navigator.mozTelephony;
-      if (!telephony) {
-        return;
+    this.notification.addEventListener('click',
+      function vmNotification_onClick(event) {
+        var telephony = window.navigator.mozTelephony;
+        if (!telephony) {
+          return;
+        }
+        telephony.dial(voicemailNumber);
       }
-
-      telephony.dial(voicemailNumber);
-    }
-
-    this.notification.addEventListener('tap', vmNotification_onTap);
+    );
   },
 
   hideNotification: function vm_hideNotification() {
@@ -81,12 +108,8 @@ var Voicemail = {
       return;
     }
 
-    if (this.notification.parentNode) {
-      NotificationScreen.removeNotification(this.notificationId);
-    }
-
+    this.notification.close();
     this.notification = null;
-    this.notificationId = 0;
   }
 };
 

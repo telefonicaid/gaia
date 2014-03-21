@@ -130,22 +130,110 @@ var mozFMRadio = navigator.mozFM || navigator.mozFMRadio || {
   }
 };
 
+// XXX fake mozSetting object for UI testing on PC
+var mozSettings = navigator.mozSettings || {
+  addObserver: function settings_addObserver(key, callback) {},
+  createLock: function settings_createLock() {
+    return {
+      get: function() {
+        var request = {
+          result: {}
+        };
+
+        window.setTimeout(function() {
+          if (request.onsuccess) {
+            request.result['ril.radio.disabled'] = false;
+            request.onsuccess();
+          }
+        }, 500);
+
+        return request;
+      }
+    };
+  }
+};
+
+// XXX fake SpeakerManager object for UI testing on PC
+(function(aGlobal) {
+  aGlobal.SpeakerManager = aGlobal.SpeakerManager || aGlobal.MozSpeakerManager;
+
+  if (aGlobal.SpeakerManager)
+    return;
+
+  function SpeakerManager() {
+    this.speakerforced = false;
+  }
+
+  SpeakerManager.prototype = {
+    set forcespeaker(enable) {
+      if (this.speakerforced != enable) {
+        this.speakerforced = enable;
+        if (this.onspeakerforcedchange) {
+          this.onspeakerforcedchange();
+        }
+      }
+    }
+  };
+
+  aGlobal.SpeakerManager = SpeakerManager;
+})(window);
+
 function updateFreqUI() {
   historyList.add(mozFMRadio.frequency);
   frequencyDialer.setFrequency(mozFMRadio.frequency);
   var frequency = frequencyDialer.getFrequency();
   favoritesList.select(frequency);
-  $('bookmark-button').setAttribute('data-bookmarked',
-       favoritesList.contains(frequency));
+  $('bookmark-button').dataset.bookmarked = favoritesList.contains(frequency);
 }
 
 function updatePowerUI() {
-  console.log('Power status: ' + (mozFMRadio.enabled ? 'on' : 'off'));
-  $('power-switch').setAttribute('data-enabled', mozFMRadio.enabled);
+  var enabled = mozFMRadio.enabled;
+  if (enabled) {
+    PerformanceTestingHelper.dispatch('fm-radio-enabled');
+    PerformanceTestingHelper.dispatch('startup-path-done');
+  }
+  console.log('Power status: ' + (enabled ? 'on' : 'off'));
+  var powerSwitch = $('power-switch');
+  powerSwitch.dataset.enabled = enabled;
+  powerSwitch.dataset.enabling = enabling;
 }
 
 function updateAntennaUI() {
   $('antenna-warning').hidden = mozFMRadio.antennaAvailable;
+}
+
+function updateAirplaneModeUI() {
+  $('airplane-mode-warning').hidden = !rilDisabled;
+}
+
+var enabling = false;
+function updateFrequencyBarUI() {
+  var frequencyBar = $('frequency-bar');
+  if (enabling) {
+    frequencyBar.classList.add('dim');
+  } else {
+    frequencyBar.classList.remove('dim');
+  }
+}
+
+function updateEnablingState(enablingState) {
+  enabling = enablingState;
+  updatePowerUI();
+  updateFrequencyBarUI();
+}
+
+var rilDisabled = false;
+function enableFMRadio(frequency) {
+  if (rilDisabled)
+    return;
+
+  var request = mozFMRadio.enable(frequency);
+  // Request might fail, see bug862672
+  request.onerror = function onerror_enableFMRadio(event) {
+    updateEnablingState(false);
+  };
+
+  updateEnablingState(true);
 }
 
 /**
@@ -158,7 +246,7 @@ function cancelSeekAndSetFreq(frequency) {
     mozFMRadio.setFrequency(frequency);
   }
 
-  var seeking = !!$('frequency').getAttribute('data-seek-dir');
+  var seeking = !!$('power-switch').getAttribute('data-seeking');
   if (!seeking) {
     setFreq();
   } else {
@@ -178,6 +266,9 @@ var frequencyDialer = {
   _translateX: 0,
 
   init: function() {
+    // First thing is to show a warning if there    // is not antenna.
+    updateAntennaUI();
+
     this._initUI();
     this.setFrequency(mozFMRadio.frequency);
     this._addEventListeners();
@@ -185,8 +276,8 @@ var frequencyDialer = {
 
   _addEventListeners: function() {
     function _removeEventListeners() {
-      document.body.removeEventListener('mouseup', fd_body_mouseup, false);
-      document.body.removeEventListener('mousemove', fd_body_mousemove, false);
+      document.body.removeEventListener('touchend', fd_body_touchend, false);
+      document.body.removeEventListener('touchmove', fd_body_touchmove, false);
     }
 
     function cloneEvent(evt) {
@@ -194,7 +285,7 @@ var frequencyDialer = {
         evt = evt.touches[0];
       }
       return { x: evt.clientX, y: evt.clientX,
-               timestamp: MouseEventShim.getEventTimestamp(evt) };
+               timestamp: evt.timeStamp };
     }
 
     var self = this;
@@ -222,7 +313,7 @@ var frequencyDialer = {
       return movingSpace;
     }
 
-    function fd_body_mousemove(event) {
+    function fd_body_touchmove(event) {
       event.stopPropagation();
       currentEvent = cloneEvent(event);
 
@@ -248,7 +339,7 @@ var frequencyDialer = {
       startEvent = currentEvent;
     }
 
-    function fd_body_mouseup(event) {
+    function fd_body_touchend(event) {
       event.stopPropagation();
       _removeEventListeners();
 
@@ -268,7 +359,7 @@ var frequencyDialer = {
       currentSpeed = 0;
     }
 
-    function fd_mousedown(event) {
+    function fd_touchstart(event) {
       event.stopPropagation();
 
       // Stop animation
@@ -278,11 +369,11 @@ var frequencyDialer = {
       tunedFrequency = self._currentFreqency;
 
       _removeEventListeners();
-      document.body.addEventListener('mousemove', fd_body_mousemove, false);
-      document.body.addEventListener('mouseup', fd_body_mouseup, false);
+      document.body.addEventListener('touchmove', fd_body_touchmove, false);
+      document.body.addEventListener('touchend', fd_body_touchend, false);
     }
 
-    $('dialer-container').addEventListener('mousedown', fd_mousedown, false);
+    $('dialer-container').addEventListener('touchstart', fd_touchstart, false);
   },
 
   _initUI: function() {
@@ -371,7 +462,7 @@ var frequencyDialer = {
   },
 
   _updateUI: function(frequency, ignoreDialer) {
-    $('frequency').textContent = parseFloat(frequency.toFixed(1));
+    $('frequency').textContent = frequency.toFixed(1);
     if (true !== ignoreDialer) {
       this._translateX = (this._minFrequency - frequency) * this._space;
       var dialer = $('frequency-dialer');
@@ -501,7 +592,7 @@ var favoritesList = {
           cancelSeekAndSetFreq(frequency);
         } else {
           // If fm is disabled, turn the radio on.
-          mozFMRadio.enable(frequency);
+          enableFMRadio(frequency);
         }
       }
     });
@@ -638,25 +729,28 @@ var favoritesList = {
 };
 
 function init() {
+  PerformanceTestingHelper.dispatch('start');
+
   frequencyDialer.init();
 
   var seeking = false;
   function onclick_seekbutton(event) {
     var seekButton = this;
-    var freqElement = $('frequency');
-    var seeking = !!freqElement.getAttribute('data-seek-dir');
+    var powerSwitch = $('power-switch');
+    var seeking = !!powerSwitch.getAttribute('data-seeking');
     var up = seekButton.id == 'frequency-op-seekup';
 
     function seek() {
-      freqElement.setAttribute('data-seek-dir', up ? 'up' : 'down');
+      powerSwitch.dataset.seeking = true;
+
       var request = up ? mozFMRadio.seekUp() : mozFMRadio.seekDown();
 
       request.onsuccess = function seek_onsuccess() {
-        freqElement.removeAttribute('data-seek-dir');
+        powerSwitch.removeAttribute('data-seeking');
       };
 
       request.onerror = function seek_onerror() {
-        freqElement.removeAttribute('data-seek-dir');
+        powerSwitch.removeAttribute('data-seeking');
       };
     }
 
@@ -679,7 +773,7 @@ function init() {
     if (mozFMRadio.enabled) {
       mozFMRadio.disable();
     } else {
-      mozFMRadio.enable(frequencyDialer.getFrequency());
+      enableFMRadio(frequencyDialer.getFrequency());
     }
   }, false);
 
@@ -693,31 +787,54 @@ function init() {
     updateFreqUI();
   }, false);
 
+  var speakerManager = new SpeakerManager();
+  $('speaker-switch').addEventListener('click', function toggle_speaker() {
+    speakerManager.forcespeaker = !speakerManager.speakerforced;
+  }, false);
+
+  speakerManager.onspeakerforcedchange = function onspeakerforcedchange() {
+    $('speaker-switch').dataset.speakerOn = speakerManager.speakerforced;
+  };
+
   mozFMRadio.onfrequencychange = updateFreqUI;
-  mozFMRadio.onenabled = updatePowerUI;
-  mozFMRadio.ondisabled = updatePowerUI;
+  mozFMRadio.onenabled = function() {
+    updateEnablingState(false);
+  };
+  mozFMRadio.ondisabled = function() {
+    updateEnablingState(false);
+  };
 
   mozFMRadio.onantennaavailablechange = function onAntennaChange() {
     updateAntennaUI();
     if (mozFMRadio.antennaAvailable) {
-      // If the FM radio is enabled when the antenna is unplugged, turn the FM
-      // radio on again.
-      if (!!window._previousFMRadioState) {
-        mozFMRadio.enable(frequencyDialer.getFrequency());
+      // If the FM radio is enabled or enabling when the antenna is unplugged,
+      // turn the FM radio on again.
+      if (!!window._previousFMRadioState || !!window._previousEnablingState) {
+        enableFMRadio(frequencyDialer.getFrequency());
       }
     } else {
       // Remember the current state of the FM radio
       window._previousFMRadioState = mozFMRadio.enabled;
+      window._previousEnablingState = enabling;
       mozFMRadio.disable();
     }
   };
+
+  // Disable the power button and the fav list when the airplane mode is on.
+  updateAirplaneModeUI();
+  mozSettings.addObserver('ril.radio.disabled', function(event) {
+    rilDisabled = event.settingValue;
+    updateAirplaneModeUI();
+  });
+
   historyList.init(function hl_ready() {
     if (mozFMRadio.antennaAvailable) {
       // Enable FM immediately
       if (historyList.last() && historyList.last().frequency)
-        mozFMRadio.enable(historyList.last().frequency);
+        enableFMRadio(historyList.last().frequency);
       else
-        mozFMRadio.enable(mozFMRadio.frequencyLowerBound);
+        enableFMRadio(mozFMRadio.frequencyLowerBound);
+
       favoritesList.init(updateFreqUI);
     } else {
       // Mark the previous state as True,
@@ -732,7 +849,14 @@ function init() {
 }
 
 window.addEventListener('load', function(e) {
-  init();
+  var req = mozSettings.createLock().get('ril.radio.disabled');
+  req.onsuccess = function() {
+    rilDisabled = req.result['ril.radio.disabled'];
+    init();
+  };
+  req.onerror = function() {
+    init();
+  };
 }, false);
 
 // Turn off radio immediately when window is unloaded.
@@ -744,7 +868,5 @@ window.addEventListener('unload', function(e) {
 window.addEventListener('localized', function showBody() {
   document.documentElement.lang = navigator.mozL10n.language.code;
   document.documentElement.dir = navigator.mozL10n.language.direction;
-  // <body> children are hidden until the UI is translated
-  document.body.classList.remove('hidden');
 });
 

@@ -1,0 +1,14 @@
+{
+  "extends": "../../.jshintrc",
+  "globals": {
+    "define": false,
+    "require": false,
+    "KeyEvent": false,
+    "requirejs": false,
+    "indexedDB": false,
+    "mozRequestAnimationFrame": false,
+    "requestAnimationFrame": false,
+    "cancelAnimationFrame": false,
+    "Event": false
+  }
+}

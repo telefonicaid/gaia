@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
   <meta charset="utf-8">
   <title>Gaia-UI Building Blocks</title>
   <style>
@@ -11,7 +12,6 @@
         padding: 0;
         margin: 0;
         font-size:14px;
-        font-family: "MozTT", sans-serif;
         background: #1a2633;
         background-image:
           -moz-radial-gradient(bottom right, circle cover, hsla(300,100%,62%,.07) 0%, hsla(226,77%,55%,.05) 65%, hsla(198,60%,59%,.1) 100%),
@@ -122,8 +122,9 @@
       }
 
       section#metadata h1 {
-        font: 20px/1em "MozTT", Sans-serif;
+        font-size: 2rem;
         font-weight: 600;
+        line-height: 1em;
         color: #fff;
         margin: 0;
       }
@@ -353,7 +354,7 @@
           if ( element.getAttribute("data-codetrash") == "true" ) {
             var temporalNode = element;
           } else {
-            var cloned = element.cloneNode();
+            var cloned = element.cloneNode(true);
             cloned.removeAttribute("data-codeexample");
             var temporalNode = documentPreview.createElement("div");
             temporalNode.appendChild(cloned);

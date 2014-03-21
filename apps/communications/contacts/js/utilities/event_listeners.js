@@ -1,3 +1,4 @@
+/*jshint loopfunc: true */
 'use strict';
 
 var utils = window.utils || {};
@@ -30,7 +31,7 @@ if (!utils.listeners) {
       catch (e) {
         window.console.error('Error while registering listener for: ', id, e);
       }
-    } // Add function
+    }; // Add function
 
   })(document);
 }

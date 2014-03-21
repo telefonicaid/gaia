@@ -22,10 +22,12 @@
     "camera":{},
     "geolocation":{},
     "wifi-manage":{},
+    "sms":{},
     "desktop-notification":{},
     "idle":{},
     "network-events":{},
-    "embed-apps":{}
+    "embed-apps":{},
+    "downloads": {}
   },
   "locales": {
     "en-US": {
@@ -33,5 +35,8 @@
       "description": "Test framework container"
     }
   },
-  "default_locale": "en-US"
+  "default_locale": "en-US",
+  "messages": [
+     { "dummy-system-message": "/index.html" }
+  ]
 }

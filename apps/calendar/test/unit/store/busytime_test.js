@@ -1,19 +1,10 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('responder.js');
-  requireLib('timespan.js');
-  requireLib('store/event.js');
-  requireLib('store/busytime.js');
-  requireLib('store/alarm.js');
-});
+requireLib('responder.js');
+requireLib('timespan.js');
+requireLib('store/event.js');
+requireLib('store/busytime.js');
+requireLib('store/alarm.js');
 
-/*
- * disabled in Bug 838993, to be reenabled asap in Bug 840489
- * error is :
- *     TypeError: navigator.mozL10n.DateTimeFormat is not a function
- *     at app (http://calendar.gaiamobile.org:8080/test/unit/helper.js:86)
- *
 suite('store/busytime', function() {
-
   var app;
   var subject;
   var db;
@@ -64,7 +55,6 @@ suite('store/busytime', function() {
   }
 
   setup(function(done) {
-    this.timeout(5000);
     id = 0;
     app = testSupport.calendar.app();
     db = app.db;
@@ -131,12 +121,12 @@ suite('store/busytime', function() {
         }
 
         subject.count(function(err, value) {
-          alarmCount = value;
+          busytimeCount = value;
           next();
         });
 
         alarmStore.count(function(err, value) {
-          busytimeCount = value;
+          alarmCount = value;
           next();
         });
       });
@@ -150,30 +140,6 @@ suite('store/busytime', function() {
           });
         });
       });
-    });
-  });
-
-  suite('#factory', function() {
-    test('using defaults', function() {
-      var event = Factory('event');
-      var result = subject.factory(event);
-
-      assert.deepEqual(result.start, event.remote.start);
-      assert.deepEqual(result.end, event.remote.end);
-      assert.equal(result.eventId, event._id);
-      assert.equal(result.calendarId, event.calendarId);
-    });
-
-    test('with start/end date', function() {
-      var event = Factory('event');
-
-      var start = Calendar.Calc.dateToTransport(new Date(2012, 0, 1));
-      var end = Calendar.Calc.dateToTransport(new Date(2012, 0, 2));
-
-      var result = subject.factory(event, start, end);
-
-      assert.deepEqual(result.start, start);
-      assert.deepEqual(result.end, end);
     });
   });
 
@@ -362,4 +328,3 @@ suite('store/busytime', function() {
     });
   });
 });
-*/

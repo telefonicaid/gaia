@@ -1,4 +1,4 @@
-#keyboard-frame {
+#keyboards {
   /* See the new mozpasspointerevents attribute added in bug 796452 */
   pointer-events: none;
 
@@ -9,20 +9,76 @@
   height: 100%;
 
   transform: translateY(0);
-  -moz-transition: visibility 0.2s ease, -moz-transform 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.4s ease;
 }
 
-#keyboard-frame.hide {
-  visibility: hidden;
+@media not all and (-moz-physical-home-button) {
+  #screen:not(.software-button-disabled) #keyboards {
+    bottom: 5rem;
+  }
+}
 
+#screen.software-button-enabled #keyboards {
+  bottom: 5rem;
+}
+
+#keyboards.hide {
+  opacity: 0;
   transform: translateY(100%);
+  /* ease-in for disappearing */
+  transition: opacity 0.4s ease-in, transform 0.4s ease-in;
 }
 
-#keyboard-frame iframe {
+#keyboards iframe {
   position: absolute;
   bottom: 0;
 
   width: 100%;
   height: 100%;
   border: 0;
+}
+
+/* notification */
+#keyboard-show-ime-list > .fake-notification {
+  background-repeat: no-repeat;
+  background-position: 1.5rem center;
+  background-size: 3rem;
+  -moz-box-sizing: border-box;
+  padding: 1rem 1rem 1rem 5rem;
+
+  /* wait for activate */
+  display: none;
+}
+
+#keyboard-show-ime-list > .fake-notification > .message {
+  line-height: 2.5rem;
+  font-weight: 700;
+  font-size: 1.6rem;
+  white-space: nowrap;
+}
+
+#keyboard-show-ime-list > .fake-notification > .tip {
+  color: grey;
+  font-size: 11pt;
+}
+
+#keyboard-show-ime-list > .fake-notification.activated{
+  display: block;
+}
+
+/* copied from settings page */
+#keyboard-show-ime-list > .fake-notification::before {
+  position: absolute;
+  top: calc((6.2rem - 3.2rem) / 2);
+  left: calc((5.5rem - 2.8rem) / 2);
+  width: 3rem;
+  height: 3rem;
+
+  content: '';
+
+  background: url(../icons/Keyboard.png) top left no-repeat;
+}
+
+.notransition {
+  transition: none !important;
 }

@@ -1,8 +1,5 @@
 'use strict';
 
-// Enabling workers
-var self = this;
-
 if (!window.Rest) {
   window.Rest = (function() {
 
@@ -25,40 +22,54 @@ if (!window.Rest) {
         var outReq = new RestRequest(xhr);
 
         xhr.open('GET', uri, true);
-        xhr.responseType = options.responseType || 'json';
+        var responseType = options.responseType || 'json';
+        xhr.responseType = responseType;
+        var responseProperty = responseType === 'xml' ?
+          'responseXML' : 'response';
 
-        xhr.timeout = options.operationsTimeout || DEFAULT_TIMEOUT;
+        xhr.timeout = options.operationsTimeout ||
+                            parent.config.operationsTimeout || DEFAULT_TIMEOUT;
+
+        if (options.requestHeaders) {
+          for (var header in options.requestHeaders) {
+            xhr.setRequestHeader(header, options.requestHeaders[header]);
+          }
+        }
 
         xhr.onload = function(e) {
           if (xhr.status === 200 || xhr.status === 400 || xhr.status === 0) {
-            if (callback && typeof callback.success === 'function')
-              self.setTimeout(function() {
-                callback.success(xhr.response);
+            if (callback && typeof callback.success === 'function') {
+              setTimeout(function() {
+                callback.success(xhr[responseProperty]);
               },0);
+            }
           }
           else {
-            self.console.error('HTTP error executing GET. ',
+            console.error('HTTP error executing GET. ',
                                uri, ' Status: ', xhr.status);
-            if (callback && typeof callback.error === 'function')
-              self.setTimeout(function errorHandler() {
+            if (callback && typeof callback.error === 'function') {
+              setTimeout(function errorHandler() {
                 callback.error({ status: xhr.status });
               }, 0);
+            }
           }
         }; // onload
 
         xhr.ontimeout = function(e) {
-          self.console.error('Timeout!!! while HTTP GET: ', uri);
-          if (callback && typeof callback.timeout === 'function')
-            self.setTimeout(callback.timeout, 0);
+          console.error('Timeout!!! while HTTP GET: ', uri);
+          if (callback && typeof callback.timeout === 'function') {
+            setTimeout(callback.timeout, 0);
+          }
         }; // ontimeout
 
         xhr.onerror = function(e) {
-          self.console.error('Error while executing HTTP GET: ', uri,
+          console.error('Error while executing HTTP GET: ', uri,
                                    ': ', e);
-          if (callback && typeof callback.error === 'function')
-            self.setTimeout(function() {
+          if (callback && typeof callback.error === 'function') {
+            setTimeout(function() {
               callback.error(e);
             },0);
+          }
         }; // onerror
 
         xhr.send();

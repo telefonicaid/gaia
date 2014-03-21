@@ -1,4 +1,5 @@
 Calendar.ns('Views').DayBased = (function() {
+  'use strict';
 
   var Calc = Calendar.Calc;
   var hoursOfOccurance = Calendar.Calc.hoursOfOccurance;
@@ -92,7 +93,6 @@ Calendar.ns('Views').DayBased = (function() {
      */
     _idsToHours: null,
 
-
     get element() {
       return this._element;
     },
@@ -100,8 +100,6 @@ Calendar.ns('Views').DayBased = (function() {
     get events() {
       return this._eventsElement;
     },
-
-    /** private **/
 
     /**
      * Reset the hour cache.
@@ -184,8 +182,6 @@ Calendar.ns('Views').DayBased = (function() {
 
         var html = this._renderEvent(busytime, record);
         var eventArea = hourRecord.element;
-        var records = hourRecord.records;
-        var idx = records.insertIndexOf(busytime._id);
 
         if (this.template.hourEventsSelector) {
           eventArea = eventArea.querySelector(
@@ -238,7 +234,6 @@ Calendar.ns('Views').DayBased = (function() {
      */
     _insertElement: function(html, element, records, idx) {
       var el;
-      var len = records.length;
 
       if (!element.children.length || idx === 0) {
         element.insertAdjacentHTML(
@@ -263,9 +258,6 @@ Calendar.ns('Views').DayBased = (function() {
      * @param {HTMLElement} element target to apply top/height to.
      */
     _assignPosition: function(busytime, element) {
-      var topOffset = 0;
-      var height = 0;
-
       // cache dates
       var start = busytime.startDate;
       var end = busytime.endDate;
@@ -281,7 +273,9 @@ Calendar.ns('Views').DayBased = (function() {
       // check if end time is on same date.
       var endMin = 59;
       var endHour = 23;
-      if (Calendar.Calc.isSameDate(this.date, busytime.endDate)) {
+      var isSameDateWithEndDate =
+          Calendar.Calc.isSameDate(this.date, busytime.endDate);
+      if (isSameDateWithEndDate) {
         endHour = end.getHours();
         endMin = end.getMinutes();
       }
@@ -296,14 +290,21 @@ Calendar.ns('Views').DayBased = (function() {
       // Calculate duration in hours, with minutes as decimal part
       var hoursDuration = (endHour - startHour) +
                           ((endMin - startMin) / MINUTES_IN_HOUR);
+      var elementHeight = hoursDuration;
 
-      // If this event is less than a full hour, tweak the classname so that
-      // some alternate styles for a tiny event can apply (eg. hide details)
+      // If this event is less than a full hour and NOT cross next day,
+      // tweak the classname so that some alternate styles for
+      // a tiny event can apply. (eg. hide details)
+      // And if the event is cross next day, the height of event element is 1.
       if (hoursDuration < 1) {
-        element.className += ' partial-hour';
+        if (isSameDateWithEndDate) {
+          element.className += ' partial-hour';
+        } else {
+          elementHeight = 1;
+        }
       }
 
-      return this._assignHeight(element, hoursDuration);
+      return this._assignHeight(element, elementHeight);
     },
 
     /**
@@ -320,6 +321,11 @@ Calendar.ns('Views').DayBased = (function() {
      * build the default elements for the view and return the parent element.
      */
     _buildElement: function() {
+      // XXX: wrapper used to create a new stacking context to fix Bug 972666
+      // without causing performance issues described on Bug 972675
+      var wrapper = document.createElement('div');
+      wrapper.classList.add('day-events-wrapper');
+
       // create the hidden values for element & eventsElement
       this._eventsElement = document.createElement('section');
       this._element = document.createElement('section');
@@ -338,7 +344,8 @@ Calendar.ns('Views').DayBased = (function() {
       }
 
       // setup/inject elements.
-      this.element.appendChild(this._eventsElement);
+      wrapper.appendChild(this._eventsElement);
+      this.element.appendChild(wrapper);
       this.events.classList.add(this.classType);
 
       return this.element;
@@ -350,7 +357,7 @@ Calendar.ns('Views').DayBased = (function() {
     _renderHour: function(hour) {
       return this.template.hour.render({
         displayHour: Calendar.Calc.formatHour(hour),
-        hour: String(hour)
+        hour: hour.toString()
       });
     },
 
@@ -371,8 +378,9 @@ Calendar.ns('Views').DayBased = (function() {
       var record = this.hours.get(hour);
 
       // skip records that do not exist.
-      if (record === null)
+      if (record === null) {
         return;
+      }
 
       var el = record.element;
 
@@ -384,28 +392,15 @@ Calendar.ns('Views').DayBased = (function() {
     },
 
     createHour: function(hour) {
-      this.hours.indexOf(hour);
-
-      var len = this.hours.items.length;
-      var idx = this.hours.insertIndexOf(hour);
-
       var html = this._renderHour(hour);
-      var parent = this.events;
-
-      if (hour === Calendar.Calc.ALLDAY) {
-        parent = this.allDayElement;
+      var parent = (hour === Calendar.Calc.ALLDAY) ?
+        this.allDayElement : this.events;
+      if (!parent) {
+        throw new Error('parent must be specified');
       }
 
-      if (!parent)
-        throw new Error('parent must be specified');
-
-      var el = this._insertElement(
-        html,
-        parent,
-        this.hours.items,
-        idx
-      );
-
+      var idx = this.hours.insertIndexOf(hour);
+      var el = this._insertElement(html, parent, this.hours.items, idx);
       return this.hours.set(hour, {
         element: el,
         records: new OrderedMap(),
@@ -442,8 +437,9 @@ Calendar.ns('Views').DayBased = (function() {
 
       delete this._idsToHours[id];
 
-      if (!hours)
+      if (!hours) {
         return;
+      }
 
       hours.forEach(function(number) {
         var hour = this.hours.get(number);
@@ -459,8 +455,9 @@ Calendar.ns('Views').DayBased = (function() {
         // are any more...
         var idx = flags.indexOf(calendarClass);
 
-        if (idx !== -1)
+        if (idx !== -1) {
           flags.splice(idx, 1);
+        }
 
         // if after we have removed the flag there
         // are no more we can remove the class
@@ -536,27 +533,99 @@ Calendar.ns('Views').DayBased = (function() {
     },
 
     /**
-     * Creates and returns
-     *
+     * Creates a DOM representation of this view.
+     * @return {Element} some element.
      */
     create: function() {
       var el = this._buildElement();
 
       if (this.renderAllHours) {
-        var hour = 0;
-
         if (this.outsideAllDay) {
           this.createHour('allday');
         }
 
-        for (; hour < 24; hour++) {
+        for (var hour = 0; hour < 24; hour++) {
           this.createHour(hour);
         }
       }
 
+      // TODO(gareth): This is maybe not a good place for this.
       this.changeDate(this.date);
 
+      this.delegate(el, 'click', 'section.hour',
+          this._onHourClick.bind(this));
       return el;
+    },
+
+    /**
+     * @param {MouseEvent} evt A click event on an hour element.
+     * @param {Element} el matched by css selector.
+     * @private
+     */
+    _onHourClick: function(evt, el) {
+      if (this._clickedOnEvent(evt.target)) {
+        // We just clicked on an event... bail!
+        return;
+      }
+
+      var hour = el.getAttribute('data-hour');
+      if (!hour) {
+        // Something went terribly wrong...
+        return;
+      }
+
+      var startDate = new Date(this.date.getTime());
+      startDate.setHours(0);
+      startDate.setMinutes(0);
+      startDate.setSeconds(0);
+
+      var endDate = new Date(this.date.getTime());
+      endDate.setHours(0);
+      endDate.setMinutes(0);
+      endDate.setSeconds(0);
+
+      var queryString = {};
+      if (hour === Calendar.Calc.ALLDAY) {
+        queryString.isAllDay = true;
+        endDate.setDate(startDate.getDate() + 1);
+      } else {
+        // If it's not all day it must be a number.
+        hour = parseInt(hour);
+        startDate.setHours(hour);
+        endDate.setHours(hour + 1);
+      }
+
+      queryString.startDate = startDate.toString();
+      queryString.endDate = endDate.toString();
+
+      this.app.go(
+          '/event/add/?' +
+          Calendar.QueryString.stringify(queryString)
+      );
+    },
+
+    /**
+     * The structure of one of these cells is:
+     * <div class="events">
+     *   // This will be empty if and only if we have no events
+     * </div>
+     * @param {Element} target The HTML element that got clicked.
+     * @return {boolean} Whether or not we clicked on an event.
+     * @private
+     */
+    _clickedOnEvent: function(target) {
+      // Find the div with the events class.
+      var el = target;
+      while (!el.classList.contains('events')) {
+        el = el.parentNode;
+        if (!el || el.nodeType !== 1 /** ELEMENT_NODE */) {
+          return false;
+        }
+      }
+
+      // Compute whether we found the div and it has one or more children.
+      var children = el.childNodes;
+      return children && children.length > 0;
     },
 
     activate: function() {
@@ -578,10 +647,20 @@ Calendar.ns('Views').DayBased = (function() {
     destroy: function() {
       this._removeTimespanObserver();
       var el = this.element;
-
       if (el && el.parentNode) {
         el.parentNode.removeChild(el);
       }
+    },
+
+    getScrollTop: function() {
+      var scroll = this.element.querySelectorAll('.day-events')[1];
+      var scrollTop = scroll.scrollTop;
+      return scrollTop;
+    },
+
+    setScrollTop: function(scrollTop) {
+      var scroll = this.element.querySelectorAll('.day-events')[1];
+      scroll.scrollTop = scrollTop;
     }
 
   };

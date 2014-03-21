@@ -8,7 +8,6 @@ var MockDetailsDom = '<section id="view-contact-details" role="region" class="vi
                                                                    ' +data-l10n-id="edit" data-l10n-id="edit">edit</span></button>' +
           '</menu>' +
           '<h1 id="contact-name-title"></h1>' +
-          '<sup id="favorite-star" class="hide"></sup>' +
         '</header>' +
         '<article id="contact-detail-wrapper" class="view-body">' +
           '<div id="cover-img"></div>' +
@@ -31,10 +30,12 @@ var MockDetailsDom = '<section id="view-contact-details" role="region" class="vi
                 '</div>' +
               '</li>' +
 
-              '<li id="birthday-template-#i#" data-template>' +
-                '<h2 data-l10n-id="birthday">Birthday</h2>' +
-                '<p><strong>#bday#</strong></p>' +
-              '</li>' +
+              '<!-- Dates template -->' +
+                '<li id="dates-template-#i#" data-template>' +
+                  '<h2>#type#</h2>' +
+                  '<p><strong>#date#</strong></p>' +
+                '</li>' + 
+
               '<!-- Email Template -->' +
               '<li data-mail id="email-details-template-#i#" data-template>' +
                 '<h2>#type#</h2>' +
@@ -63,6 +64,12 @@ var MockDetailsDom = '<section id="view-contact-details" role="region" class="vi
                   '<button id="link_button" class="activity icon icon-link">' +
                     '#action#' +
                   '</button>' +
+              '</li>' +
+              '<li class="duplicate-actions" id="duplicate-contacts-template" data-template>' +
+                '<h2 data-l10n-id="duplicate-contacts">Organise Contacts</h2>' +
+                '<button id="find-merge-button" data-l10n-id="find-merge-contacts" class="activity no-icon">' +
+                  'Find duplicate contacts' +
+                '</button>' +
               '</li>' +
               '<!-- Address Template -->' +
               '<li data-address id="address-details-template-#i#" data-template>' +
@@ -98,4 +105,6 @@ var MockDetailsDom = '<section id="view-contact-details" role="region" class="vi
               '</div>' +
             '</section>' +
         '</article>' +
-      '</section>';
+      '</section>' +
+      '<form is="sim-picker" id="sim-picker" role="dialog" data-type="action" hidden>' +
+      '</form>';

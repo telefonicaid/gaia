@@ -1,9 +1,9 @@
 #permission-screen {
   position: absolute;
-  top: 20px;
+  top: 2rem;
   left: 0;
   width: 100%;
-  height: -moz-calc(100% - 20px);
+  height: calc(100% - 2rem);
   background-color: rgba(0,0,0,0.4);
   -moz-transition: opacity 0.5s ease;
   pointer-events: none;
@@ -11,14 +11,15 @@
 }
 
 #screen:-moz-full-screen-ancestor > #permission-screen,
-#screen.fullscreen-app #permission-screen {
+#screen.fullscreen-app #permission-screen,
+#screen.lockscreen-camera #permission-screen {
   top: 0;
   height: 100%;
 }
 
 #screen.attention #permission-screen {
-  top: 40px;
-  height: -moz-calc(100% - 40px);
+  top: 4rem;
+  height: calc(100% - 4rem);
 }
 
 #permission-screen.visible {
@@ -26,61 +27,206 @@
   display: inline-block;
 }
 
-#permission-remember-section {
-  height: 6rem;
-  border-top: 0.1rem solid #686868;
-  width: 100%;
-  position: relative;
+@media not all and (-moz-physical-home-button) {
+  #screen:not(.software-button-disabled) #permission-screen {
+    height: calc(100% - 2rem - 5rem);
+  }
+
+  #screen.attention:not(.software-button-disabled) #permission-screen {
+    height: calc(100% - 4rem - 5rem);
+  }
+
+  #screen.fullscreen-app:not(.software-button-disabled) #permission-screen {
+    height: calc(100% - 5rem);
+  }
+}
+
+#screen.software-button-enabled #permission-screen {
+  height: calc(100% - 2rem - 5rem);
+}
+
+#screen.software-button-enabled.attention #permission-screen {
+  height: calc(100% - 4rem - 5rem);
+}
+
+
+#screen.software-button-enabled.fullscreen-app #permission-screen {
+  height: calc(100% - 7rem);
 }
 
 #permission-remember-section {
+  border-top: 0.1rem solid #686868;
+  font-size: 1.6rem;
   display: none;
+  padding: 1.5rem;
 }
 
 #permission-message {
-  background-image: none;
-  background-repeat: no-repeat no-repeat;
-  min-height: 64px;
+  margin: 0;
+  padding-top: 1.2rem;
+  padding-bottom: 0.8rem;
+  min-height: 4.4rem;
+  font-size: 1.6rem;
+  background-repeat: no-repeat;
+  background-size: 6.4rem;
+  background-position: 0 50%;
 }
 
-#permission-screen[data-type] #permission-remember-section,
+#permission-more-info {
+  margin: 1rem;
+  padding-top: 1.2rem;
+  padding-bottom: 0.8rem;
+  min-height: 4.4rem;
+  font-size: 1.6rem;
+}
+
+#permission-more-info.hidden {
+  display: none;
+}
+
+#permission-more-info a {
+  padding-bottom: 2rem;
+  color: white;
+  outline: none;
+}
+
+#permission-more-info-box {
+  padding: 1.5rem;
+  max-height: 13rem; /* XXX: use magic calc(); expression instead */
+  overflow-y: scroll;
+}
+
+#permission-more-info-box.hidden {
+  display: none;
+}
+
+#permission-screen[data-type] #permission-remember-section {
+  display: block;
+}
+
 #permission-screen[data-type] #permission-icon {
   display: inherit;
 }
 
 #permission-screen[data-type] #permission-message {
-  padding-left: 64px;
+  padding-left: 7rem;
 }
 
 #permission-remember-section label {
-  position: absolute;
-  right: 1rem;
+  float: right;
+  width: 5.8rem;
+  height: 2rem;
 }
 
 #permission-remember-label {
-  line-height: 5rem;
+  float: left;
+  width: calc(100% - 6rem);
+  line-height: 2.4rem;
+}
+
+#permission-devices {
+  margin: 0;
+  padding: 0;
+}
+
+#permission-devices li.device-cell {
+  position: relative;
+  height: 6rem;
+}
+
+#permission-devices li.device-cell > a:active {
+  background-color: rgba(52,140,158, .6);
+}
+
+#permission-devices li.device-cell label:active {
+  background-color: transparent;
+}
+
+#permission-devices .deviceEnable {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+
+  width: 100%;
+  height: 100%;
+}
+
+#permission-devices input[type="checkbox"] + span {
+  position: absolute;
+  top: -moz-calc(50% - 1.7rem);
+  right: 1.5rem;
+  margin: 0;
+  background: url(images/alarm_off.png) no-repeat center top / 3.4rem;
+  width: 3.4rem;
+  height: 3.4rem;
+}
+
+#permission-devices input[type="checkbox"]:checked + span {
+  border-color: #00acce;
+  background: url(images/alarm_on.png) no-repeat center top / 3.4rem;
+}
+
+#permission-devices .device-list > input {
+  display: none;
+}
+
+#permission-devices .device-item {
+  padding: 2rem;
+  display: block;
+  font-weight: lighter;
+  font-size: 2.1rem;
+}
+
+#permission-devices .device-item:active {
+  background-color: transparent;
+}
+
+.device-item > span {
+  pointer-events: none;
+}
+
+.device-item > .label {
+  position: absolute;
+  top: 1.0rem;
+  left: 1.7rem;
+  font-size: 2.8rem;
+  font-weight: lighter;
+  color: #cfe2e5;
 }
 
 #permission-screen[data-type="geolocation"] #permission-message {
-  background-image: url('images/PermissionsDialogIcons_Geolocation.png');
+  background-image: url(images/PermissionsDialogIcons_Geolocation.png);
 }
 
 #permission-screen[data-type="fmradio"] #permission-message {
-  background-image: url('images/PermissionsDialogIcons_FMRadio.png');
+  background-image: url(images/PermissionsDialogIcons_FMRadio.png);
 }
 
 #permission-screen[data-type*="camera"] #permission-message {
-  background-image: url('images/PermissionsDialogIcons_Camera.png');
+  background-image: url(images/PermissionsDialogIcons_Camera.png);
 }
 
 #permission-screen[data-type*="wifi"] #permission-message {
-  background-image: url('images/PermissionsDialogIcons_WifiInformation.png');
+  background-image: url(images/PermissionsDialogIcons_WifiInformation.png);
 }
 
 #permission-screen[data-type="contacts"] #permission-message {
-  background-image: url('images/PermissionsDialogIcons_Contacts.png');
+  background-image: url(images/PermissionsDialogIcons_Contacts.png);
 }
 
 #permission-screen[data-type*="device-storage"] #permission-message {
-  background-image: url('images/PermissionsDialogIcons_DeviceStorage.png');
+  background-image: url(images/PermissionsDialogIcons_DeviceStorage.png);
+}
+
+#permission-screen[data-type="video-capture"] #permission-message {
+  background-image: url(images/PermissionsDialogIcons_VideoRecorder.png);
+}
+
+#permission-screen[data-type="audio-capture"] #permission-message {
+  background-image: url(images/PermissionsDialogIcons_Microphone.png);
+}
+
+#permission-screen[data-type="media-capture"] #permission-message {
+  background-image: url(images/PermissionsDialogIcons_VideoAndMic.png);
 }

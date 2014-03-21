@@ -1,4 +1,5 @@
 Calendar.ns('Store').Alarm = (function() {
+  'use strict';
 
   var Calc = Calendar.Calc;
 
@@ -66,8 +67,9 @@ Calendar.ns('Store').Alarm = (function() {
      * Manage the queue when alarms are added.
      */
     _addDependents: function(obj, trans) {
-      if (!this.autoQueue)
+      if (!this.autoQueue) {
         return;
+      }
 
       // by using processQueue even if we added
       // 6000 alarms during a single transaction we only
@@ -194,11 +196,11 @@ Calendar.ns('Store').Alarm = (function() {
     /**
      * Finds single alarm by busytime id.
      *
-     * @param {String} busytimeId busytime id.
+     * @param {Object} related busytime object.
      * @param {IDBTransaction} [trans] optional transaction.
-     * @param {Function} callback node style [err, record].
+     * @param {Function} callback node style [err, records].
      */
-    findByBusytimeId: function(busytimeId, trans, callback) {
+    findAllByBusytimeId: function(busytimeId, trans, callback) {
       if (typeof(trans) === 'function') {
         callback = trans;
         trans = null;
@@ -210,8 +212,9 @@ Calendar.ns('Store').Alarm = (function() {
 
       var store = trans.objectStore(this._store);
       var index = store.index('busytimeId');
+      var key = IDBKeyRange.only(busytimeId);
 
-      index.get(busytimeId).onsuccess = function(e) {
+      index.mozGetAll(key).onsuccess = function(e) {
         callback(null, e.target.result);
       };
     },
@@ -255,11 +258,22 @@ Calendar.ns('Store').Alarm = (function() {
       //     to justify the perf cost here later.
       req.onsuccess = function(e) {
         var data = e.target.result;
+        var len = data.length;
+        var mozAlarm;
 
-        if (data.length <= 0) {
-          requiresAlarm = true;
+        requiresAlarm = true;
+
+        for (var i = 0; i < len; i++) {
+          mozAlarm = data[i].data;
+          if (
+            mozAlarm &&
+            'eventId' in mozAlarm &&
+            'trigger' in mozAlarm
+          ) {
+            requiresAlarm = false;
+            break;
+          }
         }
-
 
         callback = callback || function() {};
         self._moveAlarms(

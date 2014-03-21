@@ -1,10 +1,11 @@
 'use strict';
 
 var fb = window.fb || {};
+window.fb = fb;
 
-if (!fb.utils) {
   (function(document) {
-    var Utils = fb.utils = {};
+    var Utils = fb.utils || {};
+    fb.utils = Utils;
 
     var TIMEOUT_QUERY = fb.operationsTimeout;
     var FRIEND_COUNT_QUERY = 'select friend_count from user where uid=me()';
@@ -22,7 +23,7 @@ if (!fb.utils) {
       window.asyncStorage.setItem(LAST_UPDATED_KEY, {
         data: value
       }, cb);
-    }
+    };
 
     Utils.getLastUpdate = function(callback) {
       window.asyncStorage.getItem(LAST_UPDATED_KEY, function(obj) {
@@ -34,7 +35,7 @@ if (!fb.utils) {
           callback(out);
         }
       });
-    }
+    };
 
 
     Utils.getContactData = function(cid) {
@@ -53,11 +54,11 @@ if (!fb.utils) {
         else {
           outReq.done(null);
         }
-      }
+      };
 
       req.onerror = function(e) {
         outReq.failed(e.target.error);
-      }
+      };
 
       return outReq;
     };
@@ -67,10 +68,10 @@ if (!fb.utils) {
       var outReq = new Utils.Request();
 
       window.setTimeout(function get_mozContact_ByUid() {
-        Utils.getMozContactByUid(uid,
-          function onsuccess(e) {
-            if (e.target.result && e.target.result.length > 0) {
-              outReq.done(e.target.result[0]);
+        fb.getMozContactByUid(uid,
+          function onsuccess(result) {
+            if (Array.isArray(result) && result.length > 0) {
+              outReq.done(result[0]);
             } else {
               outReq.done(null);
             }
@@ -89,16 +90,16 @@ if (!fb.utils) {
       var outReq = new Utils.Request();
 
       window.setTimeout(function get_mozContact_ByUid() {
-        Utils.getMozContactByUid(uid,
-          function onsuccess(e) {
-            if (e.target.result && e.target.result.length > 0) {
-              outReq.done(e.target.result.length);
+        fb.getMozContactByUid(uid,
+          function onsuccess(result) {
+            if (Array.isArray(result)) {
+              outReq.done(result.length);
             } else {
               outReq.done(0);
             }
           },
           function onerror(e) {
-            outReq.failed(e.target.error);
+            outReq.failed(error);
           }
         );
       },0);
@@ -120,11 +121,11 @@ if (!fb.utils) {
 
         req.onsuccess = function(e) {
           outReq.done(e.target.result);
-        }
+        };
 
         req.onerror = function(e) {
           outReq.failed(e.target.error);
-        }
+        };
       }, 0);
 
       return outReq;
@@ -135,16 +136,15 @@ if (!fb.utils) {
       var outReq = new Utils.Request();
 
       window.setTimeout(function get_num_fb_contacts() {
-        var req = fb.contacts.getAll();
+        var req = fb.contacts.getLength();
 
         req.onsuccess = function() {
-          var result = req.result || [];
-          outReq.done(Object.keys(result).length);
-        }
+          outReq.done(req.result);
+        };
 
         req.onerror = function() {
           outReq.failed(req.error);
-        }
+        };
       }, 0);
 
       return outReq;
@@ -262,23 +262,23 @@ if (!fb.utils) {
             outReq.done(cleaner);
             // The cleaning activity should be starting immediately
             window.setTimeout(cleaner.start, 0);
-          }
+          };
 
           req.onerror = function() {
             window.console.error('FB Clean. Error retrieving FB Contacts');
             outReq.failed(req.error);
-          }
-        }
+          };
+        };
 
         ireq.onerror = function(e) {
           window.console.error('Error while clearing the FB Cache');
           outReq.failed(ireq.error);
-        }
+        };
 
       },0);
 
       return outReq;
-    }
+    };
 
     Utils.logout = function() {
       var outReq = new Utils.Request();
@@ -296,55 +296,20 @@ if (!fb.utils) {
             var logoutUrl = logoutService + logoutParams;
 
             var m_listen = function(e) {
+              if (e.origin !== fb.CONTACTS_APP_ORIGIN) {
+                return;
+              }
               if (e.data === 'closed') {
                 window.asyncStorage.removeItem(STORAGE_KEY);
                 outReq.done();
               }
               e.stopImmediatePropagation();
               window.removeEventListener('message', m_listen);
-            }
+            };
 
             window.addEventListener('message', m_listen);
 
-            var xhr = new XMLHttpRequest({
-              mozSystem: true
-            });
-
-            xhr.open('GET', logoutUrl, true);
-            xhr.responseType = 'json';
-
-            xhr.timeout = TIMEOUT_QUERY;
-
-            xhr.onload = function(e) {
-              if (xhr.status === 200 || xhr.status === 0) {
-                if (xhr.response.success) {
-                  window.asyncStorage.removeItem(STORAGE_KEY);
-                  outReq.done();
-                }
-                else {
-                  window.console.error('FB: Logout unexpected redirect');
-                  outReq.failed('Unexpected redirect');
-                }
-              }
-              else {
-                window.console.error('FB: Error executing logout. Status: ',
-                                     xhr.status);
-                outReq.failed(xhr.status.toString());
-              }
-            }
-
-            xhr.ontimeout = function(e) {
-              window.console.error('FB: Timeout!!! while logging out');
-              outReq.failed('Timeout');
-            }
-
-            xhr.onerror = function(e) {
-              window.console.error('FB: Error while logging out',
-                                  JSON.stringify(e));
-              outReq.failed(e.name);
-            }
-
-            xhr.send();
+            window.open(logoutUrl);
           } // if
           else {
             outReq.done();
@@ -354,7 +319,7 @@ if (!fb.utils) {
 
       return outReq;
 
-    } // logout
+    }; // logout
 
 
     // FbContactsCleaner Object
@@ -370,14 +335,40 @@ if (!fb.utils) {
       var mustUpdate = (pmode === 'update');
       var notifyClean = false;
 
+      var mustHold = false;
+      var holded = false;
+      var mustFinish = false;
+
       this.start = function() {
+        mustHold = holded = mustFinish = false;
+
         if (total > 0) {
           cleanContacts(0);
         }
         else if (typeof self.onsuccess === 'function') {
-                window.setTimeout(self.onsuccess, 0);
+          window.setTimeout(self.onsuccess);
         }
-      }
+      };
+
+      this.hold = function() {
+        mustHold = true;
+      };
+
+      this.finish = function() {
+        mustFinish = true;
+
+        if (holded) {
+          notifySuccess();
+        }
+      };
+
+      this.resume = function() {
+        mustHold = holded = mustFinish = false;
+
+        window.setTimeout(function resume_clean() {
+          cleanContacts(next);
+        });
+      };
 
       function successHandler(e) {
         if (notifyClean || typeof self.oncleaned === 'function') {
@@ -405,14 +396,8 @@ if (!fb.utils) {
           var number = idx;
           var req;
           if (fb.isFbLinked(contact)) {
-            if (mustUpdate) {
-              var fbContact = new fb.Contact(contact);
-              req = fbContact.unlink('hard');
-            }
-            else {
-              fb.markAsUnlinked(contact);
-              req = navigator.mozContacts.save(contact);
-            }
+            var fbContact = new fb.Contact(contact);
+            req = fbContact.unlink('hard');
           }
           else {
             if (mustUpdate) {
@@ -420,15 +405,31 @@ if (!fb.utils) {
               req = fbContact.remove();
             }
             else {
-              var req = navigator.mozContacts.remove(contact);
+              var req = navigator.mozContacts.remove(
+                utils.misc.toMozContact(contact));
             }
           }
           req.number = number;
           req.onsuccess = successHandler;
           req.onerror = function(e) {
             errorHandler(contact.id, e.target.error);
-          }
+          };
         }
+      }
+
+      function notifySuccess() {
+        if (typeof self.onsuccess === 'function') {
+          window.setTimeout(self.onsuccess);
+        }
+      }
+
+      function finishHandler() {
+        // It is needed to flush in order to properly update the index
+        var req = fb.contacts.flush();
+        req.onsuccess = notifySuccess;
+        req.onerror = function cleaner_flushError() {
+          errorHandler(null, req.error);
+        };
       }
 
       function continueCb() {
@@ -436,17 +437,22 @@ if (!fb.utils) {
         numResponses++;
         if (next < total && numResponses === CHUNK_SIZE) {
           numResponses = 0;
-          cleanContacts(next);
+          if (!mustHold && !mustFinish) {
+            cleanContacts(next);
+          }
+          else if (mustFinish && !holded) {
+            finishHandler();
+          }
+
+          if (mustHold) {
+            holded = true;
+          }
         }
         else if (next >= total) {
           // End has been reached
-          if (typeof self.onsuccess === 'function') {
-            window.setTimeout(self.onsuccess, 0);
-          }
+          finishHandler();
         }
       } // function
-    } // FbContactsCleaner
+    }; // FbContactsCleaner
 
   })(document);
-
-}

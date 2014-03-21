@@ -1,23 +1,13 @@
 requireCommon('test/synthetic_gestures.js');
+requireApp('calendar/shared/js/gesture_detector.js');
+requireLib('timespan.js');
 
-requireApp('calendar/test/unit/helper.js', function() {
-  requireApp('calendar/shared/js/gesture_detector.js');
-  requireLib('utils/ordered_map.js');
-  requireLib('timespan.js');
-  requireLib('templates/day.js');
-  requireLib('views/time_parent.js');
-  requireLib('views/day_based.js');
-  requireLib('views/day_child.js');
-  requireLib('views/day.js');
-});
-
-suite('views/day', function() {
+suiteGroup('Views.Day', function() {
   var subject,
       app,
       controller,
       busytimes,
       triggerEvent;
-
 
   suiteSetup(function() {
     triggerEvent = testSupport.calendar.triggerEvent;
@@ -81,6 +71,14 @@ suite('views/day', function() {
       assert.deepEqual(
         calledTime[0], date,
         'move - active time should change'
+      );
+    });
+
+    test('dayChange changes selectedDay', function() {
+      controller.move(date);
+      assert.deepEqual(
+        controller.selectedDay, date,
+        'dayChange - selectedDay should change'
       );
     });
   });

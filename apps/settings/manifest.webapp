@@ -8,15 +8,19 @@
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
+    "storage":{},
     "mobileconnection":{},
+    "voicemail":{},
     "bluetooth":{},
     "device-storage:pictures":{ "access": "readonly" },
     "device-storage:music":{ "access": "readonly" },
     "device-storage:videos":{ "access": "readonly" },
-    "device-storage:sdcard":{ "access": "readonly" },
+    "device-storage:sdcard":{ "access": "readwrite" },
     "device-storage:apps":{ "access": "readonly" },
     "webapps-manage":{},
+    "open-remote-window":{},
     "permissions":{},
+    "systemXHR": {},
     "settings":{ "access": "readwrite" },
     "wifi-manage":{},
     "attention":{},
@@ -25,7 +29,9 @@
     "power":{},
     "idle":{},
     "telephony":{},
-    "audio-channel-notification":{}
+    "audio-channel-notification":{},
+    "downloads":{},
+    "nfc":{ "access": "readonly" }
   },
   "activities": {
     "configure": {
@@ -35,13 +41,8 @@
       "disposition": "window"
     }
   },
-  "messages": ["bluetooth-requestconfirmation",
-               "bluetooth-requestpasskey",
-               "bluetooth-requestpincode",
-               "bluetooth-authorize",
-               "bluetooth-cancel",
-               "bluetooth-pairedstatuschanged",
-               "bluetooth-hfp-status-changed"],
+  "messages": ["bluetooth-pairing-request",
+               "bluetooth-cancel"],
   "locales": {
     "ar": {
       "name": "الضبط",
@@ -64,10 +65,17 @@
       "description": "Gaia 設定"
     }
   },
+  "datastores-access": {
+    "download_store": {
+      "readonly": false,
+      "description": "Stores download finished"
+    }
+  },
   "default_locale": "en-US",
   "icons": {
-    "120": "/style/icons/Settings.png",
-    "60": "/style/icons/60/Settings.png"
+    "60": "/style/icons/Settings_60.png",
+    "90": "/style/icons/Settings_90.png",
+    "120": "/style/icons/Settings_120.png"
   },
-  "orientation": "portrait-primary"
+  "orientation": "default"
 }

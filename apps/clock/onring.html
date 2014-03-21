@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
     <meta charset="utf-8">
-    <meta http-equiv="pragma" content="no-cache">
     <title>Clock</title>
     <link rel="stylesheet" type="text/css" href="style/clock.css">
     <link rel="stylesheet" type="text/css" href="style/alarm.css">
@@ -11,29 +11,25 @@
     <!-- Date/Time Localization -->
     <link rel="resource" type="application/l10n" href="/shared/locales/date.ini">
     <link rel="resource" type="application/l10n" href="locales/locales.ini">
-    <script type="application/javascript" src="/shared/js/l10n.js"></script>
-    <script type="application/javascript" src="/shared/js/l10n_date.js"></script>
-
-    <!-- Specific code -->
-    <script type="application/javascript" src="js/utils.js"></script>
-    <script type="application/javascript" defer src="js/onring.js"></script>
   </head>
+
   <body>
-    <div class="ring-display">
+    <div class="ring-display" data-ring-type="alarm">
       <div id="ring-icon"></div>
       <div id="ring-clock">
         <div id="ring-clock-display">
           <span id="ring-clock-time"></span>
           <span id="ring-clock-hour24-state"></span>
         </div>
-        <div id="ring-alarm-label"></div>
+        <div id="ring-label"></div>
       </div>
       <div id="footer-button-container">
-        <div id="ring-button-close" class="button" data-l10n-id="close">Close</div>
-        <div id="ring-button-snooze" class="button" data-l10n-id="snooze">Snooze</div>
+        <div id="ring-button-stop" class="button" data-l10n-id="stop">Stop</div>
+        <div id="ring-button-snooze" class="button" data-l10n-id="snooze-button">Snooze</div>
       </div>
       </div>
     </div>
+    <script data-main="js/onring.js" src="js/alameda.js"></script>
   </body>
 </html>
 

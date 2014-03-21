@@ -43,6 +43,23 @@
  */
 Calendar.EventMutations = (function() {
 
+  var Calc = Calendar.Calc;
+
+  /**
+   * Create a single instance busytime for the given event object.
+   *
+   * @param {Object} event to create busytime for.
+   */
+  function createBusytime(event) {
+    return {
+      _id: event._id + '-' + uuid.v4(),
+      eventId: event._id,
+      calendarId: event.calendarId,
+      start: event.remote.start,
+      end: event.remote.end
+    };
+  }
+
   function Create(options) {
     if (options) {
       for (var key in options) {
@@ -56,6 +73,7 @@ Calendar.EventMutations = (function() {
   Create.prototype = {
 
     commit: function(callback) {
+      var alarmStore = Calendar.App.store('Alarm');
       var eventStore = Calendar.App.store('Event');
       var busytimeStore = Calendar.App.store('Busytime');
       var componentStore = Calendar.App.store('IcalComponent');
@@ -75,13 +93,10 @@ Calendar.EventMutations = (function() {
         callback(e.target.error);
       };
 
-
       eventStore.persist(this.event, trans);
 
       if (!this.busytime) {
-        this.busytime = busytimeStore.factory(
-          this.event
-        );
+        this.busytime = createBusytime(this.event);
       }
 
       busytimeStore.persist(this.busytime, trans);
@@ -94,6 +109,37 @@ Calendar.EventMutations = (function() {
       controller.cacheBusytime(
         busytimeStore.initRecord(this.busytime)
       );
+
+      var alarms = this.event.remote.alarms;
+      if (alarms && alarms.length) {
+        var i = 0;
+        var len = alarms.length;
+        var now = Date.now();
+
+        var alarmTrans = alarmStore.db.transaction(
+          ['alarms'],
+          'readwrite'
+        );
+
+        for (; i < len; i++) {
+
+          var alarm = {
+            startDate: {
+              offset: this.busytime.start.offset,
+              utc: this.busytime.start.utc + (alarms[i].trigger * 1000)
+            },
+            eventId: this.busytime.eventId,
+            busytimeId: this.busytime._id
+          };
+
+          var alarmDate = Calc.dateFromTransport(this.busytime.end).valueOf();
+          if (alarmDate < now) {
+            continue;
+          }
+
+          alarmStore.persist(alarm, alarmTrans);
+        }
+      }
     }
 
   };

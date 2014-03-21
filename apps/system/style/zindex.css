@@ -8,7 +8,7 @@
 
 /* Level 1 */
 /**
- * Topest layer, covers all of the screen no matter what's the height
+ * Top layer, covers all of the screen no matter what's the height
  * of the status bar.
  * System overlay > Sleep menu > Card view
  */
@@ -18,6 +18,11 @@
   z-index: 65536;
 }
 */
+
+/* Home gesture panel should not be covered by any element of system */
+#screen > #bottom-panel.visible {
+  z-index: 2147483647;
+}
 
 #screen > *[data-z-index-level="poweroff-splash"] {
   z-index: 65536;
@@ -36,23 +41,51 @@
   z-index: 65536;
 }
 
+#screen > [data-z-index-level="hardware-buttons"] {
+  z-index: 65536;
+}
+
 #screen > [data-z-index-level="sleep-menu"] {
   z-index: 65536;
 }
 
-/* Promote the transitioning appWindow to this level as the entry and exiting transition
-  of the cards view. */
-#screen.cards-view > [data-z-index-level="app"] > .appWindow.active,
-#screen.cards-view > [data-z-index-level="app"] > .appWindow.opening,
-#screen.cards-view > [data-z-index-level="app"] > .appWindow.closing {
-  z-index: 65536;
+/* Promote the transitioning appWindow to this level as the entry and exiting
+ * transition of the cards view. */
+#screen.cards-view > [data-z-index-level="app"] > .appWindow.active:not(.homescreen),
+#screen.cards-view > [data-z-index-level="app"] > .appWindow.transition-opening:not(.homescreen),
+#screen.cards-view > [data-z-index-level="app"] > .appWindow.transition-closing.to-cardview:not(.homescreen),
+#screen.cards-view > [data-z-index-level="app"] > .appWindow.transition-opening.fullscreen-app:not(.homescreen),
+#screen.cards-view > [data-z-index-level="app"] > .appWindow.transition-closing.fullscreen-app.to-cardview:not(.homescreen) {
+  z-index: 65537;
 }
+
 #screen.cards-view > [data-z-index-level="cards-view"] {
   z-index: 65535;
 }
 
-#screen > [data-z-index-level="keyboard-frame"] {
-  z-index: 65536;
+/* Keyboard is shown above task manager */
+#screen.cards-view.task-manager > [data-z-index-level="keyboards"],
+#screen.cards-view.task-manager > [data-z-index-level="software-buttons"] {
+  z-index: 65538;
+}
+
+#screen > [data-z-index-level="keyboards"] {
+
+  /* It should lower than UtilityTray's, to let the tray overlay it
+     in some situation like selecting a new keyboard. */
+  z-index: 4094;
+}
+
+#screen > [data-z-index-level="gesture-panel"] {
+  z-index: 4093;
+}
+
+/*
+ * Promote keyboards to attention screen level when
+ * there is an active attention screen not minimized in
+ * the status bar */
+#screen.attention:not(.active-statusbar) > [data-z-index-level="keyboards"] {
+  z-index: 16384;
 }
 
 /* Level 2: Notification toaster */
@@ -66,7 +99,7 @@
 }
 
 /* Level 4: Activity menu, context menu and value selector */
-#screen > [data-z-index-level="list-menu"] {
+#screen > [data-z-index-level="action-menu"] {
   z-index: 8192;
 }
 
@@ -80,13 +113,9 @@
 }
 
 /* Demote level 5 elements to homescreen level if there is an active
-   full screen app frame */
-#screen.fullscreen-app:not(.locked):not(.attention) > [data-z-index-level="statusbar"],
-#screen.fullscreen-app:not(.locked):not(.attention) > [data-z-index-level="utility-tray"] {
-  z-index: 0;
-}
+ * full screen app frame */
 
-/* Prompote level 5 elements to attention screen level when
+/* Promote level 5 elements to attention screen level when
  * there is an active attention screen not minimized in
  * the status bar */
 #screen.attention:not(.active-statusbar) > [data-z-index-level="statusbar"] {
@@ -97,105 +126,116 @@
 }
 
 /* Level 6: Lock Screen */
+
+#screen > [data-z-index-level="app"] > .secureAppWindow.active:not(.homescreen)
+{
+  /* Or the .appWindow one would be first adopted.*/
+  z-index: 4098 !important;
+}
+
 #screen > [data-z-index-level="lockscreen"] {
   z-index: 2048;
 }
 
-#screen > [data-z-index-level="lockscreen-camera"] {
+/* Permission screen is here because of the lockscreen camera. */
+#screen > [data-z-index-level="permission-screen"] {
   z-index: 2047;
 }
 
-#screen > [data-z-index-level="simpin-dialog"] {
+#screen > [data-z-index-level="lockscreen-camera"] {
   z-index: 2046;
 }
 
-/* Keep keyboard under lockscreen when locked */
-#screen.locked > [data-z-index-level="keyboard-frame"] {
+#screen > [data-z-index-level="simpin-dialog"] {
   z-index: 2045;
 }
+
+/* Keep keyboard and edges zones under lockscreen when locked */
+#screen.locked > [data-z-index-level="keyboards"] {
+  z-index: 2044;
+}
+
+#screen > [data-z-index-level="search-bar"] {
+  z-index: 2043;
+}
+
+#screen.locked.attention > [data-z-index-level="keyboards"] {
+  z-index: 65536;
+}
+
+#screen.locked > [data-z-index-level="gesture-panel"] {
+  z-index: 2043;
+}
+
 
 /* Level 7: Dialog Module */
 #screen > [data-z-index-level="dialog-overlay"],
 #screen > [data-z-index-level="value-selector"],
-#screen > [data-z-index-level="permission-screen"],
+#screen > [data-z-index-level="ime-layout-dialog"],
 #screen > [data-z-index-level="app-install-dialog"],
 #screen > [data-z-index-level="updates-download-dialog"],
 #screen > [data-z-index-level="updates-viaDataConnection-dialog"],
-#screen > [data-z-index-level="app"] > .appWindow.inlineActivity {
+#screen > [data-z-index-level="emergency-callback-dialog"] {
   z-index: 1024;
 }
 
 /* Level 8 */
-#screen.switch-app [data-z-index-level="app"] > .appWindow.opening,
-#screen.switch-app [data-z-index-level="app"] > .appWindow.closing,
-#screen.switch-app [data-z-index-level="app"] > .appWindow:not(.homescreen).active {
+/**
+ *#screen > [data-z-index-level="app"] {
+ *  Should not specify z-index here
+ *  Keyboard should be kept upon #windows
+ *  and beneath #windows > .appWindow
+ *}
+ */
+
+/* The below z-index numbers are used to meet the following conditions:
+ * - active ones must be on top of inactive ones
+ * - keyboard frame must be below active ones
+ * - keyboard frame must be above inactive ones
+ * - during an edge gesture a new app coming from the right needs to be on top
+ * - app frame must be on top of homescreen frame, inactive or active.
+ * - finally, everything else needs to be on top of them (hence the lowest nums)
+ */
+#screen > [data-z-index-level="app"] > .appWindow[data-z-index-level="top-app"] {
+  z-index: 8;
+}
+
+#screen > [data-z-index-level="app"] > .appWindow.transition-opening:not(.homescreen) {
+  z-index: 7;
+}
+
+#screen > [data-z-index-level="app"] > .appWindow.transition-closing:not(.homescreen) {
   z-index: 6;
 }
 
-#screen > [data-z-index-level="app"] {
-  /**
-   * Should not specify z-index here
-   * Keyboard should be kept upon #windows
-   * and beneath #windows > .appWindow
-   */
+#screen > [data-z-index-level="app"] > .appWindow.active:not(.homescreen) {
+  z-index: 6;
 }
 
-/*
-  Styles during FTU. In this case lockscreen & homescreen should be behind FTU.
-  Once FTU is done, we will remove this styles in order to get the structure
-  of z-index as usual.
-*/
-
-#screen.ftu > [data-z-index-level="statusbar"]{
-  z-index: 1;
-}
-
-#screen.ftu > [data-z-index-level="lockscreen"]{
-  z-index: 1;
-}
-
-#screen.ftu > [data-z-index-level="app"] > .appWindow.homescreen,
-#screen.ftu > [data-z-index-level="app"] > .appWindow.homescreen.active {
-  z-index: 0;
-}
-
-/*
- * The below z-index numbers is used to met the following conditions:
- * - active ones must be on top of the inactive ones
- * - keyboard frame must be below the active ones
- * - keyboard frame must be above the inactive ones
- * - app frame must be on top of homescreen frame, inactive or active.
- * - finally, everything else need to be on top of them (hence the lowest nums)
- *
- */
-#screen > [data-z-index-level="app"] > #wrapper-footer,
-#screen > [data-z-index-level="app"] > #wrapper-activity-indicator {
+#screen > [data-z-index-level="app"] > .appWindow[data-z-index-level="bottom-app"] {
   z-index: 5;
 }
 
-#screen > [data-z-index-level="app"] > .appWindow.active,
-#screen > [data-z-index-level="app"] > .appWindow.opening,
-#screen > [data-z-index-level="app"] > .appWindow.closing {
+#screen > [data-z-index-level="app"] > .appWindow.homescreen.active {
   z-index: 4;
 }
 
-#screen > [data-z-index-level="app"] > .appWindow.homescreen.active {
+#screen > [data-z-index-level="app"] > .appWindow {
   z-index: 3;
 }
 
-#screen > [data-z-index-level="app"] > .appWindow {
-  z-index: 1;
+#screen > [data-z-index-level="app"] > .appWindow.homescreen {
+  z-index: 2;
 }
 
-#screen > [data-z-index-level="app"] > .appWindow.homescreen {
+#screen > [data-z-index-level="app"] > .appWindow.homescreen.transition-opening,
+#screen > [data-z-index-level="app"] > .appWindow.homescreen.transition-closing {
   z-index: 0;
 }
 
-/* We promotes the following overlays on top of the fullscreen web content. */
-
-#screen:-moz-full-screen-ancestor > [data-z-index-level="app"] > .appWindow.inlineActivity,
+/* We promote the following overlays on top of the fullscreen web content. */
 #screen:-moz-full-screen-ancestor > [data-z-index-level="sleep-menu"],
-#screen:-moz-full-screen-ancestor > [data-z-index-level="list-menu"],
+#screen:-moz-full-screen-ancestor > [data-z-index-level="action-menu"],
 #screen.locked:-moz-full-screen-ancestor > [data-z-index-level="statusbar"],
 #screen:-moz-full-screen-ancestor > [data-z-index-level="lockscreen"],
 #screen:-moz-full-screen-ancestor > [data-z-index-level="lockscreen-camera"],
@@ -203,13 +243,16 @@
 #screen:-moz-full-screen-ancestor > [data-z-index-level="value-selector"],
 #screen:-moz-full-screen-ancestor > [data-z-index-level="system-overlay"],
 #screen:-moz-full-screen-ancestor > [data-z-index-level="dialog-overlay"],
-
-#screen:-moz-full-screen-ancestor > [data-z-index-level="keyboard-frame"],
+#screen:-moz-full-screen-ancestor > [data-z-index-level="app"] > .appWindow.active > .modal-dialog,
+#screen:-moz-full-screen-ancestor > [data-z-index-level="keyboards"],
 
 #screen:-moz-full-screen-ancestor > [data-z-index-level="notification-toaster"],
 #screen:-moz-full-screen-ancestor > [data-z-index-level="cards-view"],
 #screen:-moz-full-screen-ancestor > [data-z-index-level="attention-screen"],
 #screen:-moz-full-screen-ancestor > [data-z-index-level="permission-screen"],
-#screen:-moz-full-screen-ancestor > [data-z-index-level="app-install-dialog"] {
+#screen:-moz-full-screen-ancestor > [data-z-index-level="app-install-dialog"],
+#screen:-moz-full-screen-ancestor > [data-z-index-level="ime-layout-dialog"],
+#screen:-moz-full-screen-ancestor > [data-z-index-level="fullscreen-software-home-button"],
+#screen:-moz-full-screen-ancestor > [data-z-index-level="gesture-panel"] {
   z-index: 2147483647;
 }

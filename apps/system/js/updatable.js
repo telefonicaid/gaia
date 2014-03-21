@@ -18,6 +18,7 @@ function AppUpdatable(app) {
 
   var manifest = app.manifest ? app.manifest : app.updateManifest;
   this.name = new ManifestHelper(manifest).name;
+  this.nameL10nId = '';
 
   this.size = app.downloadSize;
   this.progress = null;
@@ -74,7 +75,7 @@ AppUpdatable.prototype.availableCallBack = function() {
 
 AppUpdatable.prototype.successCallBack = function() {
   var app = this.app;
-  if (WindowManager.getDisplayedApp() !== app.origin) {
+  if (AppWindowManager.getDisplayedApp() !== app.origin) {
     this.applyUpdate();
   } else {
     var self = this;
@@ -84,12 +85,13 @@ AppUpdatable.prototype.successCallBack = function() {
     });
   }
 
+  UpdateManager.downloaded(this);
   UpdateManager.removeFromDownloadsQueue(this);
   UpdateManager.removeFromUpdatesQueue(this);
 };
 
 AppUpdatable.prototype.applyUpdate = function() {
-  WindowManager.kill(this.app.origin);
+  AppWindowManager.kill(this.app.origin);
   this._mgmt.applyDownload(this.app);
 };
 
@@ -98,10 +100,14 @@ AppUpdatable.prototype.appliedCallBack = function() {
 };
 
 AppUpdatable.prototype.errorCallBack = function(e) {
-  var errorName = e.application.downloadError.name;
+  var app = e.application;
+  var errorName = app.downloadError.name;
   console.info('downloadError event, error code is', errorName);
   UpdateManager.requestErrorBanner();
   UpdateManager.removeFromDownloadsQueue(this);
+  if (!app.downloadAvailable) {
+    UpdateManager.removeFromUpdatesQueue(this);
+  }
   this.progress = null;
 };
 
@@ -126,6 +132,7 @@ AppUpdatable.prototype.progressCallBack = function() {
 function SystemUpdatable() {
   var _ = navigator.mozL10n.get;
   this.name = _('systemUpdate');
+  this.nameL10nId = 'systemUpdate';
   this.size = 0;
   this.downloading = false;
   this.paused = false;
@@ -192,6 +199,7 @@ SystemUpdatable.prototype.handleEvent = function(evt) {
       break;
     case 'update-downloaded':
       this.downloading = false;
+      UpdateManager.downloaded(this);
       this.showApplyPrompt();
       break;
     case 'update-prompt-apply':
@@ -219,7 +227,8 @@ SystemUpdatable.prototype.showApplyPrompt = function() {
 
   var confirm = {
     title: _('installNow'),
-    callback: this.acceptInstall.bind(this)
+    callback: this.acceptInstall.bind(this),
+    recommend: true
   };
 
   UtilityTray.hide();

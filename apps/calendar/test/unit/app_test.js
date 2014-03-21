@@ -1,14 +1,11 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  require('/shared/js/lazy_loader.js');
-  requireSupport('fake_page.js');
-  requireSupport('mock_view.js');
+requireSupport('fake_page.js');
+requireSupport('mock_view.js');
 
-  requireLib('provider/abstract.js');
-  requireLib('worker/manager.js');
-  requireLib('controllers/service.js');
-  requireLib('router.js');
-  requireLib('app.js');
-});
+requireLib('provider/abstract.js');
+requireLib('worker/manager.js');
+requireLib('controllers/service.js');
+requireLib('router.js');
+requireLib('app.js');
 
 suite('app', function() {
 
@@ -450,47 +447,6 @@ suite('app', function() {
 
     suiteTeardown(function() {
       container.parentNode.removeChild(container);
-    });
-
-    test('make sure lazy nodes load', function() {
-      assert.equal(
-        document.querySelectorAll('.delay').length,
-        1,
-        'we have a single delayed container'
-      );
-
-      assert.equal(
-        document.querySelectorAll('.lazynode').length,
-        0,
-        'we do not have delayed nodes yet'
-      );
-
-      // Load the delayed nodes
-      subject.loadDOM();
-
-      assert.equal(
-        document.querySelectorAll('.delay').length,
-        0,
-        'delayed containers are removed'
-      );
-
-      assert.equal(
-        document.querySelectorAll('.lazynode').length,
-        2,
-        'delayed nodes are loaded'
-      );
-
-      assert.equal(
-        document.querySelector('.lazynode').parentNode,
-        container,
-        'the node is inserted into the correct parent'
-      );
-
-      var nextEl = document.querySelector('.first').nextElementSibling;
-      assert.ok(
-        nextEl.classList.contains('second'),
-        'node order is preserved'
-      );
     });
   });
 });

@@ -5,21 +5,18 @@
 }
 
 a:focus,
-button:focus,
-a::-moz-focus-inner,
-button::-moz-focus-inner {
+a::-moz-focus-inner {
   outline: none;
   border: none;
 }
 
 html {
   font-size: 10px;
-  font-family: 'MozTT', sans-serif;
   color: #000;
 }
 
 body {
-  background: url(images/app/ui/pattern.png) repeat left top;
+  background-color: #000;
 }
 
 form {
@@ -31,6 +28,7 @@ iframe {
   border: none;
   width: 100%;
   height: 100%;
+  display: flex; /* Fix Bug 976665 */
 }
 
 [aria-hidden="true"] { display: none !important; }
@@ -48,15 +46,44 @@ input.error {
   top: 0;
   right: 0;
   bottom: 0;
-  z-index: 10;
+  z-index: 5;
   overflow: hidden;
 }
 
+.window {
+  opacity: 1.0;
+  background: #f4f4f4;
+  transition: opacity ease 0.2s;
+}
+
+.splash {
+  background-color: black;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-image: url("/style/icons/cost-control.png");
+  background-size: 6rem;
+}
+
+
+.window.non-ready {
+  opacity: 0.0;
+}
+
+#fte_view.non-ready {
+  pointer-events: none;
+}
+
 .view {
-  top: 9.1rem;
-  background: url(images/app/ui/pattern.png) repeat left top;
+  top: 9.3rem;
+  background: #f4f4f4;
   transform: translate(0, 0);
-  transition: transform 0.3s ease;
+  transition: transform 0.5s ease,
+              opacity 0.2s ease;
+}
+
+#balance-tab,
+#telephony-tab {
+  background: #fff;
 }
 
 .view.standalone {
@@ -68,7 +95,7 @@ input.error {
   overflow-y: auto;
   position: absolute;
   bottom: 0;
-  top: 0rem;
+  top: 0;
   left: 0;
   right: 0;
 }
@@ -80,6 +107,11 @@ input.error {
 /* VIEWPORTS */
 .view[data-viewport="behind"] {
   visibility: hidden;
+}
+
+.view[data-viewport="ethereal"] {
+  pointer-events: none;
+  opacity: 0;
 }
 
 .view[data-viewport="bottom"] {
@@ -108,16 +140,10 @@ input.error {
   top: 0;
 }
 
-/* BB FILTER */
-body[role="application"] ul.filter[role="tablist"][data-position=bottom] {
-  position: absolute;
-  left: 0;
-  top: 5rem;
-}
-
 /* BB HEADER ICONS */
 body[role="application"] section[role="region"] > header .icon.config {
   background-image: url(images/app/icons/config.png);
+  background-size: 3rem;
 }
 
 body[role="application"] section[role="region"] > header button {
@@ -131,6 +157,18 @@ body[role="application"] section[role="region"] > header button {
   list-style: none;
 }
 
+li button {
+  text-align: center;
+}
+
+li button.icon {
+  text-align: left;
+}
+
+li button:after {
+  top: calc(100% + 0.1rem);
+}
+
 .fake-select select {
   height: 100%;
   position: absolute;
@@ -141,163 +179,34 @@ body[role="application"] section[role="region"] > header button {
 
 li button.icon-reload:before {
   background-image: url(images/app/icons/reload.png);
+  background-size: 3rem;
 }
 
 li button.icon-topup:before {
   background-image: url(images/app/icons/topup.png);
+  background-size: 3rem;
 }
 
 li button.icon-topupcode:before  {
   background-image: url(images/app/icons/topupcode.png);
+  background-size: 3rem;
 }
-
-
-/* BB PROGRESS */
-body[role="application"] progress:not([value]) {
-  background: url(images/app/icons/loader.png) no-repeat center center;
-  width: 3rem;
-  height: 3rem;
-  animation: loader 0.8s linear infinite;
-}
-
-@keyframes loader {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 
 /* CONTENT */
 section.content {
-  padding: 2.5rem 2rem;
-}
-
-/* COUNTDOWN */
-.countdown {
-  font-size: 1.6rem;
-  padding-bottom: 1.5rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid #BBB;
-}
-
-#top-up-countdown {
-  color: #C7C9C6;
-}
-
-/* ERROR MESSAGES */
-section.content .error-messages[aria-hidden="true"] {
-  -moz-transform: translateY(-10rem);
-  display: block!important;
-  height: 0;
-  padding: 0;
-}
-
-section.content .error-messages {
-  color: #b20000;
-  font-size: 1.4rem;
-  line-height: 1.4em;
-  padding: 0 0.8rem 0.5rem;
-  overflow: hidden;
-  border-bottom: solid 1px #b20000;
-  -moz-transition: all 0.2s ease;
-}
-
-
-/* SETTINGS LISTS */
-.settings li {
-  border-bottom: solid 1px #e0e0dd;
-  font-size: 1.6rem;
-  line-height: 1.2em;
-  padding: 1.2rem 1.5rem 1.2rem 3rem;
-  position: relative;
-  overflow: hidden;
-}
-
-.settings li[aria-disabled="true"]:after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #e6e6e6;
-  opacity: 0.7;
-}
-
-.settings li:last-child {
-  border-bottom: none;
-}
-
-.settings li time,
-.settings li .meta {
-  font-size: 1.4rem;
-  color: #505859;
-}
-
-.settings li sub {
-  vertical-align: baseline;
-  font-size: 1.2rem;
-}
-
-/* End elements */
-.settings li > .end {
-  position: absolute;
-  right: 1.5rem;
-  top: 50%;
-  height: 4.6rem;
-  margin-top: -2.3rem;
-}
-
-.settings li > .end:before {
-  content: "";
-  display: inline-block;
-  vertical-align: middle;
-  width: 1px;
-  height: 100%;
-  margin-left: -8px;
-}
-
-.settings li > .end button,
-.settings li > .end .button {
-  display: inline-block;
-  vertical-align: middle;
-  width: 10.0rem;
-  margin: 0;
-  padding-left: 0.5rem;
-  overflow: hidden;
-}
-
-.settings li > .end button .tag {
-  margin: 0;
-  float: none;
-  height: auto;
-  width: auto;
-}
-
-.settings li .toggle.end {
-  margin-top: -2.3rem;
-}
-
-.settings li label {
-  font-size: 1.4rem;
-  color: #505859;
-}
-
-.settings li .toggle input[type="checkbox"] {
-  pointer-events: none;
-}
-
-.settings li input[type="number"] {
-  width: 5.5rem;
-  height: 2.5rem;
-  line-height: 2.5rem;
-  display: inline-block;
-  text-align: right;
+  padding: 1.5rem 2rem;
 }
 
 #message-handler {
   visibility: hidden;
 }
+
+#topup-dialog,
+#settings-view {
+  z-index: 20;
+}
+
+#reset-data-usage {
+  margin-top: 1rem;
+}
+

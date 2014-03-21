@@ -1,69 +1,33 @@
 
 'use strict';
 
-// Checks for a SIM change
-function checkSIMChange(callback) {
-  asyncStorage.getItem('lastSIM', function _compareWithCurrent(lastSIM) {
-    var currentSIM = window.navigator.mozMobileConnection.iccInfo.iccid;
-    if (lastSIM !== currentSIM) {
-      debug('SIM change!');
-      MindGap.updateTagList(currentSIM);
-    }
-    ConfigManager.requestSettings(function _onSettings(settings) {
-      if (settings.nextReset) {
-        setNextReset(settings.nextReset, callback);
-        return;
-      }
-
-      if (callback) {
-        callback();
-      }
-    });
-  });
-}
-
-function checkDataUsageNotification(settings, usage, callback) {
-  var proxy = document.getElementById('message-handler').contentWindow;
-  var f = proxy ? proxy.checkDataUsageNotification :
-                  window.checkDataUsageNotification;
-  return f(settings, usage, callback);
-}
-
-// Waits for DOMContentLoaded and messagehandlerready, then call the callback
-function waitForDOMAndMessageHandler(window, callback) {
-  var remainingSteps = 2;
-  function checkReady(evt) {
-    debug(evt.type, 'event received!');
-    remainingSteps--;
-
-    // Once all events are received, execute the callback
-    if (!remainingSteps) {
-      window.removeEventListener('DOMContentLoaded', checkReady);
-      window.removeEventListener('messagehandlerready', checkReady);
-      debug('DOMContentLoaded and messagehandlerready received. Starting');
-      callback();
-    }
-  }
-
-  window.addEventListener('DOMContentLoaded', checkReady);
-  window.addEventListener('messagehandlerready', checkReady);
-}
-
 function addAlarmTimeout(type, delay) {
-  var proxy = document.getElementById('message-handler').contentWindow;
-  return proxy.addAlarmTimeout(type, delay);
+  var handlerContainer = document.getElementById('message-handler');
+  return handlerContainer.contentWindow.addAlarmTimeout(type, delay);
 }
 
 function setNextReset(when, callback) {
-  var proxy = document.getElementById('message-handler');
-  return proxy ? proxy.contentWindow.setNextReset(when, callback) :
-                 window.setNextReset(when, callback);
+  var handlerContainer = document.getElementById('message-handler');
+  return handlerContainer ?
+         handlerContainer.contentWindow.setNextReset(when, callback) :
+         window.setNextReset(when, callback);
 }
 
 function getTopUpTimeout(callback) {
-  var proxy = document.getElementById('message-handler');
-  return proxy ? proxy.contentWindow.getTopUpTimeout(callback) :
-                 window.getTopUpTimeout(callback);
+  var handlerContainer = document.getElementById('message-handler');
+  return handlerContainer ?
+         handlerContainer.contentWindow.getTopUpTimeout(callback) :
+         window.getTopUpTimeout(callback);
+}
+
+function addNetworkUsageAlarm(dataInterface, dataLimit, callback) {
+  var handlerContainer = document.getElementById('message-handler');
+  if (handlerContainer) {
+    handlerContainer.contentWindow
+      .addNetworkUsageAlarm(dataInterface, dataLimit, callback);
+  } else {
+    window.addNetworkUsageAlarm(dataInterface, dataLimit, callback);
+  }
 }
 
 // Next automatic reset date based on user preferences
@@ -106,73 +70,63 @@ function updateNextReset(trackingPeriod, value, callback) {
   setNextReset(nextReset, callback);
 }
 
-function resetData() {
+function resetData(mode, onsuccess, onerror) {
 
-  // Sets the fixing value for the current SIM
-  asyncStorage.getItem('dataUsageTags', function _updateTags(tags) {
-    if (!tags || !tags.length) {
-      console.error('dataUsageTags does not exists!');
-      return;
-    }
+  // Get all availabe Interfaces
+  var currentSimcardInterface = Common.getDataSIMInterface();
+  var wifiInterface = Common.getWifiInterface();
 
-    // Get current mobile data
-    var now = new Date();
-    var mobileRequest = window.navigator.mozNetworkStats.getNetworkStats({
-      start: now,
-      end: now,
-      connectionType: 'mobile'
-    });
-    mobileRequest.onsuccess = function _onMobileForToday() {
-      var data = mobileRequest.result.data;
-      debug('Data length should be 1 and it is', data.length);
-      var currentDataUsage = 0;
-      if (data[0].rxBytes) {
-        currentDataUsage += data[0].rxBytes;
+  // Ask reset for all available Interfaces
+  var wifiClearRequest, mobileClearRequest;
+
+  // onerror callback builder
+  var getOnErrorFor = function(networkInterface) {
+    return function() {
+      if (wifiClearRequest) {
+        wifiClearRequest.onerror = undefined;
       }
-      if (data[0].txBytes) {
-        currentDataUsage += data[0].txBytes;
+      if (mobileClearRequest) {
+        mobileClearRequest.onerror = undefined;
       }
-
-      // Adds the fixing
-      var tag = tags[tags.length - 1];
-      tag.fixing.push([now, currentDataUsage]);
-
-      // Remove the previous ones
-      for (var i = tags.length - 2; i >= 0; i--) {
-        var ctag = tags[i];
-        if (ctag.sim === tag.sim) {
-          tags.splice(i, 1);
+      (typeof onerror === 'function') && onerror(networkInterface);
+    };
+  };
+  if ((mode === 'all' || mode === 'wifi') && wifiInterface) {
+    wifiClearRequest = navigator.mozNetworkStats.clearStats(wifiInterface);
+    wifiClearRequest.onerror = getOnErrorFor('wi-Fi');
+  }
+  if ((mode === 'all' || mode === 'mobile') && currentSimcardInterface) {
+    mobileClearRequest = navigator.mozNetworkStats
+                                          .clearStats(currentSimcardInterface);
+    mobileClearRequest.onerror = getOnErrorFor('simcard');
+    mobileClearRequest.onsuccess = function _restoreDataLimitAlarm() {
+      ConfigManager.requestSettings(function _onSettings(settings) {
+        if (settings.dataLimit) {
+          // Restore network alarm
+          addNetworkUsageAlarm(currentSimcardInterface, getDataLimit(settings),
+            function _addNetworkUsageAlarmOK() {
+              ConfigManager.setOption({ 'dataUsageNotified': false });
+            });
         }
-      }
-      debug('After reset', tags);
-
-      asyncStorage.setItem('dataUsageTags', tags, function _done() {
-        ConfigManager.setOption({ lastDataReset: now });
       });
     };
+  }
 
-    var wifiRequest = window.navigator.mozNetworkStats.getNetworkStats({
-      start: now,
-      end: now,
-      connectionType: 'wifi'
-    });
-    wifiRequest.onsuccess = function _onWiFiForToday() {
-      var data = wifiRequest.result.data;
-      debug('Data length should be 1 and it is', data.length);
-      var currentWifiUsage = 0;
-      if (data[0].rxBytes) {
-        currentWifiUsage += data[0].rxBytes;
-      }
-      if (data[0].txBytes) {
-        currentWifiUsage += data[0].txBytes;
-      }
-      asyncStorage.setItem('wifiFixing', currentWifiUsage);
-    };
+    // Set last Reset
+  if (mode === 'all') {
+    ConfigManager.setOption({ lastCompleteDataReset: new Date() });
+  } else {
+    // Else clausure prevents running the update event twice
+    ConfigManager.setOption({ lastDataReset: new Date() });
+  }
 
-  });
+  // call onsuccess
+  if (typeof onsuccess === 'function') {
+    onsuccess();
+  }
 }
 
-function resetTelephony() {
+function resetTelephony(callback) {
   ConfigManager.setOption({
     lastTelephonyReset: new Date(),
     lastTelephonyActivity: {
@@ -180,12 +134,19 @@ function resetTelephony() {
       smscount: 0,
       timestamp: new Date()
     }
-  });
+  }, callback);
 }
 
-function resetAll() {
-  resetData();
-  resetTelephony();
+function logResetDataError(networkInterface) {
+  console.log('Error when trying to reset ' + networkInterface + ' interface');
+}
+
+function resetAll(callback) {
+  resetData('all', thenResetTelephony, logResetDataError);
+
+  function thenResetTelephony() {
+    resetTelephony(callback);
+  }
 }
 
 function getDataLimit(settings) {
@@ -195,9 +156,18 @@ function getDataLimit(settings) {
 }
 
 function formatTimeHTML(timestampA, timestampB) {
+  function timeElement(content) {
+    var time = document.createElement('time');
+    time.textContent = content;
+    return time;
+  }
+
+  var fragment = document.createDocumentFragment();
+
   // No interval
   if (typeof timestampB === 'undefined') {
-    return '<time>' + formatTime(timestampA) + '</time>';
+    fragment.appendChild(timeElement(Formatting.formatTime(timestampA)));
+    return fragment;
   }
 
   // Same day case
@@ -211,8 +181,12 @@ function formatTimeHTML(timestampA, timestampB) {
   }
 
   // Interval
-  return '<time>' + formatTime(timestampA) + '</time> – ' +
-         '<time>' + formatTime(timestampB) + '</time>';
+  fragment.appendChild(
+    timeElement(Formatting.formatTime(timestampA, _('short-date-format')))
+  );
+  fragment.appendChild(document.createTextNode(' – '));
+  fragment.appendChild(timeElement(Formatting.formatTime(timestampB)));
+  return fragment;
 }
 
 function localizeWeekdaySelector(selector) {
@@ -232,3 +206,253 @@ function localizeWeekdaySelector(selector) {
     list.insertBefore(monday, sunday.nextSibling); // monday is the second
   }
 }
+
+var Common = {
+
+  COST_CONTROL_APP: 'app://costcontrol.gaiamobile.org',
+
+  allNetworkInterfaces: {},
+
+  dataSimIccId: null,
+
+  allNetworkInterfaceLoaded: false,
+
+  dataSimIccIdLoaded: false,
+
+  dataSimIcc: null,
+
+  isValidICCID: function(iccid) {
+    return typeof iccid === 'string' && iccid.length;
+  },
+
+  // Waits for DOMContentLoaded and messagehandlerready, then call the callback
+  waitForDOMAndMessageHandler: function(window, callback) {
+    var docState = document.readyState;
+    var DOMAlreadyLoaded = docState === 'complete' ||
+                           docState === 'interactive';
+    var messagesReceived = {
+      'DOMContentLoaded': DOMAlreadyLoaded,
+      'messagehandlerready': false
+    };
+    function pendingMessages() {
+      var pending = 0;
+      !messagesReceived['DOMContentLoaded'] && pending++;
+      !messagesReceived['messagehandlerready'] && pending++;
+      return pending;
+    }
+    debug('DOMAlreadyLoaded:', DOMAlreadyLoaded);
+    debug('Waiting for', pendingMessages(), 'events to start!');
+
+    function checkReady(evt) {
+      debug(evt.type, 'event received!');
+      messagesReceived[evt.type] = true;
+
+      // Once all events are received, execute the callback
+      if (pendingMessages() === 0) {
+        window.removeEventListener('DOMContentLoaded', checkReady);
+        window.removeEventListener('messagehandlerready', checkReady);
+        debug('DOMContentLoaded and messagehandlerready received. Starting');
+        callback();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', checkReady);
+    window.addEventListener('messagehandlerready', checkReady);
+  },
+
+  checkSIM: function(callback, onerror) {
+    var currentSIM = Common.dataSimIccId;
+    if (currentSIM === null) {
+      console.error('Impossible: or we don\'t have SIM (so this method ' +
+                    'should not be called) or the RIL is returning null ' +
+                    'from time to time when checking ICCID.');
+
+      if (typeof onerror === 'function') {
+        onerror();
+      }
+      return;
+    }
+
+    ConfigManager.requestSettings(function _onSettings(settings) {
+      if (settings.nextReset) {
+        setNextReset(settings.nextReset, callback);
+        return;
+      }
+
+      if (callback) {
+        callback();
+      }
+    });
+  },
+
+  startFTE: function(mode) {
+    var iframe = document.getElementById('fte_view');
+
+    window.addEventListener('message', function handler(e) {
+      if (e.origin !== Common.COST_CONTROL_APP) {
+        return;
+      }
+
+      if (e.data.type === 'fte_ready') {
+        window.removeEventListener('message', handler);
+
+        iframe.classList.remove('non-ready');
+      }
+    });
+
+    iframe.src = '/fte.html' + '#' + mode;
+  },
+
+  closeFTE: function() {
+    var iframe = document.getElementById('fte_view');
+    iframe.classList.add('non-ready');
+    iframe.src = '';
+  },
+
+  startApp: function() {
+    parent.postMessage({
+      type: 'fte_finished',
+      data: ''
+    }, Common.COST_CONTROL_APP);
+  },
+
+  closeApplication: function() {
+    return setTimeout(function _close() {
+      debug('Closing.');
+      window.close();
+    });
+  },
+
+  modalAlert: function(message) {
+    alert(message);
+  },
+
+  get localize() {
+    return navigator.mozL10n.localize;
+  },
+
+  getIccInfo: function _getIccInfo(iccId) {
+    if (!iccId) {
+      return undefined;
+    }
+    var iccManager = window.navigator.mozIccManager;
+    var iccInfo = iccManager.getIccById(iccId);
+    if (!iccInfo) {
+      console.error('Unrecognized iccID: ' + iccId);
+      return undefined;
+    }
+    return iccInfo;
+  },
+
+  // Returns whether exists an nsIDOMNetworkStatsInterfaces object
+  // that meet the argument function criteria
+  getInterface: function getInterface(findFunction) {
+    if (!Common.allNetworkInterfaceLoaded) {
+      debug('Network interfaces are not ready yet');
+      var header = _('data-usage');
+      var msg = _('loading-interface-data');
+      this.modalAlert(header + '\n' + msg);
+      return;
+    }
+
+    if (Common.allNetworkInterfaces) {
+      return Common.allNetworkInterfaces.find(findFunction);
+    }
+  },
+
+  getDataSIMInterface: function _getDataSIMInterface() {
+    if (!this.dataSimIccIdLoaded) {
+      console.warn('Data simcard is not ready yet');
+      return;
+    }
+
+    var iccId = this.dataSimIccId;
+    if (iccId) {
+      var findCurrentInterface = function(networkInterface) {
+        if (networkInterface.id === iccId) {
+          return networkInterface;
+        }
+      };
+      return this.getInterface(findCurrentInterface);
+    }
+    return undefined;
+  },
+
+  getWifiInterface: function _getWifiInterface() {
+    var findWifiInterface = function(networkInterface) {
+      if (networkInterface.type === navigator.mozNetworkStats.WIFI) {
+        return networkInterface;
+      }
+    };
+    return this.getInterface(findWifiInterface);
+  },
+
+  loadNetworkInterfaces: function(onsuccess, onerror) {
+    var networks = navigator.mozNetworkStats.getAvailableNetworks();
+
+    networks.onsuccess = function() {
+      Common.allNetworkInterfaces = networks.result;
+      Common.allNetworkInterfaceLoaded = true;
+      if (onsuccess) {
+        onsuccess();
+      }
+    };
+
+    networks.onerror = function() {
+      console.error('Error when trying to load network interfaces');
+      if (onerror) {
+        onerror();
+      }
+    };
+  },
+
+  loadDataSIMIccId: function _loadDataSIMIccId(onsuccess, onerror) {
+    var settings = navigator.mozSettings,
+        mobileConnections = navigator.mozMobileConnections,
+        dataSlotId = 0;
+    var req = settings &&
+              settings.createLock().get('ril.data.defaultServiceId');
+
+    req.onsuccess = function _onsuccesSlotId() {
+      dataSlotId = req.result['ril.data.defaultServiceId'] || 0;
+      var mobileConnection = mobileConnections[dataSlotId];
+      var iccId = mobileConnection.iccId || null;
+      if (!iccId) {
+        console.error('The slot ' + dataSlotId +
+                   ', configured as the data slot, is empty');
+        (typeof onerror === 'function') && onerror();
+        return;
+      }
+      Common.dataSimIccId = iccId;
+      Common.dataSimIccIdLoaded = true;
+      Common.dataSimIcc = Common.getIccInfo(iccId);
+      if (onsuccess) {
+        onsuccess(iccId);
+      }
+    };
+
+    req.onerror = function _onerrorSlotId() {
+      console.warn('ril.data.defaultServiceId does not exists');
+      var iccId = null;
+
+      // Load the fist slot with iccId
+      for (var i = 0; i < mobileConnections.length && !iccId; i++) {
+        if (mobileConnections[i]) {
+          iccId = mobileConnections[i].iccId;
+        }
+      }
+      if (!iccId) {
+        console.error('No SIM in the device');
+        (typeof onerror === 'function') && onerror();
+        return;
+      }
+
+      Common.dataSimIccId = iccId;
+      Common.dataSimIccIdLoaded = true;
+      Common.dataSimIcc = Common.getIccInfo(iccId);
+      if (onsuccess) {
+        onsuccess(iccId);
+      }
+    };
+  }
+};

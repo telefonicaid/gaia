@@ -1,339 +1,460 @@
 /* -*- Mode: js; js-indent-level: 2; indent-tabs-mode: nil -*- */
 /* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
+/* global Settings, getIccByIndex */
 
 'use strict';
 
-var SimPinDialog = {
-  dialog: document.getElementById('simpin-dialog'),
-  dialogTitle: document.querySelector('#simpin-dialog header h1'),
-  dialogDone: document.querySelector('#simpin-dialog button[type="submit"]'),
-  dialogClose: document.querySelector('#simpin-dialog button[type="reset"]'),
+function SimPinDialog(dialog) {
+  var conns = window.navigator.mozMobileConnections;
+  var icc;
 
-  pinArea: document.getElementById('pinArea'),
-  pukArea: document.getElementById('pukArea'),
-  newPinArea: document.getElementById('newPinArea'),
-  confirmPinArea: document.getElementById('confirmPinArea'),
-
-  pinInput: null,
-  pukInput: null,
-  newPinInput: null,
-  confirmPinInput: null,
-
-  errorMsg: document.getElementById('errorMsg'),
-  errorMsgHeader: document.getElementById('messageHeader'),
-  errorMsgBody: document.getElementById('messageBody'),
-
-  mobileConnection: null,
-
-  lockType: 'pin',
-  action: 'unlock',
-  origin: null,
-
-  // Now we don't have a number-password type for input field
-  // mimic one by binding one number input and one text input
-  getNumberPasswordInputField: function spl_wrapNumberInput(name) {
-    var valueEntered = '';
-    var inputField = document.querySelector('input[name="' + name + '"]');
-    var displayField = document.querySelector('input[name="' + name + 'Vis"]');
-    var self = this;
-
-    inputField.addEventListener('keypress', function(evt) {
-      if (evt.target !== inputField)
-        return;
-      evt.preventDefault();
-
-      var code = evt.charCode;
-      if (code !== 0 && (code < 0x30 || code > 0x39))
-        return;
-
-      if (code === 0) { // backspace
-        valueEntered = valueEntered.substr(0, valueEntered.length - 1);
-      } else {
-        if (valueEntered.length >= 8)
-          return;
-        valueEntered += String.fromCharCode(code);
-      }
-      displayField.value = encryption(valueEntered);
-      if (displayField.value.length >= 4)
-        self.dialogDone.disabled = false;
-      else
-        self.dialogDone.disabled = true;
-    });
-
-    function encryption(str) {
-      return (new Array(str.length + 1)).join('*');
-    }
-
-    function setValue(value) {
-      valueEntered = value;
-      inputField.value = value;
-      displayField.value = encryption(valueEntered);
-    }
-
-    function setFocus() {
-      inputField.focus();
-    }
-
-    return {
-      get value() { return valueEntered; },
-      set value(value) { setValue(value) },
-      focus: setFocus
-    };
-  },
-
-  handleCardState: function spl_handleCardState() {
-    var _ = navigator.mozL10n.get;
-
-    var cardState = this.mobileConnection.cardState;
-    switch (cardState) {
-      case 'pinRequired':
-        this.lockType = 'pin';
-        this.errorMsg.hidden = true;
-        this.inputFieldControl(true, false, false);
-        this.pinInput.focus();
-        break;
-      case 'pukRequired':
-        this.lockType = 'puk';
-        this.errorMsgHeader.textContent = _('simCardLockedMsg') || '';
-        this.errorMsgHeader.dataset.l10nId = 'simCardLockedMsg';
-        this.errorMsgBody.textContent = _('enterPukMsg') || '';
-        this.errorMsgBody.dataset.l10nId = 'enterPukMsg';
-        this.errorMsg.hidden = false;
-        this.inputFieldControl(false, true, true);
-        this.pukInput.focus();
-        break;
-      default:
-        this.skip();
-        break;
-    }
-    this.dialogTitle.textContent = _(this.lockType + 'Title') || '';
-    this.dialogTitle.dataset.l10nId = this.lockType + 'Title';
-  },
-
-  handleError: function spl_handleLockError(evt) {
-    var retry = (evt.retryCount) ? evt.retryCount : -1;
-    this.showErrorMsg(retry, evt.lockType);
-    if (retry === -1) {
-      this.skip();
-      return;
-    }
-    if (evt.lockType === 'pin')
-      this.pinInput.focus();
-    else
-      this.pukInput.focus();
-  },
-
-  showErrorMsg: function spl_showErrorMsg(retry, type) {
-    var _ = navigator.mozL10n.get;
-
-    this.errorMsgHeader.textContent = _(type + 'ErrorMsg');
-    this.errorMsgHeader.dataset.l10nId = type + 'ErrorMsg';
-
-    if (retry !== 1) {
-      var l10nArgs = { n: retry };
-      this.errorMsgBody.dataset.l10nId = type + 'AttemptMsg2';
-      this.errorMsgBody.dataset.l10nArgs = JSON.stringify(l10nArgs);
-      this.errorMsgBody.textContent = _(type + 'AttemptMsg2', l10nArgs);
-    } else {
-      this.errorMsgBody.dataset.l10nId = type + 'LastChanceMsg';
-      this.errorMsgBody.textContent = _(type + 'LastChanceMsg');
-    }
-
-    this.errorMsg.hidden = false;
-  },
-
-  unlockPin: function spl_unlockPin() {
-    var pin = this.pinInput.value;
-    if (pin === '')
-      return;
-
-    var options = {lockType: 'pin', pin: pin };
-    this.unlockCardLock(options);
-    this.clear();
-  },
-
-  unlockPuk: function spl_unlockPuk() {
-    var _ = navigator.mozL10n.get;
-
-    var puk = this.pukInput.value;
-    var newPin = this.newPinInput.value;
-    var confirmPin = this.confirmPinInput.value;
-    if (puk === '' || newPin === '' || confirmPin === '')
-      return;
-
-    if (newPin !== confirmPin) {
-      this.errorMsgHeader.textContent = _('newPinErrorMsg');
-      this.errorMsgHeader.dataset.l10nId = 'newPinErrorMsg';
-      this.errorMsgBody.textContent = '';
-      this.errorMsg.hidden = false;
-      return;
-    }
-    var options = {lockType: 'puk', puk: puk, newPin: newPin };
-    this.unlockCardLock(options);
-    this.clear();
-  },
-
-  unlockCardLock: function spl_unlockCardLock(options) {
-    var self = this;
-    var req = this.mobileConnection.unlockCardLock(options);
-    req.onsuccess = function sp_unlockSuccess() {
-      self.close();
-      if (self.onsuccess)
-        self.onsuccess();
-    };
-  },
-
-  enableLock: function spl_enableLock() {
-    var pin = this.pinInput.value;
-    if (pin === '')
-      return;
-
-    var enabled = SimPinLock.simPinCheckBox.checked;
-    var options = {lockType: 'pin', pin: pin, enabled: enabled};
-    this.setCardLock(options);
-    this.clear();
-  },
-
-  changePin: function spl_changePin() {
-    var _ = navigator.mozL10n.get;
-
-    var pin = this.pinInput.value;
-    var newPin = this.newPinInput.value;
-    var confirmPin = this.confirmPinInput.value;
-    if (pin === '' || newPin === '' || confirmPin === '')
-      return;
-
-    if (newPin !== confirmPin) {
-      this.errorMsgHeader.textContent = _('newPinErrorMsg');
-      this.errorMsgHeader.dataset.l10nId = 'newPinErrorMsg';
-      this.errorMsgBody.textContent = '';
-      this.errorMsg.hidden = false;
-      return;
-    }
-    var options = {lockType: 'pin', pin: pin, newPin: newPin};
-    this.setCardLock(options);
-    this.clear();
-  },
-
-  setCardLock: function spl_setCardLock(options) {
-    var self = this;
-    var req = this.mobileConnection.setCardLock(options);
-    req.onsuccess = function spl_enableSuccess() {
-      self.close();
-      if (self.onsuccess)
-        self.onsuccess();
-    };
-  },
-  inputFieldControl: function spl_inputField(isPin,  isPuk, isNewPin) {
-    this.pinArea.hidden = !isPin;
-    this.pukArea.hidden = !isPuk;
-    this.newPinArea.hidden = !isNewPin;
-    this.confirmPinArea.hidden = !isNewPin;
-  },
-
-  verify: function spl_verify() {
-    switch (this.action) {
-      case 'unlock':
-        if (this.lockType === 'pin')
-          this.unlockPin();
-        else {
-          this.unlockPuk();
-        }
-        break;
-      case 'enable':
-        this.enableLock();
-        break;
-      case 'changePin':
-        this.changePin();
-        break;
-    }
-    return false;
-  },
-
-
-  clear: function spl_clear() {
-    this.errorMsg.hidden = true;
-    this.pinInput.value = '';
-    this.pukInput.value = '';
-    this.newPinInput.value = '';
-    this.confirmPinInput.value = '';
-  },
-
-  onsuccess: null,
-  oncancel: null,
-  // the origin parameter records the dialog caller.
-  // when the dialog is closed, we can relocate back to the caller's div.
-  show: function spl_show(action, onsuccess, oncancel, origin) {
-    if ('#simpin-dialog' == document.location.hash)
-      return;
-
-    var _ = navigator.mozL10n.get;
-
-    this.dialogDone.disabled = true;
-    this.action = action;
-    this.lockType = 'pin';
-    switch (action) {
-      case 'unlock':
-        this.handleCardState();
-        break;
-      case 'enable':
-        this.inputFieldControl(true, false, false);
-        this.dialogTitle.textContent = _('pinTitle') || '';
-        this.dialogTitle.dataset.l10nId = 'pinTitle';
-        break;
-      case 'changePin':
-        this.inputFieldControl(true, false, true);
-        this.dialogTitle.textContent = _('newpinTitle') || '';
-        this.dialogTitle.dataset.l10nId = 'newpinTitle';
-        break;
-    }
-
-    if (onsuccess && typeof onsuccess === 'function')
-      this.onsuccess = onsuccess;
-    if (oncancel && typeof oncancel === 'function')
-      this.oncancel = oncancel;
-
-    this.origin = origin;
-    document.location.hash = '#simpin-dialog';
-
-    if (action === 'unlock' && this.lockType === 'puk')
-      this.pukInput.focus();
-    else
-      this.pinInput.focus();
-
-  },
-
-  close: function spl_close() {
-    this.clear();
-    if (this.origin)
-      document.location.hash = this.origin;
-  },
-
-  skip: function spl_skip() {
-    this.close();
-    if (this.oncancel)
-      this.oncancel();
-
-    return false;
-  },
-
-  init: function spl_init() {
-    this.mobileConnection = window.navigator.mozMobileConnection;
-    if (!this.mobileConnection)
-      return;
-
-    this.mobileConnection.addEventListener('icccardlockerror',
-      this.handleError.bind(this));
-
-    this.dialogDone.onclick = this.verify.bind(this);
-    this.dialogClose.onclick = this.skip.bind(this);
-
-    this.pinInput = this.getNumberPasswordInputField('simpin');
-    this.pukInput = this.getNumberPasswordInputField('simpuk');
-    this.newPinInput = this.getNumberPasswordInputField('newSimpin');
-    this.confirmPinInput = this.getNumberPasswordInputField('confirmNewSimpin');
+  if (!conns) {
+    return;
   }
-};
 
-SimPinDialog.init();
+  var _localize = navigator.mozL10n.localize;
+
+
+  /**
+   * Global variables and callbacks -- set by the main `show()' method
+   */
+
+  var _origin = ''; // id of the dialog caller (specific to the Settings app)
+  var _action = ''; // requested action: unlock*, enable*, disable*, change*
+  var _onsuccess = function() {};
+  var _oncancel = function() {};
+
+  var _allowedRetryCounts = {
+    'pin': 3,
+    'pin2': 3,
+    'puk': 10,
+    'puk2': 10
+  };
+
+  /**
+   * User Interface constants
+   */
+
+  var dialogTitle = dialog.querySelector('header h1');
+  var dialogDone = dialog.querySelector('button[type="submit"]');
+  var dialogClose = dialog.querySelector('button[type="reset"]');
+  dialogDone.onclick = verify;
+  dialogClose.onclick = skip;
+
+  // numeric inputs -- 3 possible input modes:
+  //   `pin': show pin input
+  //   `puk': show puk and newPin+confirmPin inputs
+  //   `new': show pin and newPin+confirmPin inputs
+  var pinArea = dialog.querySelector('.sim-pinArea');
+  var pukArea = dialog.querySelector('.sim-pukArea');
+  var newPinArea = dialog.querySelector('.sim-newPinArea');
+  var confirmPinArea = dialog.querySelector('.sim-confirmPinArea');
+  function setInputMode(mode) {
+    pinArea.hidden = (mode === 'puk');
+    pukArea.hidden = (mode !== 'puk');
+    newPinArea.hidden = confirmPinArea.hidden = (mode === 'pin');
+  }
+  function numberPasswordInput(area) {
+    var input = area.querySelector('input');
+    input.addEventListener('input', function(evt) {
+      if (evt.target === input) {
+        dialogDone.disabled = (input.value.length < 4);
+      }
+    });
+    return input;
+  }
+  var pinInput = numberPasswordInput(pinArea);
+  var pukInput = numberPasswordInput(pukArea);
+  var newPinInput = numberPasswordInput(newPinArea);
+  var confirmPinInput = numberPasswordInput(confirmPinArea);
+
+  // error messages
+  var errorMsg = dialog.querySelector('.sim-errorMsg');
+  var errorMsgHeader = dialog.querySelector('.sim-messageHeader');
+  var errorMsgBody = dialog.querySelector('.sim-messageBody');
+  function showMessage(headerL10nId, bodyL10nId, args) {
+    if (!headerL10nId) {
+      errorMsg.hidden = true;
+      return;
+    }
+    _localize(errorMsgHeader, headerL10nId);
+    _localize(errorMsgBody, bodyL10nId, args);
+    errorMsg.hidden = false;
+  }
+
+  // "[n] tries left" error messages
+  var triesLeftMsg = dialog.querySelector('.sim-triesLeft');
+  function showRetryCount(retryCount) {
+    if (!retryCount) {
+      triesLeftMsg.hidden = true;
+    } else {
+      _localize(triesLeftMsg, 'inputCodeRetriesLeft', { n: retryCount });
+      triesLeftMsg.hidden = false;
+    }
+  }
+
+  // card lock error messages
+  function handleCardLockError(event) {
+    var type = event.lockType; // expected: 'pin', 'fdn', 'puk'
+    if (!type) {
+      skip();
+      return;
+    }
+
+    // after three strikes, ask for PUK/PUK2
+    var count = event.retryCount;
+    if (count <= 0) {
+      if (type === 'pin') {
+        // we leave this for system app
+        skip();
+      } else if (type === 'fdn' || type === 'pin2') {
+        _action = initUI('unlock_puk2');
+        pukInput.focus();
+      } else { // out of PUK/PUK2: we're doomed
+        // TODO: Shouldn't we show some kind of message here?
+        skip();
+      }
+      return;
+    }
+
+    var msgId = (count > 1) ? 'AttemptMsg3' : 'LastChanceMsg';
+    showMessage(type + 'ErrorMsg', type + msgId, { n: count });
+    showRetryCount(count);
+
+    if (type === 'pin' || type === 'fdn') {
+      pinInput.focus();
+    } else if (type === 'puk') {
+      pukInput.focus();
+    }
+  }
+
+  /**
+   * SIM card helpers -- unlockCardLock
+   */
+
+  function unlockPin() {
+    var pin = pinInput.value;
+    if (pin === '') {
+      return;
+    }
+    unlockCardLock({ lockType: 'pin', pin: pin });
+    clear();
+  }
+
+  function unlockPuk(lockType) { // lockType = `puk' or `puk2'
+    lockType = lockType || 'puk';
+    var puk = pukInput.value;
+    var newPin = newPinInput.value;
+    var confirmPin = confirmPinInput.value;
+    if (puk === '' || newPin === '' || confirmPin === '') {
+      return;
+    }
+    if (newPin !== confirmPin) {
+      showMessage('newPinErrorMsg');
+      newPinInput.value = '';
+      confirmPinInput.value = '';
+      return;
+    }
+    unlockCardLock({ lockType: lockType, puk: puk, newPin: newPin });
+    clear();
+  }
+
+  function unlockCardLock(options) {
+    var req = icc.unlockCardLock(options);
+    req.onsuccess = function sp_unlockSuccess() {
+      close();
+      _onsuccess();
+    };
+    req.onerror = function sp_unlockError() {
+      handleCardLockError(req.error);
+    };
+  }
+
+
+  /**
+   * SIM card helpers -- setCardLock
+   */
+
+  function enableLock(enabled) {
+    var pin = pinInput.value;
+    if (pin === '') {
+      return;
+    }
+    setCardLock({ lockType: 'pin', pin: pin, enabled: enabled });
+    clear();
+  }
+
+  function enableFdn(enabled) {
+    var pin = pinInput.value;
+    if (pin === '') {
+      return;
+    }
+    setCardLock({ lockType: 'fdn', pin2: pin, enabled: enabled });
+    clear();
+  }
+
+  function changePin(lockType) { // lockType = `pin' or `pin2'
+    lockType = lockType || 'pin';
+    var pin = pinInput.value;
+    var newPin = newPinInput.value;
+    var confirmPin = confirmPinInput.value;
+    if (pin === '' || newPin === '' || confirmPin === '') {
+      return;
+    }
+    if (newPin !== confirmPin) {
+      showMessage('newPinErrorMsg');
+      newPinInput.value = '';
+      confirmPinInput.value = '';
+      return;
+    }
+    setCardLock({ lockType: lockType, pin: pin, newPin: newPin });
+    clear();
+  }
+
+  function setCardLock(options) {
+    var req = icc.setCardLock(options);
+    req.onsuccess = function spl_enableSuccess() {
+      close();
+      _onsuccess();
+    };
+    req.onerror = function sp_unlockError() {
+      handleCardLockError(req.error);
+    };
+  }
+
+
+  /**
+   * Add|Edit|Remove FDN contact
+   */
+
+  var _fdnContactInfo = {};
+
+  function updateFdnContact() {
+    var req = icc.updateContact('fdn', _fdnContactInfo, pinInput.value);
+
+    req.onsuccess = function onsuccess() {
+      _onsuccess(_fdnContactInfo);
+      close();
+    };
+
+    req.onerror = function onerror(e) {
+      var wrongPin2 = /IncorrectPassword/.test(req.error.name);
+      if (wrongPin2) { // TODO: count retries (not supported by the platform)
+        _action = initUI('get_pin2');
+        showMessage('fdnErrorMsg');
+        pinInput.value = '';
+        pinInput.focus();
+      } else {
+        _oncancel(_fdnContactInfo);
+        close();
+        throw new Error('Could not edit FDN contact on SIM card', e);
+      }
+    };
+  }
+
+
+  /**
+   * Dialog box handling
+   */
+
+  function verify() { // apply PIN|PUK
+    switch (_action) {
+      // get PIN code
+      case 'get_pin':
+        _onsuccess(pinInput.value);
+        close();
+        break;
+
+      // unlock SIM
+      case 'unlock_pin':
+        unlockPin();
+        break;
+      case 'unlock_puk':
+        unlockPuk('puk');
+        break;
+      case 'unlock_puk2':
+        unlockPuk('puk2');
+        break;
+
+      // PIN lock
+      case 'enable_lock':
+        enableLock(true);
+        break;
+      case 'disable_lock':
+        enableLock(false);
+        break;
+      case 'change_pin':
+        changePin('pin');
+        break;
+
+      // get PIN2 code (FDN contact list)
+      case 'get_pin2':
+        updateFdnContact();
+        break;
+
+      // PIN2 lock (FDN)
+      case 'enable_fdn':
+        enableFdn(true);
+        break;
+      case 'disable_fdn':
+        enableFdn(false);
+        break;
+      case 'change_pin2':
+        changePin('pin2');
+        break;
+    }
+
+    return false;
+  }
+
+  function clear() {
+    errorMsg.hidden = true;
+    pinInput.value = '';
+    pukInput.value = '';
+    newPinInput.value = '';
+    confirmPinInput.value = '';
+  }
+
+  function close() {
+    clear();
+    if (_origin) {
+      Settings.currentPanel = _origin;
+    }
+  }
+
+  function skip() {
+    close();
+    _oncancel();
+    return false;
+  }
+
+
+  /**
+   * Expose a main `show()' method
+   */
+
+  function initUI(action) {
+    showMessage();
+    showRetryCount(); // Clear the retry count at first
+    dialogDone.disabled = true;
+
+    var lockType = 'pin'; // used to query the number of retries left
+    switch (action) {
+      // get PIN code
+      case 'get_pin2':
+        lockType = 'pin2';
+      case 'get_pin':
+        setInputMode('pin');
+        _localize(dialogTitle, lockType + 'Title');
+        break;
+
+      // unlock SIM
+      case 'unlock_pin':
+        setInputMode('pin');
+        _localize(dialogTitle, 'pinTitle');
+        break;
+      case 'unlock_puk':
+        lockType = 'puk';
+        setInputMode('puk');
+        showMessage('simCardLockedMsg', 'enterPukMsg');
+        _localize(dialogTitle, 'pukTitle');
+        break;
+      case 'unlock_puk2':
+        lockType = 'puk2';
+        setInputMode('puk');
+        showMessage('simCardLockedMsg', 'enterPuk2Msg');
+        _localize(dialogTitle, 'puk2Title');
+        break;
+
+      // PIN lock
+      case 'enable_lock':
+      case 'disable_lock':
+        setInputMode('pin');
+        _localize(dialogTitle, 'pinTitle');
+        break;
+      case 'change_pin':
+        setInputMode('new');
+        _localize(dialogTitle, 'newpinTitle');
+        break;
+
+      // FDN lock (PIN2)
+      case 'enable_fdn':
+        lockType = 'pin2';
+        setInputMode('pin');
+        _localize(dialogTitle, 'fdnEnable');
+        break;
+      case 'disable_fdn':
+        lockType = 'pin2';
+        setInputMode('pin');
+        _localize(dialogTitle, 'fdnDisable');
+        break;
+      case 'change_pin2':
+        lockType = 'pin2';
+        setInputMode('new');
+        _localize(dialogTitle, 'fdnReset');
+        break;
+
+      // unsupported
+      default:
+        console.error('unsupported "' + action + '" action');
+        return '';
+    }
+
+    // display the number of remaining retries if necessary
+    // XXX this only works with the emulator (and some commercial RIL stacks...)
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=905173
+    var req = icc.getCardLockRetryCount(lockType);
+    req.onsuccess = function() {
+      var retryCount = req.result.retryCount;
+      if (retryCount === _allowedRetryCounts[lockType]) {
+        // hide the retry count if users had not input incorrect codes
+        retryCount = null;
+      }
+      showRetryCount(retryCount);
+    };
+    return action;
+  }
+
+  function show(action, options) {
+    options = options || {};
+
+    icc = getIccByIndex(options.cardIndex);
+    if (!icc) {
+      return;
+    }
+
+    var dialogPanel = '#' + dialog.id;
+    if (dialogPanel == Settings.currentPanel) {
+      return;
+    }
+
+    _action = initUI(action);
+    if (!_action) {
+      skip();
+      return;
+    }
+
+    _origin = options.exitPanel || Settings.currentPanel;
+    Settings.currentPanel = dialogPanel;
+
+    _onsuccess = (typeof options.onsuccess === 'function') ?
+        options.onsuccess : function() {};
+    _oncancel = (typeof options.oncancel === 'function') ?
+        options.oncancel : function() {};
+    _fdnContactInfo = options.fdnContact;
+
+    window.addEventListener('panelready', function inputFocus() {
+      window.removeEventListener('panelready', inputFocus);
+      if (_action === 'unlock_puk' || _action === 'unlock_puk2') {
+        pukInput.focus();
+      } else {
+        pinInput.focus();
+      }
+    });
+  }
+
+  return {
+    show: show
+  };
+}
 

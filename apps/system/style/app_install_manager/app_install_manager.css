@@ -1,18 +1,22 @@
 /* dialog */
 /* FIXME we have to see why we need such specific style here and why
  * the general style in confirm.css isn't sufficient */
+#setup-installed-app-dialog,
+#ime-layout-dialog,
 #app-install-dialog,
 #app-install-cancel-dialog,
 #app-download-cancel-dialog {
   display: none;
   position: absolute;
-  top: 20px;
+  top: 2rem;
   left: 0;
   width: 100%;
   bottom: 0;
   pointer-events: none;
 }
 
+#setup-installed-app-dialog.visible,
+#ime-layout-dialog.visible,
 #app-install-dialog.visible,
 #app-install-cancel-dialog.visible,
 #app-download-cancel-dialog.visible {
@@ -20,36 +24,21 @@
   pointer-events: auto;
 }
 
+#setup-installed-app-dialog section,
+#ime-layout-dialog section,
 #app-install-dialog section,
 #app-install-cancel-dialog section,
 #app-download-cancel-dialog section {
   height: auto;
 }
 
+#setup-installed-app-dialog h1,
+#ime-layout-dialog h1,
 #app-install-dialog h1,
 #app-install-cancel-dialog h1,
 #app-download-cancel-dialog h1 {
   border-bottom: none;
   background: none;
-}
-
-#app-install-dialog table {
-  border-top: 0.1rem solid #686868;
-  margin: 1rem 0 0;
-  overflow: hidden;
-  padding-top: 1rem;
-  font-size: 1.4rem;
-  width: 100%;
-}
-
-#app-install-dialog table th {
-  text-align: left;
-  margin-right: 0.5rem;
-}
-
-#app-install-dialog table td {
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 #app-install-cancel-dialog small:first-child {
@@ -59,11 +48,12 @@
 
 /* notification */
 #install-manager-notification-container > .fake-notification {
-  padding: 10px 10px 10px 60px;
+  padding: 1rem 1rem 1rem 6rem;
   -moz-box-sizing: border-box;
 
   background-repeat: no-repeat;
-  background-position: 15px center;
+  background-position: 1.5rem center;
+  background-size: 3rem;
   background-image: url(images/downloads.png);
 }
 
@@ -73,26 +63,75 @@
 
 #install-manager-notification-container progress {
   width: 100%;
-  height: 4px;
+  height: 0.3rem;
 
   border: none;
 }
 
 #install-manager-notification-container progress::-moz-progress-bar {
   background: #ec860f;
-  border-bottom: 1px solid #b96100;
-  border-top: 2px solid #e67200;
+  border-bottom: 0.1rem solid #b96100;
+  border-top: 0.2rem solid #e67200;
 }
 
 #install-manager-notification-container progress:indeterminate::-moz-progress-bar {
   background: url(../shared/progress.gif) #f2aa56;
+  background-size: auto 0.3rem;
   border: none;
 }
 
 #install-manager-notification-container .message {
-  line-height: 20px;
+  line-height: 2rem;
   font-weight: 700;
   font-size: 1.6rem;
 }
 
 /* ... end of notification */
+
+/* ... start of keyboard layout */
+ul#ime-list {
+  padding-left: 1.5rem;
+}
+
+ul#ime-list > li {
+  /* Positioning */
+  position: relative;
+
+  /* Display & Box Model */
+  width: 100%;
+  height: 3rem;
+  padding-top: 2rem;
+
+  /* Other */
+  list-style: none;
+}
+
+ul#ime-list > li label {
+  text-transform: none;
+}
+
+ul#ime-list > li > label:not([for]),
+ul#ime-list > li > label.pack-checkbox.ime {
+  /* Positioning */
+  position: absolute;
+  top: 0;
+  left: 0;
+
+  /* Display & Box Model */
+  width: 100%;
+  height: 100%;
+}
+
+ul#ime-list > li > label.pack-checkbox.ime > span {
+  left: auto;
+  right: 3rem;
+}
+
+ul#ime-list > li > label.pack-checkbox.ime ~ a {
+  padding-right: 6.1rem;
+}
+
+ul#ime-list > li > label.pack-switch ~ a {
+   padding-right: 9rem;
+}
+/* ... end of keyboard layout */

@@ -1,4 +1,5 @@
 Calendar.ns('Views').EventBase = (function() {
+  'use strict';
 
   function EventBase(options) {
     Calendar.View.apply(this, arguments);
@@ -21,6 +22,7 @@ Calendar.ns('Views').EventBase = (function() {
     UPDATE: 'update',
     PROGRESS: 'in-progress',
     ALLDAY: 'allday',
+    LOADING: 'loading',
 
     DEFAULT_VIEW: '/month/',
 
@@ -51,7 +53,6 @@ Calendar.ns('Views').EventBase = (function() {
      */
     returnTo: function() {
       var path = this._returnTo || this.DEFAULT_VIEW;
-
       return path;
     },
 
@@ -107,17 +108,73 @@ Calendar.ns('Views').EventBase = (function() {
 
     /**
      * Assigns and displays event & busytime information.
+     * Marks view as "loading"
      *
      * @param {Object} busytime for view.
      * @param {Object} event for view.
+     * @param {Function} [callback] optional callback.
      */
-    useModel: function(busytime, event) {
-      this.provider = this.store.providerFor(event);
-      this.event = new Calendar.Models.Event(event);
+    useModel: function(busytime, event, callback) {
+      // mark view with loading class
+      var classList = this.element.classList;
+      classList.add(this.LOADING);
 
+      this.event = new Calendar.Models.Event(event);
       this.busytime = busytime;
-      this._displayModel();
+
+      var changeToken = ++this._changeToken;
+
+      var self = this;
+
+      this.store.ownersOf(event, fetchOwners);
+
+      function fetchOwners(err, owners) {
+        self.originalCalendar = owners.calendar;
+
+        self.provider = self.app.provider(
+          owners.account.providerType
+        );
+
+        self.provider.eventCapabilities(
+          self.event,
+          fetchEventCaps
+        );
+      }
+
+      function fetchEventCaps(err, caps) {
+        if (self._changeToken !== changeToken) {
+          return;
+        }
+
+        if (err) {
+          console.log('Failed to fetch events capabilities', err);
+
+          if (callback) {
+            classList.remove(self.LOADING);
+            callback(err);
+          }
+
+          return;
+        }
+
+        if (!caps.canUpdate) {
+          self._markReadonly(true);
+          self.element.classList.add(self.READONLY);
+        }
+
+        classList.remove(self.LOADING);
+
+        // inheritance hook...
+        self._updateUI();
+
+        if (callback) {
+          callback();
+        }
+      }
     },
+
+    /** override me! **/
+    _updateUI: function() {},
 
     /**
      * Loads event and triggers form update.
@@ -128,30 +185,32 @@ Calendar.ns('Views').EventBase = (function() {
      *
      * @param {String} id busytime id.
      */
-    _loadModel: function(id) {
+    _loadModel: function(id, callback) {
       var self = this;
       var token = ++this._changeToken;
       var time = this.app.timeController;
+      var classList = this.element.classList;
+
+      classList.add(this.LOADING);
 
       time.findAssociated(id, function(err, list) {
+        if (err) {
+          classList.remove(this.LOADING);
+          console.log('Error looking up records for id: ', id);
+        }
+
         var records = list[0];
         if (token === self._changeToken) {
-          self.useModel(records.busytime, records.event);
+          self.useModel(
+            records.busytime,
+            records.event,
+            callback
+          );
+        } else {
+          // ensure loading is removed
+          classList.remove(this.LOADING);
         }
       });
-    },
-
-    _displayModel: function() {
-      var model = this.event;
-      var calendar = this.store.calendarFor(model);
-      var caps = this.provider.eventCapabilities(model.data);
-
-      if (!caps.canUpdate) {
-        this._markReadonly(true);
-        this.element.classList.add(this.READONLY);
-      }
-
-      this._updateUI();
     },
 
     /**
@@ -208,16 +267,22 @@ Calendar.ns('Views').EventBase = (function() {
      * be found via the time controller.
      */
     dispatch: function(data) {
+      // always remove loading initially (to prevent worst case)
+      this.element.classList.remove(this.LOADING);
+
       var id = data.params.id;
       var classList = this.element.classList;
       var last = this.app.router.last;
 
       if (last && last.path) {
-
-        if (/^\/event\/add\//.test(last.path)) {
+        if (!(/^\/(day|event|month|week)/.test(last.path))) {
+          // We came from some place suspicious so fall back to default.
           this._returnTo = this.DEFAULT_VIEW;
         } else {
-          this._returnTo = last.path;
+          // Return to the default view if we just added an event.
+          // Else go back to where we came from.
+          this._returnTo = /^\/event\/add\//.test(last.path) ?
+              this.DEFAULT_VIEW : last.path;
         }
       }
 
@@ -225,22 +290,31 @@ Calendar.ns('Views').EventBase = (function() {
         this._returnTop = this._returnTo;
       }
 
+      var self = this;
+      function completeDispatch() {
+        if (self.ondispatch) {
+          self.ondispatch();
+        }
+      }
+
       if (id) {
-        this._loadModel(id);
         classList.add(this.UPDATE);
+
+        this._loadModel(id, completeDispatch);
       } else {
-        var controller = this.app.timeController;
         classList.add(this.CREATE);
+
+        var controller = this.app.timeController;
         this.event = this._createModel(controller.mostRecentDay);
         this._updateUI();
+
+        Calendar.nextTick(completeDispatch);
       }
 
       this.primaryButton.removeAttribute('aria-disabled');
     },
 
-    onfirstseen: function() {
-
-    }
+    onfirstseen: function() {}
 
   };
 

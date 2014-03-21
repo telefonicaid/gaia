@@ -8,10 +8,13 @@ var AutoSettings = (function() {
   var OPTION_CONFIGURERS = {
     'select': function _selectConfigurer(guiWidget) {
       var optionName = guiWidget.dataset.option;
-      var text, parent = guiWidget.parentElement;
+      var span, parent = guiWidget.parentElement;
       if (parent.classList.contains('fake-select')) {
-        text = document.createTextNode('');
-        parent.insertBefore(text, parent.firstChild);
+        var firstChild = parent.firstChild;
+        if (!firstChild || firstChild.tagName !== 'SPAN') {
+          span = document.createElement('span');
+          parent.insertBefore(span, parent.firstChild);
+        }
       }
       guiWidget.addEventListener('change', function _onSelectChange() {
         debug('Value:', guiWidget.value);
@@ -22,9 +25,13 @@ var AutoSettings = (function() {
           value = settings.defaultValue(optionName);
         }
         guiWidget.value = value;
-        if (text) {
+        if (span) {
           var selected = guiWidget.options[guiWidget.selectedIndex];
-          text.data = selected.textContent;
+          var l10nId = selected.getAttribute('data-l10n-id');
+          span.textContent = selected.textContent;
+          if (l10nId) {
+            span.setAttribute('data-l10n-id', l10nId);
+          }
         }
       });
     },

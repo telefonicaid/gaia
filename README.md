@@ -1,4 +1,4 @@
-# Gaia
+# Gaia [![Build Status](https://travis-ci.org/mozilla-b2g/gaia.png)](https://travis-ci.org/mozilla-b2g/gaia)
 
 Gaia is Mozilla's Phone UX for the Boot to Gecko (B2G) project.
 
@@ -6,36 +6,30 @@ Boot to Gecko aims to create a complete, standalone operating system for the ope
 
 You can read more about B2G here:
 
-  http://mozilla.org/b2g
+> [http://mozilla.org/b2g](http://mozilla.org/b2g)
 
 follow us on twitter: @Boot2Gecko
 
-  http://twitter.com/Boot2Gecko
+> [http://twitter.com/Boot2Gecko](http://twitter.com/Boot2Gecko)
 
 join the Gaia mailing list:
 
-  http://groups.google.com/group/mozilla.dev.gaia
+> [http://groups.google.com/group/mozilla.dev.gaia](http://groups.google.com/group/mozilla.dev.gaia)
 
 and talk to us on IRC:
 
-  #gaia on irc.mozilla.org
+>  #gaia on irc.mozilla.org
 
-See INSTALL file in B2G repository for instructions on building and running B2G. To try out Gaia on desktop, see
+## Hacking Gaia
 
-  https://wiki.mozilla.org/Gaia/Hacking
+[The Gaia/Hacking page on MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Firefox_OS/Platform/Gaia/Hacking) has all the information that you need to start working on Gaia, including building and running Gaia on a compatible device or desktop computer.
 
-# Installing on different devices resolution
-### Currently supported screens
-  * **qHD**: ~540×960, device pixel ratio = 1.6875
-  * **WVGA**: ~480×800, device pixel ratio = 1.5
+## Shepherd (bot)
 
-### How to:
-You need to set `HIDPI=1` when using any `make` command
+Opt-into new features by adding +shepherd to your first commit.
 
-### Examples
-`HIDPI=1 make reset-gaia`
-`HIDPI=1 make install-gaia`
-`HIDPI=1 BUILD_APP_NAME=contacts make install-gaia`
+Features available:
+  - automatic github -> bugzilla linking
 
 
 ## Tests
@@ -65,47 +59,144 @@ on the filesystem and execute relevant tests when they change:
 
 Note: If you add new files, you will need to restart test-agent-server.
 
+As a convenience, you can also use the `gaia-test` script to launch the
+test-agent-server and open the Test Agent app in firefox:
+
+1. Add firefox to your `$PATH` or set `$FIREFOX` to your preferred
+   firefox/aurora/nightly binary.
+2. Run `./bin/gaia-test` to run the test-agent-server and launch firefox.
+3. Run `make test-agent-test` or modify files as described above.
+
 For more details on writing tests, see:
 https://developer.mozilla.org/en/Mozilla/Boot_to_Gecko/Gaia_Unit_Tests
 
 ### Integration Tests
 
-Integration tests for an app are located in
-`apps/<APP>/test/integration/`.
+Gaia uses
+[marionette-js-runner](https://github.com/mozilla-b2g/marionette-js-runner)
+to run the tests with a custom builder for gaia. Tests should live with the rest of your apps code (in apps/my_app/test/marionette) and
+test files should end in _test.js.
 
-Prerequisites:
+All integration tests run under a node environment. You need node >= 0.10
+for this to work predictably.
 
-1. adb
-2. FirefoxOS Device / Emulator / B2G Desktop
+Shared code for tests lives under shared/test/integration.
 
-To run integration tests:
+#### Running integration tests
 
-1. In your gaia/ directory, run `make` to build the profile
-2. Run B2G Desktop
+NOTE: unless your tests end in _test.js they will not be
+automatically picked up by `make test-integration`.
 
-   or forward port 2828 from your device / emulator using
-   `adb forward tcp:2828 tcp:2828`
+```sh
+make test-integration
+```
 
-3. Run `make test-integration` from the gaia/ directory
+#### Invoking a test file
 
-   or `make test-integration APP=<APP>` to run unit tests for a
-   specified app
+```sh
+make test-integration TEST_FILES=<test>
+```
 
-   or `make test-integration TESTS=<PATH/TO/TESTFILE.js>` to run unit
-   tests in a specific file
+For example, we could run the `day_view_test.js` test in calendar app with the below command.
+```
+make test-integration TEST_FILES=./apps/calendar/test/marionette/day_view_test.js
+```
 
-   or `make test-integration REPORTER=<REPORTER>` to run integration
-   tests with the specified reporter, for example `XUnit`
+If you would like to run more than one test, we could do the below command.
+```
+make test-integration TEST_FILES="./apps/calendar/test/marionette/day_view_test.js ./apps/calendar/test/marionette/today_test.js"
+```
 
-   or `make test-integration TESTVARS=<PATH/TO/TESTVARS.json>` to run
-   tests with variables in the testvars file (this defaults to
-   testvars.json)
+#### Invoking tests for a specific app
 
-Note: If you're using a FirefoxOS Device, it must have been flashed
-with a build with marionette enabled. If it doesn't have marionette
-enabled, then running `make test-integration` will time out.
+```sh
+make test-integration APP=<APP>
+```
 
-The testvars file is a JSON file that maps app names to objects
-holding key/values as required by that app's integration tests.  See
-that app's integration test code and/or README for which key/values
-are required.
+For example, we could run all tests for the calendar app with `make test-integration APP=calendar`.
+
+#### Running tests while working
+
+If you wish to run many tests in background you might not want to be disturbed
+by the b2g-desktop window popping everytime, or the sound. One solution for
+the first issue is to use Xvfb:
+
+```sh
+xvfb-run make test-integration
+```
+
+If you are using PulseAudio and want to keep the tests quied, then just force
+an invalid server:
+
+```sh
+PULSE_SERVER=":" make test-integration
+```
+
+You can of course combine both:
+
+```sh
+PULSE_SERVER=":" xvfb-run make test-integration
+```
+
+#### Running tests without building profile
+
+if you would like to run tests without building profile, use `make test-integration-test`:
+```sh
+PROFILE_FOLDER=profile-test make # generate profile directory in first time
+make test-integration-test
+```
+
+#### Debugging Tests
+
+To view log out from a test
+
+```sh
+make test-integration VERBOSE=1
+```
+
+#### Where to find documentation
+  - [Node.js](http://nodejs.org)
+
+  - [MDN: for high level overview](https://developer.mozilla.org/en-US/docs/Marionette/Marionette_JavaScript_Tools)
+  - [mocha: which is wrapped by marionette-js-runner](http://visionmedia.github.io/mocha/)
+  - [marionette-js-runner: for the test framework](https://github.com/mozilla-b2g/marionette-js-runner)
+  - [marionette-client: for anything to do with client.X](http://lightsofapollo.github.io/marionette_js_client/api-docs/classes/Marionette.Client.html)
+
+#### Gotchas
+
+- For performance reasons we don't run `make profile` for each test
+  run this means you need to manually remove the `profile-test`
+  folder when you make changes to your apps.
+
+- If you don't have a b2g folder one will be downloaded for you.
+  This can be problematic if you're offline. You can symlink a
+  b2g-desktop directory to b2g/ in gaia to avoid the download.
+
+- If you have some weird node errors, try removing node_modules since
+  things may be stale.
+
+- To get debug information from the b2g desktop client, run this:
+`DEBUG=b2g-desktop ./bin/gaia-marionette name/of/test.js`
+
+- To get debug information from b2g desktop and all of the marionette
+plugins, run this:
+`DEBUG=* ./bin/gaia-marionette name/of/test.js`
+
+### UI Tests
+
+#### Functional
+
+See [Gaia functional tests README](https://github.com/mozilla-b2g/gaia/blob/master/tests/python/gaia-ui-tests/README.md)
+
+#### Endurance
+
+See [how to run the Gaia endurance tests](https://developer.mozilla.org/en-US/docs/Mozilla/Firefox_OS/Platform/Automated_testing/endurance_tests/how_to_run_gaiaui_endurance_tests)
+
+## Generate jsdoc
+
+To generate API reference locally, you have to install grunt with following command:
+
+    $ npm -g grunt-cli
+
+then run `make docs` command to generate docs.
+The generated API docs will be located in `docs` folder.

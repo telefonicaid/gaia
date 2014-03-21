@@ -1,0 +1,34 @@
+#fxa-dialog,
+#fxa-iframe {
+  width: 100%;
+  height: 100%;
+  background: white;
+}
+
+#fxa-dialog.isFTU {
+  /* 
+   * In the case of FTU, we need to use the whole space available,
+   * including the one used for the tray (during the FTU there is
+   * no tray).
+   */
+  height: calc(100% + 2rem);
+}
+
+
+#fxa-dialog.fxa-dialog {
+  animation: show-fx-acct .5s;
+}
+
+#fxa-dialog.fxa-dialog.closing {
+  animation: hide-fx-acct .5s;
+}
+
+@keyframes show-fx-acct {
+  0% { transform: translateY(100%); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes hide-fx-acct {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(100%); }
+}

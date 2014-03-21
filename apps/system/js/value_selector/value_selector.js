@@ -9,6 +9,9 @@ var ValueSelector = {
   _popups: {},
   _buttons: {},
   _datePicker: null,
+  _currentPickerType: null,
+  _currentInputType: null,
+  _currentDatetimeValue: '',
 
   debug: function(msg) {
     var debugFlag = false;
@@ -18,53 +21,21 @@ var ValueSelector = {
   },
 
   init: function vs_init() {
-
     var self = this;
 
-    window.navigator.mozKeyboard.onfocuschange = function onfocuschange(evt) {
-      var typeToHandle = ['select-one', 'select-multiple', 'date',
-        'time', 'datetime', 'datetime-local', 'blur'];
-
-      var type = evt.detail.type;
-      // handle the <select> element and inputs with type of date/time
-      // in system app for now
-      if (typeToHandle.indexOf(type) == -1)
-        return;
-
-      var currentValue = evt.detail.value;
-
+    window.addEventListener('mozChromeEvent', function(evt) {
       switch (evt.detail.type) {
-        case 'select-one':
-        case 'select-multiple':
-          self.debug('select triggered' + JSON.stringify(evt.detail));
-          self._currentPickerType = evt.detail.type;
-          self.showOptions(evt.detail);
-          break;
-
-        case 'date':
-          self.showDatePicker(currentValue);
-          break;
-
-        case 'time':
-          self.showTimePicker(currentValue);
-          break;
-
-        case 'datetime':
-        case 'datetime-local':
-          // TODO
-          break;
-        case 'blur':
-          self.hide();
+        case 'inputmethod-contextchange':
+          self.inputFocusChange(evt.detail);
           break;
       }
-    };
+    });
 
     this._element = document.getElementById('value-selector');
     this._element.addEventListener('mousedown', this);
     this._containers['select'] =
       document.getElementById('value-selector-container');
     this._containers['select'].addEventListener('click', this);
-    ActiveEffectHelper.enableActive(this._containers['select']);
 
     this._popups['select'] =
       document.getElementById('select-option-popup');
@@ -79,44 +50,103 @@ var ValueSelector = {
 
     this._buttons['time'] = document.getElementById('time-picker-buttons');
     this._buttons['time'].addEventListener('click', this);
-    this._buttons['date'] = document.getElementById('spin-date-picker-buttons');
 
+    this._buttons['date'] = document.getElementById('spin-date-picker-buttons');
     this._buttons['date'].addEventListener('click', this);
 
-    this._containers['time'] = document.getElementById('picker-bar');
-    this._containers['date'] = document.getElementById('spin-date-picker');
+    this._context = document.getElementById('time-picker');
 
-    ActiveEffectHelper.enableActive(this._buttons['select']);
-    ActiveEffectHelper.enableActive(this._buttons['time']);
-    ActiveEffectHelper.enableActive(this._buttons['date']);
+    this._containers['time'] = this._context.querySelector('.picker-container');
+    this._containers['date'] = document.getElementById('spin-date-picker');
 
     // Prevent focus being taken away by us for time picker.
     // The event listener on outer box will not be triggered cause
     // there is a evt.stopPropagation() in value_picker.js
-    var pickerElements = ['value-picker-hours', 'value-picker-minutes',
-                         'value-picker-hour24-state'];
 
-    pickerElements.forEach((function pickerElements_forEach(id) {
-      var element = document.getElementById(id);
-      element.addEventListener('mousedown', this);
-    }).bind(this));
+    var pickerElements = ['.value-picker-hours', '.value-picker-minutes',
+                         '.value-picker-hour24-state'];
 
-    window.addEventListener('appopen', this);
-    window.addEventListener('appwillclose', this);
+    pickerElements.forEach(function(className) {
+      var el = this._context.querySelector(className);
+      el.addEventListener('mousedown', this);
+    }, this);
 
-    // invalidate the current spin date picker when language setting changes
+    window.addEventListener('appopened', this);
+    window.addEventListener('appclosing', this);
+
+    // invalidate the current date and time picker when language setting changes
     navigator.mozSettings.addObserver('language.current',
       (function language_change(e) {
         if (this._datePicker) {
           this._datePicker.uninit();
           this._datePicker = null;
+        }
+        if (this._timePickerInitialized) {
+          this._timePickerInitialized = false;
+          TimePicker.uninitTimePicker();
       }}).bind(this));
+  },
+
+  inputFocusChange: function vs_focusChange(detail) {
+    var self = this;
+
+    var typeToHandle = ['select-one', 'select-multiple', 'date',
+      'time', 'datetime', 'datetime-local', 'blur'];
+
+    var currentInputType = detail.inputType;
+    // handle the <select> element and inputs with type of date/time
+    // in system app for now
+    if (typeToHandle.indexOf(currentInputType) == -1)
+      return;
+
+    if (detail.choices)
+      detail.choices = JSON.parse(detail.choices);
+
+    var currentValue = detail.value;
+    self._currentDatetimeValue = currentValue;
+    self._currentInputType = currentInputType;
+
+    switch (currentInputType) {
+      case 'select-one':
+      case 'select-multiple':
+        self.debug('select triggered' + JSON.stringify(detail));
+        self._currentPickerType = currentInputType;
+        self.showOptions(detail);
+        break;
+
+      case 'date':
+        var min = detail.min;
+        var max = detail.max;
+        self.showDatePicker(currentValue, min, max);
+        break;
+
+      case 'time':
+        self.showTimePicker(currentValue);
+        break;
+
+      case 'datetime':
+      case 'datetime-local':
+        var min = detail.min;
+        var max = detail.max;
+        if (currentValue !== '') {
+          var date = new Date(currentValue);
+          var localDate = date.toLocaleFormat('%Y-%m-%d');
+          self.showDatePicker(localDate, min, max);
+        } else {
+          self.showDatePicker('', min, max);
+        }
+        break;
+
+      case 'blur':
+        self.hide();
+        break;
+    }
   },
 
   handleEvent: function vs_handleEvent(evt) {
     switch (evt.type) {
-      case 'appopen':
-      case 'appwillclose':
+      case 'appopened':
+      case 'appclosing':
         this.hide();
         break;
 
@@ -162,16 +192,16 @@ var ValueSelector = {
 
     if (this._currentPickerType === 'select-one') {
       var selectee = this._containers['select'].
-          querySelectorAll('[aria-checked="true"]');
+          querySelectorAll('[aria-selected="true"]');
       for (var i = 0; i < selectee.length; i++) {
-        selectee[i].removeAttribute('aria-checked');
+        selectee[i].removeAttribute('aria-selected');
       }
 
-      target.setAttribute('aria-checked', 'true');
-    } else if (target.getAttribute('aria-checked') === 'true') {
-      target.removeAttribute('aria-checked');
+      target.setAttribute('aria-selected', 'true');
+    } else if (target.getAttribute('aria-selected') === 'true') {
+      target.removeAttribute('aria-selected');
     } else {
-      target.setAttribute('aria-checked', 'true');
+      target.setAttribute('aria-selected', 'true');
     }
 
     // setValue here to trigger change event
@@ -179,7 +209,7 @@ var ValueSelector = {
     var optionIndices = [];
 
     var selectee = this._containers['select'].
-          querySelectorAll('[aria-checked="true"]');
+          querySelectorAll('[aria-selected="true"]');
 
     if (this._currentPickerType === 'select-one') {
 
@@ -226,19 +256,75 @@ var ValueSelector = {
   },
 
   confirm: function vs_confirm() {
+    var currentInputType = this._currentInputType;
 
-    if (this._currentPickerType === 'time') {
+    switch (currentInputType) {
+      case 'time':
+        var timeValue = TimePicker.getTimeValue();
+        this.debug('output value: ' + timeValue);
+        window.navigator.mozKeyboard.setValue(timeValue);
+        break;
 
-      var timeValue = TimePicker.getTimeValue();
-      this.debug('output value: ' + timeValue);
+      case 'date':
+        var dateValue = this._datePicker.value;
+        // The format should be 2012-09-19
+        dateValue = dateValue.toLocaleFormat('%Y-%m-%d');
+        this.debug('output value: ' + dateValue);
+        window.navigator.mozKeyboard.setValue(dateValue);
+        break;
 
-      window.navigator.mozKeyboard.setValue(timeValue);
-    } else if (this._currentPickerType === 'date') {
-      var dateValue = this._datePicker.value;
-      // The format should be 2012-09-19
-      dateValue = dateValue.toLocaleFormat('%Y-%m-%d');
-      this.debug('output value: ' + dateValue);
-      window.navigator.mozKeyboard.setValue(dateValue);
+      case 'datetime':
+      case 'datetime-local':
+        var currentDatetimeValue = this._currentDatetimeValue;
+        if (this._currentPickerType === 'date') {
+          this.hide();
+
+          if (currentDatetimeValue !== '') {
+            var date = new Date(this._currentDatetimeValue);
+            var localTime = date.toLocaleFormat('%H:%M');
+            this.showTimePicker(localTime);
+          } else {
+            this.showTimePicker();
+          }
+          return;
+        } else if (this._currentPickerType === 'time') {
+          var selectedDate = this._datePicker.value;
+          var hour = TimePicker.getHour();
+          var minute = TimePicker.timePicker.minute.getSelectedDisplayedText();
+          var second = '';
+          var millisecond = '';
+          var date = null;
+          // The second and millisecond values can't be selected by picker.
+          // So set these values as same as
+          // the current value of datetime/datetime-local input field
+          // when currentDatetimeValue is not equal to ''(space),
+          // or set the values as same as current time.
+          if (currentDatetimeValue !== '') {
+            date = new Date(this._currentDatetimeValue);
+          } else {
+            date = new Date();
+          }
+          second = date.getSeconds();
+          millisecond = date.getMilliseconds();
+
+          selectedDate.setHours(hour);
+          selectedDate.setMinutes(minute);
+          selectedDate.setSeconds(second);
+          selectedDate.setMilliseconds(millisecond);
+
+          var datetimeValue = '';
+          if (currentInputType === 'datetime') {
+            // The datetime format should be 1983-09-08T14:54:39.123Z
+            datetimeValue = selectedDate.toISOString();
+          } else { // if (currentInputType === 'datetime-local')
+            // The datetime-local format should be 1983-09-08T14:54:39.123
+            datetimeValue = selectedDate.toLocaleFormat('%Y-%m-%dT%H:%M:%S.') +
+                            selectedDate.getMilliseconds();
+          }
+          this.debug('output value: ' + datetimeValue);
+          window.navigator.mozKeyboard.setValue(datetimeValue);
+        }
+        break;
     }
 
     window.navigator.mozKeyboard.removeFocus();
@@ -270,15 +356,15 @@ var ValueSelector = {
 
     for (var i = 0, n = options.length; i < n; i++) {
 
-      var checked = options[i].selected ? ' aria-checked="true"' : '';
+      var checked = options[i].selected ? ' aria-selected="true"' : '';
 
       // This for attribute is created only to avoid applying
       // a general rule in building block
       var forAttribute = ' for="gaia-option-' + options[i].optionIndex + '"';
 
-      optionHTML += '<li data-option-index="' + options[i].optionIndex + '"' +
-                     checked + '>' +
-                     '<label' + forAttribute + '> <span>' +
+      optionHTML += '<li role="option" data-option-index="' +
+                     options[i].optionIndex + '"' + checked + '>' +
+                     '<label role="presentation"' + forAttribute + '> <span>' +
                      escapeHTML(options[i].text) +
                      '</span></label>' +
                     '</li>';
@@ -288,6 +374,10 @@ var ValueSelector = {
                              '#value-selector-container ol');
     if (!optionsContainer)
       return;
+
+    // Add ARIA property to notify if this is a multi-select or not.
+    optionsContainer.setAttribute('aria-multiselectable',
+      this._currentPickerType !== 'select-one');
 
     optionsContainer.innerHTML = optionHTML;
 
@@ -331,11 +421,7 @@ var ValueSelector = {
         minutes: now.getMinutes()
       };
     } else {
-      var inputParser = ValueSelector.InputParser;
-      if (!inputParser)
-        console.error('Cannot get input parser for value selector');
-
-      time = inputParser.importTime(currentValue);
+      time = InputParser.importTime(currentValue);
     }
 
     var timePicker = TimePicker.timePicker;
@@ -354,23 +440,39 @@ var ValueSelector = {
     timePicker.minute.setSelectedIndex(time.minutes);
   },
 
-  showDatePicker: function vs_showDatePicker(currentValue) {
+  showDatePicker: function vs_showDatePicker(currentValue, min, max) {
     this._currentPickerType = 'date';
     this.show();
     this.showPanel('date');
 
+    var minDate = null;
+    var maxDate = null;
+
+    var str2Date = function vs_str2Date(str) {
+      if (!str)
+        return null;
+
+      var dcs = str.split('-');
+      var date = new Date(dcs[0], parseInt(dcs[1]) - 1, dcs[2]);
+
+      if (isNaN(date.getTime()))
+        date = null;
+
+      return date;
+    };
+
+    minDate = str2Date(min);
+    maxDate = str2Date(max);
+
     if (!this._datePicker) {
       this._datePicker = new SpinDatePicker(this._containers['date']);
     }
+    this._datePicker.setRange(minDate, maxDate);
 
     // Show current date as default value
     var date = new Date();
     if (currentValue) {
-      var inputParser = ValueSelector.InputParser;
-      if (!inputParser)
-        console.error('Cannot get input parser for value selector');
-
-      date = inputParser.formatInputDate(currentValue, '');
+      date = InputParser.formatInputDate(currentValue, '');
     }
     this._datePicker.value = date;
   }
@@ -388,23 +490,23 @@ var TimePicker = {
   get hourSelector() {
     delete this.hourSelector;
     return this.hourSelector =
-      document.getElementById('value-picker-hours');
+      ValueSelector._context.querySelector('.value-picker-hours');
   },
 
   get minuteSelector() {
     delete this.minuteSelector;
     return this.minuteSelector =
-      document.getElementById('value-picker-minutes');
+      ValueSelector._context.querySelector('.value-picker-minutes');
   },
 
   get hour24StateSelector() {
     delete this.hour24StateSelector;
     return this.hour24StateSelector =
-      document.getElementById('value-picker-hour24-state');
+      ValueSelector._context.querySelector('.value-picker-hour24-state');
   },
 
   initTimePicker: function tp_initTimePicker() {
-    var localeTimeFormat = navigator.mozL10n.get('dateTimeFormat_%X');
+    var localeTimeFormat = navigator.mozL10n.get('shortTimeFormat');
     var is12hFormat = (localeTimeFormat.indexOf('%p') >= 0);
     this.timePicker.is12hFormat = is12hFormat;
     this.setTimePickerStyle();
@@ -436,21 +538,45 @@ var TimePicker = {
 
     if (is12hFormat) {
       var hour24StateUnitStyle = {
-        valueDisplayedText: ['AM', 'PM'],
+        valueDisplayedText: [
+          navigator.mozL10n.get('time_am'),
+          navigator.mozL10n.get('time_pm')
+        ],
         className: unitClassName
       };
       this.timePicker.hour24State =
         new ValuePicker(this.hour24StateSelector, hour24StateUnitStyle);
     }
+
+    var separator = ':';
+    var minutesPosition = localeTimeFormat.indexOf('%M');
+    if (minutesPosition > 0) {
+      separator = localeTimeFormat.substr(minutesPosition - 1, 1);
+    }
+    document.getElementById('hours-minutes-separator').textContent = separator;
+  },
+
+  uninitTimePicker: function tp_uninitTimePicker() {
+    TimePicker.timePicker.minute.uninit();
+    TimePicker.timePicker.hour.uninit();
+    if (TimePicker.timePicker.hour24State) {
+      TimePicker.timePicker.hour24State.uninit();
+    }
   },
 
   setTimePickerStyle: function tp_setTimePickerStyle() {
-    var style = (this.timePicker.is12hFormat) ? 'format12h' : 'format24h';
-    document.getElementById('picker-bar').classList.add(style);
+    var style = 'format24h';
+    if (this.timePicker.is12hFormat) {
+      var localeTimeFormat = navigator.mozL10n.get('shortTimeFormat');
+      var reversedPeriod =
+        (localeTimeFormat.indexOf('%p') < localeTimeFormat.indexOf('%M'));
+      style = (reversedPeriod) ? 'format12hrev' : 'format12h';
+    }
+    var container = ValueSelector._context.querySelector('.picker-container');
+    container.className = 'picker-container ' + style;
   },
 
-  // return a string for the time value, format: "16:37"
-  getTimeValue: function tp_getTimeValue() {
+  getHour: function tp_getHours() {
     var hour = 0;
     if (this.timePicker.is12hFormat) {
       var hour24Offset = 12 * this.timePicker.hour24State.getSelectedIndex();
@@ -460,67 +586,16 @@ var TimePicker = {
     } else {
       hour = this.timePicker.hour.getSelectedIndex();
     }
+    return hour;
+  },
+
+  // return a string for the time value, format: "16:37"
+  getTimeValue: function tp_getTimeValue() {
+    var hour = this.getHour();
     var minute = this.timePicker.minute.getSelectedDisplayedText();
 
-    return hour + ':' + minute;
+    return (hour < 10 ? '0' : '') + hour + ':' + minute;
   }
 };
-
-var ActiveEffectHelper = (function() {
-
-  var lastActiveElement = null;
-
-  function _setActive(element, isActive) {
-    if (isActive) {
-      element.classList.add('active');
-      lastActiveElement = element;
-    } else {
-      element.classList.remove('active');
-      if (lastActiveElement) {
-        lastActiveElement.classList.remove('active');
-        lastActiveElement = null;
-      }
-    }
-  }
-
-  function _onMouseDown(evt) {
-    var target = evt.target;
-
-    _setActive(target, true);
-    target.addEventListener('mouseleave', _onMouseLeave);
-  }
-
-  function _onMouseUp(evt) {
-    var target = evt.target;
-
-    _setActive(target, false);
-    target.removeEventListener('mouseleave', _onMouseLeave);
-  }
-
-  function _onMouseLeave(evt) {
-    var target = evt.target;
-    _setActive(target, false);
-    target.removeEventListener('mouseleave', _onMouseLeave);
-  }
-
-  var _events = {
-    'mousedown': _onMouseDown,
-    'mouseup': _onMouseUp
-  };
-
-  function _enableActive(element) {
-    // Attach event listeners
-    for (var event in _events) {
-      var callback = _events[event] || null;
-      if (callback)
-        element.addEventListener(event, callback);
-    }
-  }
-
-  return {
-    enableActive: _enableActive
-  };
-
-})();
 
 ValueSelector.init();

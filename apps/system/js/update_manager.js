@@ -19,7 +19,8 @@ var UpdateManager = {
   _errorTimeout: null,
   _wifiLock: null,
   _systemUpdateDisplayed: false,
-  _isDataConnectionWarningDialogEnabled: true,
+  _dataConnectionWarningEnabled: true,
+  _startedDownloadUsingDataConnection: false,
   _settings: null,
   NOTIFICATION_BUFFERING_TIMEOUT: 30 * 1000,
   TOASTER_TIMEOUT: 1200,
@@ -102,29 +103,23 @@ var UpdateManager = {
     this.updateWifiStatus();
     this.updateOnlineStatus();
 
-    window.asyncStorage.
-      getItem('gaia.system.isDataConnectionWarningDialogEnabled',
-      (function(value) {
-        value = value || true;
-        this._isDataConnectionWarningDialogEnabled = true;
-        this.downloadDialog.dataset.dataConnectionInlineWarning = !value;
-    }).bind(this));
+    // Always display the warning after users reboot the phone.
+    this._dataConnectionWarningEnabled = true;
+    this.downloadDialog.dataset.dataConnectionInlineWarning = false;
   },
 
   requestDownloads: function um_requestDownloads(evt) {
     evt.preventDefault();
 
     if (evt.target == this.downloadViaDataConnectionButton) {
-      window.asyncStorage.
-        setItem('gaia.system.isDataConnectionWarningDialogEnabled', false);
-      this._isDataConnectionWarningDialogEnabled = false;
-      this.downloadDialog.dataset.dataConnectionInlineWarning = true;
+      this._startedDownloadUsingDataConnection = true;
       this.startDownloads();
     } else {
-      if (this._isDataConnectionWarningDialogEnabled &&
+      if (this._dataConnectionWarningEnabled &&
           this.downloadDialog.dataset.nowifi === 'true') {
         this.downloadViaDataConnectionDialog.classList.add('visible');
       } else {
+        this._startedDownloadUsingDataConnection = false;
         this.startDownloads();
       }
     }
@@ -175,7 +170,8 @@ var UpdateManager = {
     var _ = navigator.mozL10n.get;
     var self = this;
     this._errorTimeout = setTimeout(function waitForMore() {
-      SystemBanner.show(_('downloadError'));
+      var systemBanner = new SystemBanner();
+      systemBanner.show(_('downloadError'));
       self._errorTimeout = null;
     }, this.NOTIFICATION_BUFFERING_TIMEOUT);
   },
@@ -204,12 +200,12 @@ var UpdateManager = {
   },
 
   showDownloadPrompt: function um_showDownloadPrompt() {
-    var _ = navigator.mozL10n.get;
+    var _localize = navigator.mozL10n.localize;
 
     this._systemUpdateDisplayed = false;
-    this.downloadDialogTitle.textContent = _('numberOfUpdates', {
-                                              n: this.updatesQueue.length
-                                           });
+    _localize(this.downloadDialogTitle, 'numberOfUpdates', {
+      n: this.updatesQueue.length
+    });
 
     var updateList = '';
 
@@ -234,7 +230,7 @@ var UpdateManager = {
       // The user can choose not to update an app
       var checkContainer = document.createElement('label');
       if (updatable instanceof SystemUpdatable) {
-        checkContainer.textContent = _('required');
+        _localize(checkContainer, 'required');
         checkContainer.classList.add('required');
         this._systemUpdateDisplayed = true;
       } else {
@@ -245,6 +241,7 @@ var UpdateManager = {
 
         var span = document.createElement('span');
 
+        checkContainer.classList.add('pack-checkbox');
         checkContainer.appendChild(checkbox);
         checkContainer.appendChild(span);
       }
@@ -253,6 +250,9 @@ var UpdateManager = {
       var name = document.createElement('div');
       name.classList.add('name');
       name.textContent = updatable.name;
+      if (updatable.nameL10nId) {
+        name.dataset.l10nId = updatable.nameL10nId;
+      }
       listItem.appendChild(name);
 
       if (updatable.size) {
@@ -267,6 +267,7 @@ var UpdateManager = {
     }, this);
 
     this.downloadDialog.classList.add('visible');
+    this.updateDownloadButton();
   },
 
   updateDownloadButton: function() {
@@ -307,36 +308,40 @@ var UpdateManager = {
     }
   },
 
+  downloaded: function um_downloaded(udatable) {
+    if (this._startedDownloadUsingDataConnection) {
+      this._startedDownloadUsingDataConnection = false;
+      this._dataConnectionWarningEnabled = false;
+      this.downloadDialog.dataset.dataConnectionInlineWarning = true;
+    }
+  },
+
   startedUncompressing: function um_startedUncompressing() {
     this._uncompressing = true;
     this.render();
   },
 
   render: function um_render() {
-    var _ = navigator.mozL10n.get;
+    var _localize = navigator.mozL10n.localize;
 
-    this.toasterMessage.innerHTML =
-      _('updateAvailableInfo', {
-        n: this.updatesQueue.length - this.lastUpdatesAvailable
-      });
+    _localize(this.toasterMessage, 'updateAvailableInfo', {
+      n: this.updatesQueue.length - this.lastUpdatesAvailable
+    });
 
-    var message = '';
     if (this._downloading) {
       if (this._uncompressing && this.downloadsQueue.length === 1) {
-        message = _('uncompressingMessage');
+        _localize(this.message, 'uncompressingMessage');
       } else {
-        var humanProgress = this._humanizeSize(this._downloadedBytes);
-        message = _('downloadingUpdateMessage', {
-                    progress: humanProgress
-                  });
+        _localize(this.message, 'downloadingUpdateMessage', {
+          progress: this._humanizeSize(this._downloadedBytes)
+        });
       }
     } else {
-      message = _('updateAvailableInfo', {
-                 n: this.updatesQueue.length
-                });
+      _localize(this.message, 'updateAvailableInfo', {
+        n: this.updatesQueue.length
+      });
     }
 
-    this.message.innerHTML = message;
     var css = this.container.classList;
     this._downloading ? css.add('downloading') : css.remove('downloading');
   },
@@ -382,7 +387,8 @@ var UpdateManager = {
     this.updatesQueue.push(updatable);
 
     if (this._notificationTimeout === null) {
-      this._notificationTimeout = setTimeout(this.displayNotificationAndToaster.bind(this),
+      this._notificationTimeout = setTimeout(
+        this.displayNotificationAndToaster.bind(this),
         this.NOTIFICATION_BUFFERING_TIMEOUT);
     }
     this.render();

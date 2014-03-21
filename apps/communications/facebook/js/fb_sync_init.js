@@ -18,6 +18,7 @@ fb.sync = Sync;
   // Delay in closing the window
   var CLOSE_DELAY = 5000;
   var FB_TRAY_ICON = '/contacts/style/images/f_logo.png';
+  var FB_SYNC_ERROR_PARAM = 'isSyncError';
 
   Alarm.init = function() {
     fb.init(function fb_alarm_init() {
@@ -43,7 +44,7 @@ fb.sync = Sync;
         setNextAlarm(true, fb.syncPeriod);
       }
     }); // fb.init
-  } // Alarm.init
+  }; // Alarm.init
 
   function syncSuccess() {
     fb.sync.debug('Sync finished ok at ', new Date());
@@ -72,7 +73,7 @@ fb.sync = Sync;
         showNotification({
           title: _('facebook'),
           body: _('notificationLogin'),
-          iconURL: FB_TRAY_ICON,
+          iconURL: FB_TRAY_ICON + '?' + FB_SYNC_ERROR_PARAM + '=1',
           callback: handleInvalidToken
         });
       break;
@@ -88,7 +89,7 @@ fb.sync = Sync;
         showNotification({
           title: _('facebook'),
           body: _('syncError'),
-          iconURL: FB_TRAY_ICON,
+          iconURL: FB_TRAY_ICON + '?' + FB_SYNC_ERROR_PARAM + '=1',
           callback: function() {
             scheduleAt(fb.syncPeriod, closeApp);
           }
@@ -152,11 +153,11 @@ fb.sync = Sync;
       if (typeof callback === 'function') {
         callback();
       }
-    }
+    };
 
     req.onerror = function(e) {
       alarmSetErrorCb(false, e);
-    }
+    };
   }
 
   function ackAlarm(callback) {
@@ -195,11 +196,11 @@ fb.sync = Sync;
             };
             outReq.failed(errorParam);
           });
-        }
+        };
 
         req.onerror = function(e) {
           outReq.failed(e);
-        }
+        };
       });
     }, 0);
 
@@ -226,10 +227,10 @@ fb.sync = Sync;
         if (typeof callback === 'function') {
           callback();
         }
-      }
+      };
       req.onerror = function(e) {
         alarmSetErrorCb(notifyParent, e);
-      }
+      };
 
     }); // Get last update
   } // doSetNextAlarm
@@ -243,7 +244,7 @@ fb.sync = Sync;
       if (typeof params.callback === 'function') {
         params.callback();
       }
-    }
+    };
   }
 
   function closeApp() {

@@ -1,10 +1,10 @@
 /* generic stuff that will probably live in the building blocks */
 
 form, fieldset, input, textarea {
-  border: 0px;
+  border: 0;
   background-color: transparent;
-  padding: 0px;
-  margin: 0px;
+  padding: 0;
+  margin: 0;
 }
 
 input, textarea {
@@ -14,6 +14,7 @@ input, textarea {
 select {
   border: none;
   background: transparent;
+  font-size: 1.7rem;
 }
 
 input[type="checkbox"] {
@@ -22,16 +23,26 @@ input[type="checkbox"] {
 
 form,
 form ol {
-  margin: 0px;
-  padding: 0px;
+  margin: 0;
+  padding: 0;
 }
 
 /* for calendar */
 
 form li {
-  padding: 0.25rem;
+  margin: 1rem 2rem;
 }
 
-form li {
-  margin: 1rem 2rem;
+.datetime {
+  /* pass the events from <span> to <input> */
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 1.5rem;
+  font-weight: normal;
+}
+
+.hidden-input {
+  /* visibility: hidden; will avoid events to reach the <input> */
+  opacity: 0;
 }

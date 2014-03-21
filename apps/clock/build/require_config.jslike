@@ -1,0 +1,59 @@
+{
+  appDir: '..',
+  baseUrl: 'js',
+  dir: '../../../build_stage/clock',
+  mainConfigFile: '../js/require_config.js',
+  paths: {
+    prim: 'empty:'
+  },
+  findNestedDependencies: true,
+
+  // Build a separate module for each panel. Because the application
+  // consistently initializes with the `startup` module, this module and all
+  // its dependencies do not need to be included by the "secondary" panels
+  // ("Alarm Edit", "Timer", and "Stopwatch").
+  modules: [
+    {
+      name: 'startup',
+      include: ['panels/alarm/main']
+    },
+    {
+      name: 'onring'
+    },
+    {
+      name: 'panels/alarm_edit/main',
+      exclude: ['startup']
+    },
+    {
+      name: 'panels/timer/main',
+      exclude: ['startup']
+    },
+    {
+      name: 'panels/stopwatch/main',
+      exclude: ['startup']
+    }
+  ],
+
+  // Set to 'uglify2' to get uglify to run using the
+  // uglify2 settings below.
+  optimize: 'none',
+
+  // Just strip comments, no code compression or mangling.
+  // Only active if optimize: 'uglify2'
+  uglify2: {
+    // Comment out the output section to get rid of line
+    // returns and tabs spacing.
+    output: {
+      beautify: true
+    },
+    compress: false,
+    mangle: false
+  },
+
+  fileExclusionRegExp: /^\.|^test$|^build$/,
+
+  // Keeping build dir since Makefile cleans it up and
+  // preps build dir with the shared directory
+  keepBuildDir: true,
+  removeCombined: true
+}

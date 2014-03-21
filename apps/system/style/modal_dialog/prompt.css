@@ -4,26 +4,22 @@
     menu-dialoges/core.css
     other/buttons/style.css
  * ---------------------------------- */
- 
+
 [role="dialog"] p {
-  font-family: 'MozTT', Sans-serif;
   font-weight: lighter;
   font-size: 2.2rem;
   color: #FAFAFA;
-  margin: 0;
+  margin: 1rem 0 0 0;
+  padding: 1rem 1.5rem;
 }
 
 [role="dialog"] p:last-child {
   overflow-x: hidden;
   overflow-y: auto;
   word-wrap: break-word;
-  /*screen height - menu data-items - dialog padding - title height*/
-  /*almost 60% screen height*/
-  max-height: 28rem;
 }
 
 [role="dialog"] .content {
-  font-family: 'MozTT', Sans-serif;
   font-weight: lighter;
   font-size: 2.2rem;
   color: #fff;
@@ -43,8 +39,13 @@
 
 [role="dialog"] .content small {
   font-size: 1.4rem;
-  font-family: 'MozTT', Sans-serif;
   font-weight: normal;
   color: #cbcbcb;
   display: block;
+}
+
+/* Since considering 20px height of status bar,
+   overwrite padding top which is defined in shared/style/confirm.css*/
+form[role="dialog"][data-type="confirm"] {
+  padding: 2rem 0 7rem;
 }

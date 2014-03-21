@@ -10,6 +10,7 @@ var Wallpaper = {
   },
 
   init: function wallpaper_init() {
+    this.wallpaperURL = new SettingsURL();
     this.getAllElements();
     this.loadCurrentWallpaper();
     this.bindEvent();
@@ -20,13 +21,13 @@ var Wallpaper = {
     var settings = navigator.mozSettings;
     settings.addObserver('wallpaper.image',
       function onHomescreenChange(event) {
-        self.preview.src = event.settingValue;
+        self.preview.src = self.wallpaperURL.set(event.settingValue);
     });
 
     var lock = settings.createLock();
     var reqWallpaper = lock.get('wallpaper.image');
     reqWallpaper.onsuccess = function wallpaper_getWallpaperSuccess() {
-      self.preview.src = reqWallpaper.result['wallpaper.image'];
+      self.preview.src = self.wallpaperURL.set(this.result['wallpaper.image']);
     };
   },
 
@@ -34,39 +35,47 @@ var Wallpaper = {
     var self = this;
     var settings = navigator.mozSettings;
     var onWallpaperClick = function wallpaper_onWallpaperClick() {
-      var a = new MozActivity({
-        name: 'pick',
-        data: {
-          type: 'image/jpeg',
-          width: 320,
-          height: 480
-        }
+      ForwardLock.getKey(function(secret) {
+        var a = new MozActivity({
+          name: 'pick',
+          data: {
+            type: ['wallpaper', 'image/*'],
+            includeLocked: (secret !== null),
+            // XXX: This will not work with Desktop Fx / Simulator.
+            width: window.screen.width * window.devicePixelRatio,
+            height: window.screen.height * window.devicePixelRatio
+          }
+        });
+
+        a.onsuccess = function onPickSuccess() {
+          var blob = a.result.blob;
+
+          if (!blob)
+            return;
+
+          if (blob.type.split('/')[1] === ForwardLock.mimeSubtype) {
+            // If this is a locked image from the locked content app, unlock it
+            ForwardLock.unlockBlob(secret, blob, function(unlocked) {
+              setWallpaper(unlocked);
+            });
+          } else {
+            setWallpaper(blob);
+          }
+
+          function setWallpaper(blob) {
+            navigator.mozSettings.createLock().set({
+              'wallpaper.image': blob
+            });
+          }
+        };
+        a.onerror = function onPickError() {
+          console.warn('pick failed!');
+        };
       });
-
-      a.onsuccess = function onPickSuccess() {
-        if (!a.result.blob)
-          return;
-
-        var reader = new FileReader();
-        reader.readAsDataURL(a.result.blob);
-        reader.onload = function() {
-          self.preview.src = reader.result;
-          navigator.mozSettings.createLock().set({
-            'wallpaper.image': reader.result
-          });
-        }
-
-        self.preview.src = a.result.url;
-        settings.createLock().set({'wallpaper.image': a.result.url});
-      };
-      a.onerror = function onPickError() {
-        console.warn('pick failed!');
-      };
-    }
+    };
     this.preview.addEventListener('click', onWallpaperClick);
     this.button.addEventListener('click', onWallpaperClick);
   }
 };
 
 Wallpaper.init();
-

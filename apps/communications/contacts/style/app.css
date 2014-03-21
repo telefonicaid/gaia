@@ -6,7 +6,7 @@
 
 
 /* Global */
-html, body {
+html {
   width: 100%;
   height: 100%;
   margin: 0;
@@ -14,12 +14,13 @@ html, body {
   font-size: 62.5%;
   overflow: hidden;
   position: relative;
+  background-color: white;
 }
 
 body {
-  background: #000;
   color: #fff;
-  font: 1.6rem/2.2rem MozTT, Sans-serif;
+  font-size: 1.6rem;
+  line-height: 2.2rem;
   text-align: center;
   vertical-align: middle;
 }
@@ -68,17 +69,16 @@ abbr, acronym {
 }
 
 strong {
-  font-family: MozTT, Sans-serif;
   font-weight: bold;
 }
 
 b {
-  font-family: MozTT, Sans-serif;
   font-weight: 600;
 }
 
 small {
-  font: 1.1rem/1rem MozTT, Sans-serif;
+  font-size: 1.1rem;
+  line-height: 1rem;
   color: #999;
 }
 
@@ -147,11 +147,6 @@ textarea {
   height: 4.6rem;
 }
 
-input[type="text"], textarea {
-  font: 1.3rem/4rem MozTT, Sans-serif;
-  font-weight: 600;
-}
-
 input[type="text"]:focus, textarea:focus {
   border-color: #7a7a7a;
 }
@@ -193,7 +188,6 @@ menu, nav, section, video, audio, canvas, progress, meter, time {
   width: 100%;
   height: 100%;
   transform: translate(0, 0);
-  transition: transform 0.5s ease;
 }
 
 .view:not(.view-noscroll) {
@@ -207,15 +201,6 @@ menu, nav, section, video, audio, canvas, progress, meter, time {
 
 .view-bottom {
   transform: translateY(100%);
-}
-
-
-/* BB Header redefinition
-    This avoids full repainting on scroll in the contacts lists
-    We must fill a bug with this issue
- */
-section[role="region"] > header:first-child {
-  background-color: #cd6623;
 }
 
 /* Rewritting from buttons.css */
@@ -235,6 +220,11 @@ li button.activity,
 li a[role="button"].activity {
   background-color: #fff;
   padding: 0 1rem 0 0;
+}
+
+li button.activity.no-icon,
+li a[role="button"].activity.no-icon {
+  padding-left: 1.5rem;
 }
 
 li button.activity:active,
@@ -266,13 +256,17 @@ li a[role="button"].activity > b em{
   font-style: normal;
 }
 
+[data-type="list"] li p {
+  margin-left: 1.5rem;
+}
+
 /* Long strings (email) */
 li button.activity > b ,
 li a[role="button"].activity > b{
   font-weight: normal;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;;
+  white-space: nowrap;
   display: block;
   position: absolute;
   left: 3rem;
@@ -282,8 +276,24 @@ li a[role="button"].activity > b{
 }
 
 /* BB Lists extending */
+#view-contacts-list [data-type="list"] {
+  padding: 2.5rem 2.5rem 0 0;
+}
+
+.active[data-type="list"] li:after, [data-type="list"] li > a:after {
+  left: 0;
+}
+
 [data-type="list"] header {
-  margin-left: -1rem;
+  padding: 0 0 0 1.5rem;
+  position: sticky;
+  top: -1.5rem;
+  background: #FFF;
+  z-index: 2;
+}
+
+[data-type="list"].active li:after {
+  right: 0;
 }
 
 /* JS helper */
@@ -291,8 +301,6 @@ li a[role="button"].activity > b{
 [data-type="list"] li aside {
   pointer-events: none;
 }
-
-
 
 /* Selection tag extended from shared/style/buttons.css */
 .view-select-tag .selection-list li button {
@@ -304,7 +312,7 @@ li a[role="button"].activity > b{
 }
 
 .view-select-tag .selection-list li button.icon-selected:before {
-  background: transparent url(gphx/bitmap/default/lists/tick.png) no-repeat center center;
+  background: transparent url(gphx/bitmap/default/lists/tick.png) no-repeat center center / 2rem;
 }
 
 /* Input areas customization*/
@@ -318,6 +326,13 @@ form p + p {
   height: calc(100% - 5rem);
 }
 
+#view-screenshot.contact-list > #view-screenshot-body {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  background: -moz-element(#view-contacts-list);
+}
+
 .view-body-inner {
   overflow-x: hidden;
   overflow-y: auto;
@@ -328,15 +343,16 @@ form p + p {
   z-index: 5;
   width: 100%;
   -moz-box-sizing: border-box;
-  padding: 1.4rem 2rem;
-  background: #f4f4f4;
+  padding: 1.5rem;
+  background: #fff;
   color: #333;
   text-align: left;
+  will-change: scroll-position;
 }
 
 /* Removes scroll from the view body inner */
 .view-noscroll .view-body-inner {
-  width: -moz-calc(100% + 0.8rem);
+  width: -moz-calc(100% + 1rem);
 }
 
 
@@ -392,7 +408,7 @@ form p + p {
 /* ICONS */
 
 span[role="button"] {
-  font: 0/0 a;
+  font-size: 0;
   background: transparent no-repeat center center;
   background-size: 100% auto;
   display: inline-block;
@@ -438,8 +454,9 @@ span[role="button"].icon-delete {
 
 span[role="button"].icon-addimage {
   background-image: url(/contacts/style/gphx/bitmap/default/forms/add.png);
-  width: 2.8rem;
-  height: 2.8rem;
+  background-size: 3rem;
+  width: 3rem;
+  height: 2.9rem;
 }
 
 li button.icon-call:before {
@@ -480,7 +497,13 @@ li button.icon-fb-profile:before {
 }
 
 li button.icon-add:before {
-  background: url(/contacts/style/gphx/bitmap/default/buttons/plus_sign.png) no-repeat center center;
+  background-image: url(/contacts/style/gphx/bitmap/default/buttons/plus_sign.png);
+  background-size: auto;
+}
+
+li button.icon-find-and-merge:before {
+  background-image: url(/contacts/style/images/findandmerge.png);
+  background-size: auto;
 }
 
 
@@ -580,13 +603,14 @@ span[role="button"].icon-arrow.icon-arrow-right {
 
 /* MEDIA: specific ratio used in forms; */
 .fillflow-media {
-  border: solid 1px #c8c8c8;
   margin: 0 0.5rem 0.5rem 0;
   width: 8.8rem;
   height: 8.3rem;
   position: relative;
-  background-color: #fff;
   z-index: 0;
+  border: 0.1rem solid rgb(204, 204, 204);
+  border-radius: 0.3rem 0.3rem 0.3rem 0.3rem;
+  background: #fff url("/contacts/style/gphx/bitmap/default/forms/shadow.png") repeat-x;
 }
 .fillflow-media p {
   position: absolute;
@@ -599,11 +623,11 @@ span[role="button"].icon-arrow.icon-arrow-right {
 
 .fillflow-media p em {
   display: block;
-  color: #777;
+  color: #858585;
   font-size: 1.3rem;
-  font-weight: bold;
+  font-weight: normal;
   font-style: normal;
-  margin-top: 1rem;
+  margin-top: 0.5rem;
 }
 
 .fillflow-media .edit-photo {
@@ -640,6 +664,10 @@ nav[data-type="scrollbar"] {
   z-index: 6;
 }
 
+nav[data-type="scrollbar"].selecting {
+  bottom: 4.2rem;
+}
+
 nav[data-type="scrollbar"] ol > li > * {
   pointer-events: none;
 }
@@ -648,5 +676,67 @@ nav[data-type="scrollbar"] p img {
   position: absolute;
   top: 25%;
   left: 25%;
-  width: auto;
+  width: 4.8rem;
+}
+
+#groups-container.selecting {
+  height: -moz-calc(100% - 7rem);
+}
+
+.contact-checkbox {
+  left: 0 !important;
+  display: none !important;
+}
+
+.contact-checkbox-selecting {
+  display: block !important;
+}
+
+.contact-text-selecting {
+  padding-left: 2rem !important;
+}
+
+form[role="dialog"].no-overlay {
+  background: none;
+  pointer-events: none;
+  position: fixed;
+}
+
+form[role="dialog"].no-overlay button {
+  pointer-events: auto;
+}
+
+#selectable-form {
+  background: none;
+}
+
+
+#groups-list[data-type="list"].active.selecting li:not(:active):after {
+  display:none !important;
+}
+
+.has-preferred-sim .icon-call div:after {
+  content: "";
+  position: absolute;
+  width: 1.4rem;
+  height: 1rem;
+  bottom: 0;
+  right: 0.9rem;
+  background-image: url("/shared/style/sim_picker/images/long-tap-indicator.png");
+  background-repeat: no-repeat;
+  background-size: 1.4rem 1rem;
+}
+
+.js-sim-indication {
+  float: right;
+  margin-right: -0.2rem;
+  display: none;
+}
+
+.has-preferred-sim .js-sim-indication { 
+  display: initial;
+}
+
+#sim-picker {
+  text-align: left;
 }

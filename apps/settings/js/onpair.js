@@ -21,7 +21,6 @@ var PairView = {
 
   pairView: document.getElementById('pair-view'),
 
-  deviceInfo: document.getElementById('device-info'),
   nameLabel: document.getElementById('label-name'),
   pairDescription: document.getElementById('pair-description'),
   pairButton: document.getElementById('button-pair'),
@@ -41,13 +40,18 @@ var PairView = {
     this.closeButton.addEventListener('click', this);
     window.addEventListener('resize', this);
 
-    this.nameLabel.textContent = this._device.name;
-    this.deviceInfo.className = this._device.icon;
+    var truncatedDeviceName = getTruncated(this._device.name, {
+      node: this.nameLabel,
+      maxLine: 2,
+      ellipsisIndex: 3
+    });
+
+    this.nameLabel.textContent = truncatedDeviceName;
     this.pairView.hidden = false;
 
     var stringName = this._pairMode + '-pair-' + this._pairMethod;
     this.pairDescription.textContent =
-      _(stringName, {device: this._device.name});
+      _(stringName, {device: truncatedDeviceName});
 
     switch (this._pairMethod) {
       case 'confirmation':
@@ -90,6 +94,15 @@ var PairView = {
   close: function() {
     window.opener.gDeviceList.setConfirmation(this._device.address, false);
     window.close();
+  },
+
+  closeInput: function() {
+    if (!this.pinInputItem.hidden) {
+      this.pinInput.blur();
+    }
+    if (!this.passkeyInputItem.hidden) {
+      this.passkeyInput.blur();
+    }
   },
 
   handleEvent: function pv_handleEvent(evt) {

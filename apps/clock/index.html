@@ -1,16 +1,28 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
     <meta charset="utf-8">
-    <meta http-equiv="pragma" content="no-cache">
     <title>Clock</title>
     <link rel="stylesheet" type="text/css" href="style/clock.css">
     <link rel="stylesheet" type="text/css" href="style/alarm.css">
+    <link rel="stylesheet" type="text/css" href="style/stopwatch.css">
+    <link rel="stylesheet" type="text/css" href="style/timer.css">
+    <link rel="stylesheet" type="text/css" href="style/views.css">
+    <link rel="stylesheet" type="text/css" href="style/form_button.css">
+    <link rel="stylesheet" type="text/css" href="style/picker/value_selector.css">
+    <link rel="stylesheet" type="text/css" href="style/picker/picker.css">
 
     <!-- Shared styles -->
     <link rel="stylesheet" type="text/css" href="shared/style/headers.css">
-    <link rel="stylesheet" type="text/css" href="shared/style/switches.css">
     <link rel="stylesheet" type="text/css" href="shared/style/status.css">
+    <link rel="stylesheet" type="text/css" href="shared/style/tabs.css">
+    <!-- These are lazy loaded. Need to be included here so the build picks them up
+    <link rel="stylesheet" type="text/css" href="shared/style/input_areas.css" >
+    <link rel="stylesheet" type="text/css" href="shared/style/buttons.css" >
+    <link rel="stylesheet" type="text/css" href="shared/style/edit_mode.css" >
+    <link rel="stylesheet" type="text/css" href="shared/style/switches.css" >
+    -->
 
     <!-- Shared sounds -->
     <link rel="resources" type="directory" href="shared/resources/media/alarms/">
@@ -18,142 +30,25 @@
     <!-- Localization -->
     <link rel="resource" type="application/l10n" href="/shared/locales/date.ini">
     <link rel="resource" type="application/l10n" href="locales/locales.ini">
-    <script defer src="/shared/js/l10n.js"></script>
-    <script defer src="/shared/js/l10n_date.js"></script>
-
-    <!-- Specific code -->
-    <script defer src="shared/js/gesture_detector.js"></script>
-    <script defer src="shared/js/mouse_event_shim.js"></script>
-    <script defer src="shared/js/async_storage.js"></script>
-    <script defer src="js/utils.js"></script>
-    <script defer src="js/alarmsdb.js"></script>
-    <script defer src="js/clock.js"></script>
-    <script defer src="js/alarm.js"></script>
-    <script defer src="js/alarmManager.js"></script>
   </head>
 
   <body>
     <div id="views">
-      <div id="alarm-view" class="active view">
-        <div id="clock-view">
-          <div id="analog-clock">
-            <div id="analog-clock-container">
-              <svg id="analog-clock-svg"
-                   xmlns="http://www.w3.org/2000/svg"
-                   version="1.1" viewBox="0 0 270 270">
-                <circle id="minutehandCentralPoint" cx="135" cy="135" r="9"/>
-                <rect id="hourhand" x="131" y="135" width="8" height="92"/>
-                <rect id="minutehand" x="131" y="135" width="8" height="113"/>
-                <!-- This is the second hand path, Thanks illustrator! -->
-                <path id="secondhand"
-                  d="M142.103,135c0-3.562-3.103-6.495-6.103-6.936V0h-2v128.095c-3,0.53-5.897,3.415-5.897,6.905
-                  s2.897,6.375,5.897,6.905V161h2v-19.064C139,141.495,142.103,138.562,142.103,135z"/>
-              </svg>
-            </div>
-          </div>
-          <div id="digital-clock-background">
-            <div id="digital-clock">
-              <div id="digital-clock-display">
-                <span id="clock-time"></span>
-                <span id="clock-hour24-state"></span>
-              </div>
-            </div>
-          </div>
-          <div id="clock-day-date"></div>
-          <a id="alarm-new" href="#alarm" class="right button plus"></a>
-          <ul id="alarms" class="tableView"></ul>
-        </div>
-        <section id="banner-countdown" role="status">
-          <p> <!-- this will be replaced dynamically -->
-            The alarm is set for <strong>8 hours</strong> and <strong>45 minutes</strong> from now.
-          </p>
-        </section>
+      <div id="main-panel-wrapper">
+        <div class="active panel" data-panel-id="alarm"></div>
+        <div class="panel hidden" data-panel-id="timer"></div>
+        <div class="panel hidden" data-panel-id="stopwatch"></div>
       </div>
+      <form role="dialog" class="skin-dark panel hidden" data-panel-id="alarm_edit" data-type="edit">
+      </form>
     </div>
 
-    <!-- Alarm -->
-    <section id="alarm" class="view skin-organic" role="region" data-title="Alarm" hidden>
-      <!--
-      <header>
-        <a href="#alarm-view" id="alarm-clock-container"><span class="icon icon-close" id="alarm-close" >close</span></a>
-        <menu type="toolbar">
-          <a id="alarm-done" href="#alarm-view" data-l10n-id="done">Done</a>
-        </menu>
-        <h1 id="alarm-title"></h1>
-      </header>
-      <ul id="edit-alarm" class="tableView">
-        <li class="picker">
-          <div id="value-indicator-left"></div>
-          <div id="value-indicator-right"></div>
-          <div id="picker-bar">
-            <div id="picker-container">
-              <div id="value-indicator-bottom"></div>
-              <div id="picker-bar-background"></div>
-              <div id="left-picker-separator"></div>
+    <ul role="tablist" class="skin-dark bottom" id="clock-tabs">
+      <li id="alarm-tab" role="tab" aria-selected="true"><a href="#alarm-panel" data-l10n-id="alarm">Alarm</a></li>
+      <li id="timer-tab" role="tab"><a href="#timer-panel" data-l10n-id="timer">Timer</a></li>
+      <li id="stopwatch-tab" role="tab"><a href="#stopwatch-panel" data-l10n-id="stopwatch">Stopwatch</a></li>
+    </ul>
 
-              <div id="value-indicator-wrapper">
-                <div id="value-indicator-hover-time">:</div>
-                <div id="value-indicator-hover"></div>
-              </div>
- 
-              <div id="value-picker-hours"></div>
-              <div id="value-picker-minutes"></div>
-              <div id="right-picker-separator"></div>
-              <div id="value-picker-hour24-state" class="animation-on"></div>
-            </div>
-            <div id="picker-bar-gradient"></div>
-          </div>
-        </li>
-        <li class="singleline field">
-          <span class="view-alarm-lbl" data-l10n-id="label">Label</span>
-          <input type="text" class="right" data-l10n-id="alarm" name="alarm.label" placeholder="Alarm"/>
-        </li>
-        <li class="singleline field">
-          <span class="view-alarm-lbl" data-l10n-id="repeat">Repeat</span>
-          <select id="repeat-select" multiple="true" class="abstract-menu">
-            <option value="0" data-l10n-id="weekday-1-long">Monday</option>
-            <option value="1" data-l10n-id="weekday-2-long">Tuesday</option>
-            <option value="2" data-l10n-id="weekday-3-long">Wednesday</option>
-            <option value="3" data-l10n-id="weekday-4-long">Thursday</option>
-            <option value="4" data-l10n-id="weekday-5-long">Friday</option>
-            <option value="5" data-l10n-id="weekday-6-long">Saturday</option>
-            <option value="6" data-l10n-id="weekday-0-long">Sunday</option>
-          </select>
-          <a id="repeat-menu" data-l10n-id="never" class="abstract-menu">Never</a>
-          <p></p>
-        </li>
-        <li class="singleline field">
-          <span class="view-alarm-lbl" data-l10n-id="sound">Sound</span>
-          <select id="sound-select" class="abstract-menu">
-            <option value="ac_classic_clock_alarm.opus" data-l10n-id="ac_classic_clock_alarm_opus"></option>
-            <option value="ac_classic_clock_alarm_prog.opus" data-l10n-id="ac_classic_clock_alarm_prog_opus"></option>
-            <option value="ac_classic_clock_radio.opus" data-l10n-id="ac_classic_clock_radio_opus"></option>
-            <option value="ac_normal_gem_echoes.opus" data-l10n-id="ac_normal_gem_echoes_opus"></option>
-            <option value="ac_normal_ringing_strings.opus" data-l10n-id="ac_normal_ringing_strings_opus"></option>
-            <option value="ac_soft_humming_waves.opus" data-l10n-id="ac_soft_humming_waves_opus"></option>
-            <option value="ac_soft_into_the_void.opus" data-l10n-id="ac_soft_into_the_void_opus"></option>
-            <option value="ac_soft_smooth_strings.opus" data-l10n-id="ac_soft_smooth_strings_opus"></option>
-          </select>
-          <a id="sound-menu" class="abstract-menu">Classic</a>
-          <p></p>
-        </li>
-        <li class="singleline field">
-          <span class="view-alarm-lbl snooze-lbl" data-l10n-id="snooze">Snooze</span>
-          <select id="snooze-select" class="abstract-menu">
-            <option data-l10n-id="nMinutes" data-l10n-args='{"n": "5"}'  value="5">  5 minutes</option>
-            <option data-l10n-id="nMinutes" data-l10n-args='{"n": "10"}' value="10">10 minutes</option>
-            <option data-l10n-id="nMinutes" data-l10n-args='{"n": "15"}' value="15">15 minutes</option>
-            <option data-l10n-id="nMinutes" data-l10n-args='{"n": "20"}' value="20">20 minutes</option>
-          </select>
-          <a id="snooze-menu" class="abstract-menu" data-l10n-id="nMinutes" data-l10n-args='{"n": "5"}'>5 minutes</a>
-          <p></p>
-        </li>
-        <li id="alarm-delete-button" class="singleline">
-          <a id="alarm-delete" href="#alarm-view" data-l10n-id="delete">Delete</a>
-        </li>
-      </ul>
-      -->
-    </section>
+    <script data-main="js/startup.js" src="js/alameda.js"></script>
   </body>
 </html>
-

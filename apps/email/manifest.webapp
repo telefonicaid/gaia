@@ -8,16 +8,16 @@
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "messages": [
-     { "alarm": "/index.html" }
+    { "alarm": "/index.html" },
+    { "notification": "/index.html" }
   ],
   "permissions": {
     "alarms":{},
     "audio-channel-notification":{},
     "contacts":{ "access": "readcreate" },
     "desktop-notification":{},
-    "device-storage:music":{ "access": "readcreate" },
-    "device-storage:pictures":{ "access": "readcreate" },
-    "device-storage:videos":{ "access": "readcreate" },
+    "storage":{},
+    "device-storage:sdcard":{ "access": "readcreate" },
     "systemXHR":{},
     "settings":{ "access": "readonly" },
     "tcp-socket":{}
@@ -42,29 +42,33 @@
   },
   "default_locale": "en-US",
   "icons": {
-    "60": "/style/icons/60/Email.png",
-    "79": "/style/icons/Email.png"
+    "79": "/style/icons/Email_90.png",
+    "60": "/style/icons/Email_60.png",
+    "120": "/style/icons/Email_120.png"
   },
   "activities": {
     "new": {
       "filters": {
         "type": "mail"
       },
-      "disposition": "window"
+      "disposition": "window",
+      "returnValue": true
     },
     "share": {
       "filters": {
-        "type": "image/*"
-       },          
+        "type": ["audio/*", "image/*", "url", "video/*"]
+      },
       "disposition": "window",
       "returnValue": true
     },
     "view": {
       "filters": {
         "type": "url",
-        "url": { "required":true, "regexp":"/^mailto:/" }
+        "url": { "required":true, "pattern":"mailto:.{1,16384}" },
+        "disposition": "window",
+        "returnValue": true
       }
     }
   },
-  "orientation": "portrait-primary"
+  "orientation": "default"
 }

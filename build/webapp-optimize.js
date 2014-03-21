@@ -1,3 +1,8 @@
+var utils = require('./utils');
+var config;
+const { Cc, Ci, Cr, Cu, CC } = require('chrome');
+Cu.import('resource://gre/modules/Services.jsm');
+Cu.import('resource://gre/modules/FileUtils.jsm');
 
 function debug(str) {
   //dump(' -*- webapp-optimize.js: ' + str + '\n');
@@ -9,25 +14,22 @@ function debug(str) {
  */
 
 var win = { navigator: {} };
-Services.scriptloader.loadSubScript('file:///' + GAIA_DIR +
-    '/shared/js/l10n.js?reload=' + new Date().getTime(), win);
-
-
 let scope = {};
-Services.scriptloader.loadSubScript('file:///' + GAIA_DIR +
-    '/build/jsmin.js?reload=' + new Date().getTime(), scope);
-const { JSMin } = scope;
+let JSMin;
 
 /**
  * Locale list -- by default, only the default one
+ * (the default locale is always the last element in this array)
  */
 
-var l10nLocales = [GAIA_DEFAULT_LOCALE];
-var l10nDictionary = {
-  locales: {},
-  default_locale: GAIA_DEFAULT_LOCALE
-};
-l10nDictionary.locales[GAIA_DEFAULT_LOCALE] = {};
+var l10nLocales;
+function newDictionary() {
+  let dictionary = {};
+  l10nLocales.forEach(function(lang) {
+    dictionary[lang] = {};
+  });
+  return dictionary;
+}
 
 /**
  * whitelist by app name for javascript asset aggregation.
@@ -38,33 +40,84 @@ const JS_AGGREGATION_BLACKLIST = [
 ];
 
 /**
- * Helpers
+ * whitelist files by app for resource inlining
+ */
+const INLINE_WHITELIST = {
+  'system': [ 'net_error.html' ]
+};
+
+/**
+ * whitelist by app name for l10n optimization.
+ */
+const L10N_OPTIMIZATION_BLACKLIST = [
+  // https://bugzilla.mozilla.org/show_bug.cgi?id=898408
+  'pdfjs'
+];
+
+const RE_PROPS = /^[\/\\]?(.+?)[\/\\].+\.([\w-]+)\.properties$/;
+const RE_INI = /locales[\/\\].+\.ini$/;
+
+/**
+ * Optimization helpers -- these environment variables are used:
+ *   - config.GAIA_INLINE_LOCALES  - embed the minimum l10n data in HTML files
+ *   - config.GAIA_CONCAT_LOCALES  - aggregates l10n files
+ *   - config.GAIA_OPTIMIZE        - aggregates JS files
  */
 
+/**
+ * Reads the content of a file in a webapp, using relative paths.
+ *
+ * @param {Object} webapp details of current web app.
+ * @param {NSFile} htmlFile filename/path of the document.
+ * @param {String} relativePath file path, using the htmlFile as base URL.
+ * @returns {String} file content.
+ */
 function optimize_getFileContent(webapp, htmlFile, relativePath) {
-  let paths = relativePath.split('/');
+  let paths = relativePath.split(/[\/\\]/);
   let file;
+  let gaia = utils.gaia.getInstance(config);
 
   // get starting directory: webapp root, HTML file or /shared/
   if (/^\//.test(relativePath)) {
     paths.shift();
-    file = webapp.sourceDirectoryFile.clone();
+    file = webapp.buildDirectoryFile.clone();
   } else {
     file = htmlFile.parent.clone();
   }
   if (paths[0] == 'shared') {
-    file = getFile(GAIA_DIR);
+    file = utils.getFile(config.GAIA_DIR);
   }
 
   paths.forEach(function appendPath(name) {
+    if (name === '..') {
+      file = file.parent;
+      return;
+    }
     file.append(name);
-    if (isSubjectToBranding(file.path)) {
-      file.append((OFFICIAL == 1) ? 'official' : 'unofficial');
+    if (utils.isSubjectToBranding(file.path)) {
+      file.append((config.OFFICIAL == 1) ? 'official' : 'unofficial');
     }
   });
 
   try {
-    return getFileContent(file);
+    let content;
+    // we inject extended locales to localization manifest (locales.ini) files
+    if (RE_INI.test(file.path)) {
+      content = utils.getFileContent(file);
+      if (gaia.l10nManager) {
+        var ini = gaia.l10nManager.modifyLocaleIni(content, l10nLocales);
+        content = gaia.l10nManager.serializeIni(ini);
+      }
+    // we substitute the localization properties file from gaia with the ones
+    // from LOCALE_BASEDIR
+    } else if (RE_PROPS.test(relativePath) && gaia.l10nManager &&
+      !file.path.contains('en-US')) {
+      let propFile = gaia.l10nManager.getPropertiesFile(webapp, file.path);
+      if (propFile.exists()) {
+        file = propFile;
+      }
+    }
+    return content ? content : utils.getFileContent(file);
   } catch (e) {
     dump(file.path + ' could not be found.\n');
     return '';
@@ -76,10 +129,10 @@ function optimize_getFileContent(webapp, htmlFile, relativePath) {
  * Depending on the script tags there are two files made:
  *
  * - defered scripts (<script defer src= ...) :
- *    $(Gaia.aggregatePrefix)defer_$(html_filename).js
+ *    $(utils.Gaia.aggregatePrefix)defer_$(html_filename).js
  *
  * - normal scripts (<script src=...) :
- *    $(Gaia.aggregatePrefix)$(html_filename).js
+ *    $(utils.Gaia.aggregatePrefix)$(html_filename).js
  *
  *
  * Also it is possible to skip aggregation on a per script basis:
@@ -95,6 +148,15 @@ function optimize_getFileContent(webapp, htmlFile, relativePath) {
  * @param {NSFile} htmlFile filename/path of the document.
  */
 function optimize_aggregateJsResources(doc, webapp, htmlFile) {
+  if (config.GAIA_OPTIMIZE !== '1' ||
+      JS_AGGREGATION_BLACKLIST.indexOf(webapp.sourceDirectoryName) >= 0)
+    return;
+
+  dump(
+    '[optimize] aggregating javascript for : "' +
+    webapp.sourceDirectoryName + '" \n'
+  );
+
   // Everyone should be putting their scripts in head with defer.
   // The best case is that only l10n.js is put into a normal.
   let scripts = Array.slice(
@@ -139,7 +201,7 @@ function optimize_aggregateJsResources(doc, webapp, htmlFile) {
     // and to make parser's life better.
     try {
       content = JSMin(content).code;
-    } catch(e) {
+    } catch (e) {
       debug('Failed to minify content: ' + e);
     }
 
@@ -169,17 +231,24 @@ function optimize_aggregateJsResources(doc, webapp, htmlFile) {
 
   // find the absolute root of the app's html file.
   let rootUrl = htmlFile.parent.path;
-  rootUrl = rootUrl.replace(webapp.manifestFile.parent.path, '');
+  if (webapp.build && webapp.build.dir) {
+    // Only required for keyboard a.t.m. Because all other apps that use build
+    // don't use defer'ed javascripts in their HTML files.
+    rootUrl = '.';
+  }
+  else {
+    rootUrl = rootUrl.replace(webapp.manifestFile.parent.path, '') || '.';
+  }
   // the above will yield something like: '', '/facebook/', '/contacts/', etc...
 
-  function writeAggregatedScript(config) {
+  function writeAggregatedScript(conf) {
     // skip if we don't have any content to write.
-    if (!config.content)
+    if (!conf.content)
       return;
 
+    var gaia = utils.gaia.getInstance(config);
     // prefix the file we are about to write content to.
-    let scriptBaseName =
-      Gaia.aggregatePrefix + config.prefix + baseName + '.js';
+    let scriptBaseName = gaia.aggregatePrefix + conf.prefix + baseName + '.js';
 
     let target = rootDirectory.clone();
     target.append(scriptBaseName);
@@ -187,15 +256,15 @@ function optimize_aggregateJsResources(doc, webapp, htmlFile) {
     debug('writing aggregated source file: ' + target.path);
 
     // write the contents of the aggregated script
-    writeContent(target, config.content);
+    utils.writeContent(target, conf.content);
 
     let script = doc.createElement('script');
-    let lastScript = config.lastNode;
+    let lastScript = conf.lastNode;
 
     script.src = rootUrl + '/' + scriptBaseName;
     script.defer = lastScript.defer;
-    // use the config's type if given (for text/javascript;version=x)
-    script.type = config.type || lastScript.type;
+    // use the conf's type if given (for text/javascript;version=x)
+    script.type = conf.type || lastScript.type;
 
     debug('writing to path="' + target.path + '" src="' + script.src + '"');
 
@@ -215,21 +284,206 @@ function optimize_aggregateJsResources(doc, webapp, htmlFile) {
   scripts.forEach(commentScript);
 }
 
-function optimize_embedl10nResources(doc, dictionary) {
-  // remove all external l10n resource nodes
-  var resources = doc.querySelectorAll('link[type="application/l10n"]');
-  for (let i = 0; i < resources.length; i++) {
-    let res = resources[i].outerHTML;
-    resources[i].outerHTML = '<!-- ' + res + ' -->';
+/**
+ * Append values to the global object on the page
+ *
+ * @param {HTMLDocument} doc DOM document of the file.
+ * @param {Object} globals dictionary containing the appended globals.
+ */
+function optimize_embedGlobals(doc, globals) {
+  var script = doc.createElement('script');
+  var content = '';
+  for (var key in globals) {
+    content += 'window.' + key + '="' + globals[key] + '";';
   }
-
-  // put the current dictionary in an inline JSON script
-  let script = doc.createElement('script');
-  script.type = 'application/l10n';
-  script.innerHTML = '\n  ' + JSON.stringify(dictionary) + '\n';
+  script.innerHTML = content;
   doc.documentElement.appendChild(script);
 }
 
+/**
+ * Inline and minify all css/script resources on the page
+ *
+ * @param {HTMLDocument} doc DOM document of the file.
+ * @param {Object} webapp details of current web app.
+ * @param {String} path of the file to inline (verify whitelist)
+ * @param {NSFile} htmlFile filename/path of the document.
+ */
+function optimize_inlineResources(doc, webapp, filePath, htmlFile) {
+  var appName = webapp.sourceDirectoryName;
+  var fileName = filePath.split('/').pop();
+  if (!INLINE_WHITELIST[appName] ||
+      INLINE_WHITELIST[appName].indexOf(fileName) === -1) {
+    return;
+  }
+
+  dump(
+    'inlining resources for : "' +
+    appName + '/' + fileName + '" \n'
+  );
+
+  // inline javascript
+  let scripts = Array.slice(doc.querySelectorAll('script[src]'));
+  scripts.forEach(function(oldScript) {
+    let newScript = doc.createElement('script');
+    let content = optimize_getFileContent(webapp, htmlFile, oldScript.src);
+    try {
+      content = JSMin(content).code;
+    } catch (e) {
+      dump('Error minifying content: ' + htmlFile.path);
+    }
+    newScript.innerHTML = content;
+    if (oldScript.hasAttribute('defer')) {
+      doc.documentElement.appendChild(newScript);
+    } else {
+      oldScript.parentNode.insertBefore(newScript, oldScript);
+    }
+    oldScript.parentNode.removeChild(oldScript);
+  });
+
+  // add the system manifest url to our global object for net_error
+  // see: https://bugzilla.mozilla.org/show_bug.cgi?id=959800#c8
+  optimize_embedGlobals(doc, {
+    SYSTEM_MANIFEST: 'app://system.' + config.GAIA_DOMAIN + '/manifest.webapp'
+  });
+
+  // inline stylesheets
+  let styles = Array.slice(doc.querySelectorAll('link[rel="stylesheet"]'));
+  styles.forEach(function(oldStyle) {
+    let cssPath = oldStyle.href.split('/').slice(0, -1).join('/');
+    let newStyle = doc.createElement('style');
+    newStyle.rel = 'stylesheet';
+    newStyle.type = 'text/css';
+    let content = optimize_getFileContent(webapp, htmlFile,
+                                                 oldStyle.href);
+    // inline css image url references
+    newStyle.innerHTML = content.replace(/url\(([^)]+?)\)/g, function(match, url) {
+      let file;
+      if (cssPath.split('/')[0] === 'shared') {
+        file = utils.getFile(config.GAIA_DIR, cssPath, url);
+      } else {
+        file = utils.getFile(config.GAIA_DIR, webapp.sourceAppDirectoryName,
+                             webapp.sourceDirectoryName, cssPath, url);
+      }
+      return match.replace(url, utils.getFileAsDataURI(file));
+    });
+    oldStyle.parentNode.insertBefore(newStyle, oldStyle);
+    oldStyle.parentNode.removeChild(oldStyle);
+  });
+}
+
+/**
+ * Part of our polyfill for web components
+ * Inserts components into the DOM as comment nodes
+ * @param {HTMLDocument} doc DOM document of the file.
+ * @param {Object} webapp details of current web app.
+ */
+function optimize_embedHtmlImports(doc, webapp, htmlFile) {
+  let imports = doc.querySelectorAll('link[rel="import"]');
+  if (!imports.length) {
+    return;
+  }
+
+  // Mapping of all custom element templates
+  var elementTemplates = {};
+
+  Array.prototype.forEach.call(imports, function eachImport(eachImport) {
+    let content = optimize_getFileContent(webapp, htmlFile, eachImport.href);
+    content = '<div>' + content + '</div>';
+    let elementRoot = utils.getDocument(content);
+    let elements = elementRoot.querySelectorAll('element');
+
+    // Remove import node from doc
+    eachImport.parentNode.removeChild(eachImport);
+
+    for (let i = 0, iLen = elements.length; i < iLen; i++) {
+      var element = elements[i];
+      var template = element.querySelector('template');
+      elementTemplates[element.getAttribute('name')] = template.innerHTML;
+    }
+  });
+
+  // Insert comment node
+  var replaceableElements = doc.querySelectorAll('*[is]');
+  Array.prototype.forEach.call(replaceableElements, function eachEl(el) {
+    el.innerHTML = '<!--' + elementTemplates[el.getAttribute('is')] + '-->';
+    el.removeAttribute('is');
+  });
+}
+
+/**
+ * Creates a dictionary for all l10n entities that are required by the HTML
+ * document, and include it as an inline JSON.
+ *
+ * @param {HTMLDocument} doc DOM document of the file.
+ * @param {Object} dictionary minimal set of strings required to translate all
+ *                            elements in the HTML document that use
+ *                            data-l10n-id attributes.
+ */
+function optimize_embedL10nResources(doc, dictionary) {
+  if (config.GAIA_INLINE_LOCALES !== '1')
+    return;
+
+  // split the l10n dictionary on a per-locale basis,
+  // and embed it in the HTML document by enclosing it in <script> nodes.
+  for (let lang in dictionary) {
+    let script = doc.createElement('script');
+    script.type = 'application/l10n';
+    script.lang = lang;
+    script.innerHTML = '\n  ' + JSON.stringify(dictionary[lang]) + '\n';
+    doc.documentElement.appendChild(script);
+  }
+}
+
+/**
+ * Replaces all external l10n resource nodes by a single link:
+ * <link type="application/l10n" href="/locales-obj/{{locale}}.json" />,
+ * and merge the document dictionary into the webapp dictionary.
+ *
+ * @param {HTMLDocument} doc DOM document of the file.
+ * @param {Object} webapp details of current web app.
+ * @param {Object} dictionary full, multi-locale dictionary containing all
+ *                            strings that are loaded by the HTML document.
+ */
+function optimize_concatL10nResources(doc, webapp, dictionary) {
+  if (config.GAIA_CONCAT_LOCALES !== '1')
+    return;
+
+  var resources = doc.querySelectorAll('link[type="application/l10n"]');
+  if (resources.length) {
+    let parentNode = resources[0].parentNode;
+    let fetch = false;
+    for (let i = 0; i < resources.length; i++) {
+      let link = resources[i];
+      link.parentNode.removeChild(link);
+      // if any l10n link does no have the no-fetch
+      // attribute we will embed the locales json link
+      if (!link.hasAttribute('data-no-fetch')) {
+        fetch = true;
+      }
+    }
+    if (fetch) {
+      let jsonLink = doc.createElement('link');
+      jsonLink.href = '/locales-obj/{{locale}}.json';
+      jsonLink.type = 'application/l10n';
+      jsonLink.rel = 'prefetch';
+      parentNode.appendChild(jsonLink);
+    }
+  }
+
+  // merge the l10n dictionary into webapp.dictionary
+  for (let lang in dictionary) {
+    for (let id in dictionary[lang]) {
+      webapp.dictionary[lang][id] = dictionary[lang][id];
+    }
+  }
+}
+
+/**
+ * Writes an HTML document to disk.
+ *
+ * @param {HTMLDocument} doc DOM document of the file.
+ * @param {NSFile} file filename/path of the document.
+ */
 function optimize_serializeHTMLDocument(doc, file) {
   debug('saving: ' + file.path);
 
@@ -258,19 +512,40 @@ function optimize_serializeHTMLDocument(doc, file) {
   let innerHTML = docElt.innerHTML.replace(/  \n*<\/body>\n*/, '  </body>\n');
   htmlStr += '>\n  ' + innerHTML + '\n</html>\n';
 
-  writeContent(file, doctypeStr + htmlStr);
+  utils.writeContent(file, doctypeStr + htmlStr);
 }
 
-function optimize_compile(webapp, file) {
+/**
+ * Optimizes the JS and l10n resources for an HTML document in a webapp.
+ *
+ * @param {Object} webapp details of current web app.
+ * @param {NSFile} file filename/path of the HTML document.
+ * @param {Function} callback function to trigger when all optimizations are
+ *                            done for this HTML document.
+ */
+function optimize_compile(webapp, file, callback) {
   let mozL10n = win.navigator.mozL10n;
-
   let processedLocales = 0;
-  let dictionary = l10nDictionary;
+
+  /**
+   * For each HTML file, we retrieve two multi-locale dictionaries:
+   *
+   *  - subDict (used with config.GAIA_INLINE_LOCALES)
+   *    = minimal set of strings required to translate all HTML elements that
+   *    use data-l10n-id attributes; it gets embedded in the HTML document.
+   *
+   *  - fullDict (used with config.GAIA_CONCAT_LOCALES)
+   *    = full set of all l10n strings that are loaded by the HTML document,
+   *    including subDict and all strings that are used dynamically from JS;
+   *    it gets merged into webapp.dictionary.
+   */
+  let subDict = newDictionary();
+  let fullDict = newDictionary();
 
   // catch console.[log|warn|info] calls and redirect them to `dump()'
   // XXX for some reason, this won't work if gDEBUG >= 2 in l10n.js
   function optimize_dump(str) {
-    dump(file.path.replace(GAIA_DIR, '') + ': ' + str + '\n');
+    dump(file.path.replace(config.GAIA_DIR, '') + ': ' + str + '\n');
   }
 
   win.console = {
@@ -307,7 +582,8 @@ function optimize_compile(webapp, file) {
         processedLocales + '/' + l10nLocales.length);
 
     let docElt = win.document.documentElement;
-    dictionary.locales[mozL10n.language.code] = mozL10n.dictionary;
+    subDict[mozL10n.language.code] = mozL10n.getDictionary(docElt);
+    fullDict[mozL10n.language.code] = mozL10n.getDictionary();
 
     if (processedLocales < l10nLocales.length) {
       // load next locale
@@ -318,82 +594,118 @@ function optimize_compile(webapp, file) {
       docElt.dir = mozL10n.language.direction;
       docElt.lang = mozL10n.language.code;
 
-      // save localized document
-      let newPath = file.path + '.' + GAIA_DEFAULT_LOCALE;
-      let newFile = new FileUtils.File(newPath);
-      optimize_embedl10nResources(win.document, dictionary);
-
-      if (GAIA_OPTIMIZE == 1 &&
-          JS_AGGREGATION_BLACKLIST.indexOf(webapp.sourceDirectoryName) === -1) {
-        optimize_aggregateJsResources(win.document, webapp, newFile);
-        dump(
-          '[optimize] aggregating javascript for : "' +
-          webapp.sourceDirectoryName + '" \n'
-        );
-      }
-
+      // save localized / optimized document
+      let newFile = new FileUtils.File(file.path + '.' +
+        config.GAIA_DEFAULT_LOCALE);
+      optimize_embedHtmlImports(win.document, webapp, newFile);
+      optimize_embedL10nResources(win.document, subDict);
+      optimize_concatL10nResources(win.document, webapp, fullDict);
+      optimize_aggregateJsResources(win.document, webapp, newFile);
+      optimize_inlineResources(win.document, webapp, file.path, newFile);
       optimize_serializeHTMLDocument(win.document, newFile);
+
+      // notify the world that this HTML document has been optimized
+      callback();
     }
   };
 
   // load and parse the HTML document
-  let DOMParser = CC('@mozilla.org/xmlextras/domparser;1', 'nsIDOMParser');
-  win.document = (new DOMParser()).
-      parseFromString(getFileContent(file), 'text/html');
+  win.document = utils.getDocument(utils.getFileContent(file));
 
-  // if this HTML document uses l10n.js, pre-localize it --
-  // selecting a language triggers `XMLHttpRequest' and `dispatchEvent' above
-  if (win.document.querySelector('script[src$="l10n.js"]')) {
+  // If this HTML document uses l10n.js, pre-localize it --
+  //   note: a document can use l10n.js by including either l10n.js or
+  //   application/l10n resource link elements (see /shared/js/lazy_l10n.js).
+  if ((win.document.querySelector('script[src$="l10n.js"]') ||
+      win.document.querySelector('link[type$="application/l10n"]')) &&
+      L10N_OPTIMIZATION_BLACKLIST.indexOf(webapp.sourceDirectoryName) < 0) {
+    // selecting a language triggers `XMLHttpRequest' and `dispatchEvent' above
     debug('localizing: ' + file.path);
     mozL10n.language.code = l10nLocales[processedLocales];
+  } else {
+    callback();
   }
 }
 
 
-/**
- * Pre-translate all HTML files for the default locale
- */
+function execute(options) {
+  /**
+   * Pre-translate all HTML files for the default locale
+   */
 
-debug('Begin');
+  debug('Begin');
+  config = options;
 
-if (GAIA_INLINE_LOCALES === '1') {
-  l10nLocales = [];
-  l10nDictionary.locales = {};
+  Services.scriptloader.loadSubScript('file:///' + config.GAIA_DIR +
+      '/shared/js/l10n.js?reload=' + new Date().getTime(), win);
+  Services.scriptloader.loadSubScript('file:///' + config.GAIA_DIR +
+      '/build/jsmin.js?reload=' + new Date().getTime(), scope);
+  JSMin = scope.JSMin;
+  l10nLocales = [config.GAIA_DEFAULT_LOCALE];
 
-  // LOCALES_FILE is a relative path by default: shared/resources/languages.json
-  // -- but it can be an absolute path when doing a multilocale build.
-  // LOCALES_FILE is using unix separator, ensure working fine on win32
-  let abs_path_chunks = [GAIA_DIR].concat(LOCALES_FILE.split('/'));
-  let file = getFile.apply(null, abs_path_chunks);
-  if (!file.exists()) {
-    file = getFile(LOCALES_FILE);
-  }
-  let locales = JSON.parse(getFileContent(file));
+  if (config.GAIA_INLINE_LOCALES === '1' ||
+      config.GAIA_CONCAT_LOCALES === '1') {
+    l10nLocales = [];
 
-  // we keep the default locale order for `l10nDictionary.locales',
-  // but we ensure the default locale comes last in `l10nLocales'.
-  for (let lang in locales) {
-    if (lang != GAIA_DEFAULT_LOCALE) {
-      l10nLocales.push(lang);
+    // LOCALES_FILE is a relative path by default:
+    // shared/resources/languages.json
+    // -- but it can be an absolute path when doing a multilocale build.
+    let file = utils.resolve(config.LOCALES_FILE,
+      config.GAIA_DIR);
+    let locales = JSON.parse(utils.getFileContent(file));
+
+    // ensure the default locale comes last in `l10nLocales'.
+    for (let lang in locales) {
+      if (lang != config.GAIA_DEFAULT_LOCALE) {
+        l10nLocales.push(lang);
+      }
     }
-    l10nDictionary.locales[lang] = {};
+    l10nLocales.push(config.GAIA_DEFAULT_LOCALE);
   }
-  l10nLocales.push(GAIA_DEFAULT_LOCALE);
-}
 
-Gaia.webapps.forEach(function(webapp) {
-  // if BUILD_APP_NAME isn't `*`, we only accept one webapp
-  if (BUILD_APP_NAME != '*' && webapp.sourceDirectoryName != BUILD_APP_NAME)
-    return;
+  utils.gaia.getInstance(config).webapps.forEach(function(webapp) {
+    // if BUILD_APP_NAME isn't `*`, we only accept one webapp
+    if (config.BUILD_APP_NAME != '*' &&
+      webapp.sourceDirectoryName != config.BUILD_APP_NAME)
+      return;
 
-  debug(webapp.sourceDirectoryName);
+    debug(webapp.sourceDirectoryName);
 
-  let files = ls(webapp.sourceDirectoryFile, true, /^(shared|tests?)$/);
-  files.forEach(function(file) {
-    if (/\.html$/.test(file.leafName)) {
-      optimize_compile(webapp, file);
+    let filesToProcess = [];
+    webapp.dictionary = newDictionary();
+
+    function writeDictionaries() {
+      if (filesToProcess.length || config.GAIA_CONCAT_LOCALES !== '1')
+        return;
+
+      // all HTML documents in the webapp have been optimized:
+      // create one concatenated l10n file per locale for all HTML documents
+
+      // create the /locales-obj directory if necessary
+      let localeDir = webapp.buildDirectoryFile.clone();
+      localeDir.append('locales-obj');
+      utils.ensureFolderExists(localeDir);
+
+      // create all JSON dictionaries in /locales-obj
+      for (let lang in webapp.dictionary) {
+        let file = localeDir.clone();
+        file.append(lang + '.json');
+        utils.writeContent(file, JSON.stringify(webapp.dictionary[lang]));
+      }
+    }
+
+    // optimize all HTML documents in the webapp
+    let files = utils.ls(webapp.buildDirectoryFile, true, /^(shared|tests?)$/);
+    files.forEach(function(file) {
+      if (/\.html$/.test(file.leafName)) {
+        filesToProcess.push(file);
+      }
+    });
+    while (filesToProcess.length) {
+      optimize_compile(webapp, filesToProcess.pop(), writeDictionaries);
     }
   });
-});
 
-debug('End');
+  debug('End');
+}
+
+exports.execute = execute;

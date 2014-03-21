@@ -1,0 +1,140 @@
+/* Message information page for report details*/
+.report-view {
+  background-color: #fff;
+}
+
+.report-view > div {
+  padding: 1.5rem 1.5rem 0 3rem;
+  font-size: 1.8rem;
+}
+
+.report-view  p, .report-view  span {
+  font-family: 'Fira Sans', sans-serif;
+}
+
+.report-view .description > .type {
+  font-size: 1.5rem;
+  color: #ff4e00;
+}
+
+.report-view .description > .subject {
+  font-size: 1.9rem;
+  font-style: italic;
+}
+
+.report-view .datetime,
+.report-view .received-detail {
+  font-size: 1.5rem;
+  color: #858585;
+}
+
+.report-view .sent-detail {
+  padding-top: 0;
+}
+
+/* Default layout (sent message) */
+.report-view .received-detail {
+  display: none;
+}
+
+.report-view .sent-detail {
+  padding-bottom: 3rem;
+}
+
+/* Layout for received message */
+.report-view.received .sent-detail {
+  display: none;
+}
+
+.report-view.received .received-detail {
+  display: block;
+}
+
+.report-view.received .description {
+  padding-bottom: 3rem;
+}
+
+.report-view .status-container {
+  padding-top: 1rem;
+}
+
+.report-view .contact-title {
+  color: #6a6a6a;
+  font-size: 1.6rem;
+  padding-left: 3rem;
+}
+
+.article-list[data-type="list"].report-view > ul.contact-list{
+  /* Showing 4 complete contacts and part of the contact name if list
+     contains more than 4 contacts */
+  max-height: 27rem;
+  margin: 0.5rem 0 1.5rem 0;
+  position: static;
+}
+
+.report-view > ul.contact-list > li,
+.report-view > ul.contact-list a {
+  min-height: 6rem;
+  height: auto;
+}
+
+.report-view > ul.contact-list > li {
+  padding: 1.0rem 0 1.0rem 1.5rem;
+}
+
+.report-view > ul.contact-list > li:first-child {
+  border-top: solid 0.1rem #bdbdbd;
+}
+
+.report-view > ul.contact-list > li {
+  border-bottom: solid 0.1rem #e7e7e7;
+}
+
+.report-view > ul.contact-list > li p.name {
+  font-size: 1.9rem;
+  font-weight: bold;
+}
+
+.report-view .suggestion div > p {
+  padding-top: 2.0rem;
+  color: #5b5b5b;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  white-space: normal;
+}
+
+.report-view .suggestion div > p:not(.hide) ~ p {
+  padding-top: 0;
+}
+
+.report-view span ~ aside {
+  background-size: 2.2rem;
+  width: 2.2rem;
+  height: 2.2rem;
+}
+
+.report-view span[data-type="received"] ~ aside,
+.report-view span[data-type="sent"] ~ aside {
+  background: url('images/icons/report_delivered.png') no-repeat center center;
+}
+
+.report-view span[data-type="error"] ~ aside {
+  background: url('images/icons/report_exclamation.png') no-repeat center center;
+}
+
+.report-view span[data-type="not-downloaded"] ~ aside {
+  background: url('images/icons/download.png') no-repeat center center;
+  opacity: 0.5;
+}
+
+.report-view .size-block,
+.report-view .received-detail,
+.report-view .sim-info {
+  padding-top: 0;
+}
+
+.report-view .size-block span,
+.report-view .sim-info span{
+  font-size: 1.5rem;
+  color: #858585;
+}

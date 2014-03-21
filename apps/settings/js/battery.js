@@ -28,11 +28,13 @@ var Battery = (function Battery() {
   function attachListeners() {
     _battery.addEventListener('chargingchange', handleEvent);
     _battery.addEventListener('levelchange', handleEvent);
+    window.addEventListener('localized', handleEvent);
   }
 
   function detachListeners() {
     _battery.removeEventListener('chargingchange', handleEvent);
     _battery.removeEventListener('levelchange', handleEvent);
+    window.removeEventListener('localized', handleEvent);
   }
 
   function handleEvent(evt) {
@@ -85,13 +87,18 @@ navigator.mozL10n.ready(function SettingsBattery() {
   Battery.init(updateInfo);
   Battery.update();
 
-  document.addEventListener('mozvisibilitychange', function visibilityChange() {
-    if (!document.mozHidden) {
+  document.addEventListener('visibilitychange', function visibilityChange() {
+    if (!document.hidden) {
       Battery.attachListeners();
       Battery.update();
     } else {
       Battery.detachListeners();
     }
   });
-});
 
+  window.addEventListener('panelready', function(e) {
+    if (e.detail.current === '#battery') {
+      Battery.update();
+    }
+  });
+});

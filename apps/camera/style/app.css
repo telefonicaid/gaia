@@ -1,0 +1,39 @@
+
+html,
+body {
+  font-size: 10px;
+  height: 100%;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  background-color: black;
+}
+
+/** Mini reset
+ ---------------------------------------------------------*/
+
+* {
+  -moz-box-sizing: border-box;
+  font-weight: inherit;
+  margin: 0;
+  padding: 0;
+}
+
+/** Lists
+ ---------------------------------------------------------*/
+
+ul { list-style: none; }
+
+/** Rotates
+ ---------------------------------------------------------*/
+
+.deg0 .rotates { transform: rotate(0deg); }
+.deg90 .rotates { transform: rotate(-90deg); }
+.deg180 .rotates { transform: rotate(-180deg); }
+.deg270 .rotates { transform: rotate(-270deg); }
+
+/** Hidden
+ ---------------------------------------------------------*/
+
+.hidden { display: none; }

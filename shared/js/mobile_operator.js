@@ -1,17 +1,19 @@
 'use strict';
 
 var MobileOperator = {
-  BRAZIL_MCC: 724,
+  BRAZIL_MCC: '724',
   BRAZIL_CELLBROADCAST_CHANNEL: 50,
 
   userFacingInfo: function mo_userFacingInfo(mobileConnection) {
     var network = mobileConnection.voice.network;
-    var iccInfo = mobileConnection.iccInfo;
-    var operator = network.shortName || network.longName;
+    var iccid = mobileConnection.iccId;
+    var iccObj = navigator.mozIccManager.getIccById(iccid);
+    var iccInfo = iccObj ? iccObj.iccInfo : null;
+    var operator = network ? (network.shortName || network.longName) : null;
 
-    if (iccInfo.isDisplaySpnRequired && iccInfo.spn
-        && !mobileConnection.voice.roaming) {
-      if (iccInfo.isDisplayNetworkNameRequired) {
+    if (operator && iccInfo && iccInfo.isDisplaySpnRequired && iccInfo.spn &&
+        !mobileConnection.voice.roaming) {
+      if (iccInfo.isDisplayNetworkNameRequired && operator !== iccInfo.spn) {
         operator = operator + ' ' + iccInfo.spn;
       } else {
         operator = iccInfo.spn;
@@ -26,7 +28,8 @@ var MobileOperator = {
       var carriers = MobileInfo.brazil.carriers;
       var regions = MobileInfo.brazil.regions;
 
-      carrier = carriers[network.mnc] || (this.BRAZIL_MCC.toString() + network.mnc);
+      carrier = carriers[network.mnc] ||
+                (this.BRAZIL_MCC + network.mnc);
       region = (regions[lac] ? regions[lac] + ' ' + lac : '');
     }
 
@@ -39,8 +42,10 @@ var MobileOperator = {
 
   isBrazil: function mo_isBrazil(mobileConnection) {
     var cell = mobileConnection.voice.cell;
-    return mobileConnection.voice.network.mcc == this.BRAZIL_MCC &&
-           cell && cell.gsmLocationAreaCode;
+    var net = mobileConnection.voice.network;
+    return net ?
+           (net.mcc === this.BRAZIL_MCC && cell && cell.gsmLocationAreaCode) :
+           null;
   }
 };
 
@@ -48,9 +53,9 @@ var MobileOperator = {
 var MobileInfo = {
   brazil: {
     carriers: {
-      '0': 'NEXTEL',
-      '2': 'TIM', '3': 'TIM', '4': 'TIM',
-      '5': 'CLARO', '6': 'VIVO', '7': 'CTBC', '8': 'TIM',
+      '00': 'NEXTEL',
+      '02': 'TIM', '03': 'TIM', '04': 'TIM',
+      '05': 'CLARO', '06': 'VIVO', '07': 'CTBC', '08': 'TIM',
       '10': 'VIVO', '11': 'VIVO', '15': 'SERCOMTEL',
       '16': 'OI', '23': 'VIVO', '24': 'OI', '31': 'OI',
       '32': 'CTBC', '33': 'CTBC', '34': 'CTBC', '37': 'AEIOU'

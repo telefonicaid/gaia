@@ -10,7 +10,7 @@
 //
 // This function is capable of parsing and returning EXIF data for a
 // JPEG file, but for speed, it ignores all EXIF data except the embedded
-// preview image.
+// preview image and the image orientation.
 //
 // This function requires the BlobView utility class
 //
@@ -115,6 +115,45 @@ function parseJPEGMetadata(file, metadataCallback, metadataError) {
           end: start + exif.THUMBNAILLENGTH
         };
       }
+
+      // map exif orientation flags for easy transforms
+      switch (exif.ORIENTATION) {
+        case undefined:
+        case 1:
+          metadata.rotation = 0;
+          metadata.mirrored = false;
+          break;
+        case 2:
+          metadata.rotation = 0;
+          metadata.mirrored = true;
+          break;
+        case 3:
+          metadata.rotation = 180;
+          metadata.mirrored = false;
+          break;
+        case 4:
+          metadata.rotation = 180;
+          metadata.mirrored = true;
+          break;
+        case 5:
+          metadata.rotation = 90;
+          metadata.mirrored = true;
+          break;
+        case 6:
+          metadata.rotation = 90;
+          metadata.mirrored = false;
+          break;
+        case 7:
+          metadata.rotation = 270;
+          metadata.mirrored = true;
+          break;
+        case 8:
+          metadata.rotation = 270;
+          metadata.mirrored = false;
+          break;
+        default:
+          throw Error('Unknown Exif code for orientation');
+      }
     }
   }
 
@@ -138,23 +177,21 @@ function parseJPEGMetadata(file, metadataCallback, metadataError) {
 
     var offset = data.getUint32(14, byteorder);
 
-    /*
-     * This is how we would parse all EXIF metadata more generally.
-     * I'm leaving this code in as a comment in case we need other EXIF
-     * data in the future.
-     *
-    parseIFD(data, offset + 10, byteorder, exif);
+     // This is how we would parse all EXIF metadata more generally.
+     // Especially need for iamge orientation
+    parseIFD(data, offset + 10, byteorder, exif, true);
 
-    if (exif.EXIFIFD) {
-      parseIFD(data, exif.EXIFIFD + 10, byteorder, exif);
-      delete exif.EXIFIFD;
-    }
+    // I'm leaving this code in as a comment in case we need other EXIF
+    // data in the future.
+    // if (exif.EXIFIFD) {
+    //   parseIFD(data, exif.EXIFIFD + 10, byteorder, exif);
+    //   delete exif.EXIFIFD;
+    // }
 
-    if (exif.GPSIFD) {
-      parseIFD(data, exif.GPSIFD + 10, byteorder, exif);
-      delete exif.GPSIFD;
-    }
-   */
+    // if (exif.GPSIFD) {
+    //   parseIFD(data, exif.GPSIFD + 10, byteorder, exif);
+    //   delete exif.GPSIFD;
+    // }
 
     // Instead of a general purpose EXIF parse, we're going to drill
     // down directly to the thumbnail image.
@@ -239,6 +276,7 @@ function parseJPEGMetadata(file, metadataCallback, metadataError) {
      '34665': 'EXIFIFD',         // Offset of EXIF data
      '34853': 'GPSIFD',          // Offset of GPS data
     */
+    '274' : 'ORIENTATION',
     '513': 'THUMBNAIL',         // Offset of thumbnail
     '514': 'THUMBNAILLENGTH'    // Length of thumbnail
   };
@@ -247,7 +285,8 @@ function parseJPEGMetadata(file, metadataCallback, metadataError) {
     var tag = data.getUint16(offset, byteorder);
     var tagname = tagnames[tag];
 
-    if (!tagname) // If we don't know about this tag type, skip it
+    // If we don't know about this tag type or already processed it, skip it
+    if (!tagname || exif[tagname])
       return;
 
     var type = data.getUint16(offset + 2, byteorder);

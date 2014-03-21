@@ -15,18 +15,24 @@ var MockUtils = {
 
   getDayDate: function re_getDayDate(timestamp) {
     this.mCalledGetDayDate = true;
-  },
-
-  getPhoneNumberPrimaryInfo: function getPhoneNumberPrimaryInfo(matchingTel,
-    contact) {
-    this.mCalledGetPhoneNumberPrimaryInfo = true;
+    var date = new Date(timestamp);
+    var startDate = new Date(date.getFullYear(),
+                             date.getMonth(), date.getDate());
+    return startDate.getTime();
   },
 
   getPhoneNumberAdditionalInfo: function getPhoneNumberAdditionalInfo(
-    matchingTel, associatedContact) {
+                                                                matchingTel) {
     this.mCalledGetPhoneNumberAdditionalInfo = true;
 
     return matchingTel.value % 2 == 0 ? matchingTel.value : undefined;
+  },
+
+  addEllipsis: function ut_addEllipsis() {},
+
+  getNextFontSize: function ut_getNextFontSize(view, fakeView, maxFontSize,
+    minFontSize, fontStep) {
+    return maxFontSize;
   },
 
   mTearDown: function tearDown() {
@@ -38,13 +44,13 @@ var MockUtils = {
   },
 
   getPhoneNumberPrimaryInfo: function ut_getPhoneNumberPrimaryInfo(matchingTel,
-    contact) {
+                                                                   contact) {
     this.mCalledGetPhoneNumberPrimaryInfo = true;
     if (contact) {
       if (contact.name && String(contact.name) !== '') {
         return contact.name;
       } else if (contact.org && String(contact.org) !== '') {
-        return  contact.org;
+        return contact.org;
       }
     }
     if (matchingTel) {

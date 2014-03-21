@@ -9,7 +9,7 @@ var ApplicationsList = {
 
   _permissionsTable: null,
 
-  container: document.querySelector('#appPermissions > ul'),
+  container: document.querySelector('#appPermissions > div > ul'),
   detailTitle: document.querySelector('#appPermissions-details > header > h1'),
   developerHeader: document.getElementById('developer-header'),
   developerInfos: document.getElementById('developer-infos'),
@@ -27,26 +27,19 @@ var ApplicationsList = {
   },
 
   init: function al_init() {
-    var appsMgmt = navigator.mozApps.mgmt;
-    appsMgmt.oninstall = this.oninstall.bind(this);
-    appsMgmt.onuninstall = this.onuninstall.bind(this);
+    window.addEventListener('applicationinstall', this.oninstall.bind(this));
+    window.addEventListener('applicationuninstall',
+                            this.onuninstall.bind(this));
 
     this.uninstallButton.addEventListener('click', this);
     this.container.addEventListener('click', this);
 
     // load the permission table
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', '/resources/permissions_table.json', true);
-    xhr.responseType = 'json';
-    xhr.onreadystatechange = (function() {
-      if (xhr.readyState == 4 && (xhr.status == 200 || xhr.status === 0)) {
-        var table = xhr.response;
-        this._permissionsTable = table;
-
-        this.initExplicitPermissionsTable();
-      }
-    }).bind(this);
-    xhr.send();
+    var self = this;
+    loadJSON('/resources/permissions_table.json', function loadPermTable(data) {
+      self._permissionsTable = data;
+      self.initExplicitPermissionsTable();
+    });
 
     // Implement clear bookmarks apps button and its confirm dialog
     var confirmDialog = this.bookmarksClear.dialog;
@@ -127,9 +120,6 @@ var ApplicationsList = {
       var apps = evt.target.result;
 
       apps.forEach(function(app) {
-        if (HIDDEN_APPS.indexOf(app.manifestURL) != -1)
-          return;
-
         var manifest = app.manifest ? app.manifest : app.updateManifest;
         if (manifest.type != 'certified') {
           self._apps.push(app);
@@ -149,7 +139,7 @@ var ApplicationsList = {
 
       self._sortApps();
       self.render();
-    }
+    };
   },
 
   render: function al_render() {
@@ -157,23 +147,11 @@ var ApplicationsList = {
 
     var listFragment = document.createDocumentFragment();
     this._apps.forEach(function appIterator(app, index) {
-      var icon = null;
+      var icon = document.createElement('img');
       var manifest = new ManifestHelper(app.manifest ?
           app.manifest : app.updateManifest);
-      if (manifest.icons &&
-          Object.keys(manifest.icons).length) {
 
-        var key = Object.keys(manifest.icons)[0];
-        var iconURL = manifest.icons[key];
-
-        // Adding origin if it's not a data URL
-        if (!(iconURL.slice(0, 4) === 'data')) {
-          iconURL = app.origin + '/' + iconURL;
-        }
-
-        icon = document.createElement('img');
-        icon.src = iconURL;
-      }
+      icon.src = this._getBestIconURL(app, manifest.icons);
 
       var item = document.createElement('li');
 
@@ -222,7 +200,7 @@ var ApplicationsList = {
     if (!app)
       return;
 
-    window.location.hash = '#appPermissions';
+    Settings.currentPanel = '#appPermissions';
 
     this._apps.splice(appIndex, 1);
 
@@ -305,8 +283,13 @@ var ApplicationsList = {
     var _ = navigator.mozL10n.get;
 
     var item = document.createElement('li');
-    var content = document.createElement('span');
-    content.textContent = _('perm-' + perm.replace(':', '-'));
+    var content = document.createElement('p');
+    var contentL10nId = 'perm-' + perm.replace(':', '-');
+    content.textContent = _(contentL10nId);
+    content.dataset.l10nId = contentL10nId;
+
+    var fakeSelect = document.createElement('span');
+    fakeSelect.classList.add('button', 'icon', 'icon-dialog');
 
     var select = document.createElement('select');
     select.dataset.perm = perm;
@@ -326,7 +309,10 @@ var ApplicationsList = {
     allowOpt.text = _('allow');
     select.add(allowOpt);
 
-    select.value = value;
+    var opt = select.querySelector('[value="' + value + '"]');
+    opt.setAttribute('selected', true);
+
+    select.value = select.options[select.selectedIndex].textContent;
     select.setAttribute('value', value);
     select.onchange = this.selectValueChanged.bind(this);
 
@@ -334,8 +320,9 @@ var ApplicationsList = {
       select.focus();
     };
 
-    content.appendChild(select);
+    fakeSelect.appendChild(select);
     item.appendChild(content);
+    item.appendChild(fakeSelect);
     this.detailPermissionsList.appendChild(item);
   },
 
@@ -398,6 +385,42 @@ var ApplicationsList = {
         otherApp.manifest : otherApp.updateManifest);
       return manifest.name > otherManifest.name;
     });
+  },
+
+  _getBestIconURL: function al_getBestIconURL(app, icons) {
+    if (!icons || !Object.keys(icons).length) {
+      return '../style/images/default.png';
+    }
+
+    // The preferred size is 30 by the default. If we use HDPI device, we may
+    // use the image larger than 30 * 1.5 = 45 pixels.
+    var preferredIconSize = 30 * (window.devicePixelRatio || 1);
+    var preferredSize = Number.MAX_VALUE;
+    var max = 0;
+
+    for (var size in icons) {
+      size = parseInt(size, 10);
+      if (size > max) {
+        max = size;
+      }
+
+      if (size >= preferredIconSize && size < preferredSize) {
+        preferredSize = size;
+      }
+    }
+    // If there is an icon matching the preferred size, we return the result,
+    // if there isn't, we will return the maximum available size.
+    if (preferredSize === Number.MAX_VALUE) {
+      preferredSize = max;
+    }
+
+    var url = icons[preferredSize];
+
+    if (url) {
+      return !(/^(http|https|data):/.test(url)) ? app.origin + url : url;
+    } else {
+      return '../style/images/default.png';
+    }
   }
 };
 

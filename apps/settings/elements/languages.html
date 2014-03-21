@@ -1,0 +1,50 @@
+<element name="languages" extends="section">
+  <template>
+
+    <header>
+      <a href="#root"><span class="icon icon-back">back</span></a>
+      <h1 data-l10n-id="language-header"> Language </h1>
+    </header>
+
+    <div>
+      <ul>
+        <li>
+          <p data-l10n-id="language">Language</p>
+          <span class="button icon icon-dialog">
+            <select name="language.current"></select>
+          </span>
+        </li>
+        <li hidden>
+          <p data-l10n-id="region">Region</p>
+          <span class="button icon icon-dialog">
+            <select name="region.current">
+              <option value="BR">Brasil</option>
+              <option value="CO">Columbia</option>
+              <option value="ES">España</option>
+              <option value="FR">France</option>
+              <option value="PT">Portugal</option>
+              <option value="TW">Taiwan</option>
+              <option value="UK">United Kingdom</option>
+              <option value="US">United States</option>
+              <option value="VZ">Venezuela</option>
+            </select>
+          </span>
+        </li>
+      </ul>
+
+      <header>
+        <h2 data-l10n-id="sample-format">Sample Format</h2>
+      </header>
+      <ul>
+        <li class="description">
+          <p id="region-date">Friday, September 28 2012</p>
+          <p id="region-time">06:54 PM</p>
+        </li>
+      </ul>
+    </div>
+
+    <script src="shared/js/keyboard_helper.js"></script>
+    <script src="js/languages.js"></script>
+
+  </template>
+</element>

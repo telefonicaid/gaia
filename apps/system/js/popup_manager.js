@@ -53,10 +53,10 @@ var PopupManager = {
 
     this.title.textContent = this.getTitleFromUrl(frame.dataset.url);
 
+    this._currentPopup[origin] = frame;
+
     // Reset overlay height
     this.setHeight(window.innerHeight - StatusBar.height);
-
-    this._currentPopup[origin] = frame;
 
     var popup = this._currentPopup[origin];
     var dataset = popup.dataset;
@@ -67,7 +67,7 @@ var PopupManager = {
     // this seems needed, or an override to origin in close()
     this._currentOrigin = origin;
 
-    if (WindowManager.getDisplayedApp() == origin) {
+    if (AppWindowManager.displayedApp == origin) {
       this.screen.classList.add('popup');
     }
 
@@ -147,8 +147,12 @@ var PopupManager = {
       case 'mozbrowserlocationchange':
         evt.target.dataset.url = evt.detail;
 
-        if (WindowManager.getDisplayedApp() !== evt.target.dataset.frameOrigin)
+        if (AppWindowManager.displayedApp !== evt.target.dataset.frameOrigin)
           return;
+
+        if (typeof(popup) === 'undefined') {
+          return;
+        }
 
         this.title.textContent = this.getTitleFromUrl(popup.dataset.url);
         break;
@@ -204,6 +208,7 @@ var PopupManager = {
 
       case 'appopen':
         this._currentOrigin = evt.detail.origin;
+        this.setHeight(window.innerHeight - StatusBar.height);
         this.show();
         break;
 
@@ -214,8 +219,8 @@ var PopupManager = {
         break;
 
       case 'keyboardchange':
-        this.setHeight(window.innerHeight -
-          StatusBar.height - evt.detail.height);
+        var keyboardHeight = KeyboardManager.getHeight();
+        this.setHeight(window.innerHeight - StatusBar.height - keyboardHeight);
         break;
 
       case 'keyboardhide':
@@ -265,7 +270,7 @@ var PopupManager = {
   },
 
   getTitleFromUrl: function pm_getTitleFromUrl(url) {
-    var app = WindowManager.getCurrentDisplayedApp();
+    var app = AppWindowManager.getActiveApp();
     var opened = this._getOriginObject(url);
     var opener = this._getOriginObject(app.frame.dataset.frameOrigin);
     // Same origin means: Protocol, Domain, Port

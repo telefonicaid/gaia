@@ -2,44 +2,39 @@
  * Application Permissions
  */
 
-#appPermissions ul li img {
+#appPermissions ul li img,
+#homescreen ul li img {
   float: left;
   margin-top: calc(3rem - 1.5rem);
   margin-right: 1.4rem;
   width: 3rem;
   height: 3rem;
-}
-
-#permissionsListHeader + ul li select {
-  width: 25%;
-  padding: 0.5rem;
-  border: 0;
-  background: #367fa2;
-  text-align: center;
-  color: black;
-  font-size: 1.4rem;
-}
-
-#permissionsListHeader + ul li select[value='allow'] {
-  background-color: #22aa22;
-}
-
-#permissionsListHeader + ul li select[value='deny'] {
-  background-color: #da4e49;
+  filter: url('shadow.svg#drop-shadow');
 }
 
 #uninstall-app {
   display: block;
   margin: auto;
   position: relative;
-  top: 1rem;
-  font-size: 1.4rem;
+  top: 1.5rem;
+  font-size: 1.6rem;
   line-height: 1em;
-  width: calc(100% - 5rem);
+  width: calc(100% - 3rem);
   height: calc(6rem - 2rem);
 }
 
 #appPermissions .cb-alert {
   position: fixed;
+}
+
+/**
+ * Right To Left Layout
+ */
+
+html[dir="rtl"] #appPermissions ul li img,
+html[dir="rtl"] #homescreen ul li img {
+  float: right;
+  margin-left: 1.4rem;
+  margin-right: auto;
 }
 

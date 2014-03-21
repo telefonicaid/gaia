@@ -8,14 +8,13 @@ html {
 }
 
 body {
-  background-color: #000;
   color: #fff;
-  font-family: "MozTT", sans-serif;
   margin: 0;
   padding: 0;
   height: 100%;
   width: 100%;
   overflow: hidden;
+  background-color: black;
 }
 
 /*
@@ -29,8 +28,8 @@ body {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  bottom: 0;
+  right: 0;
 
   /* almost transparent gray */
   background-color: rgba(0, 0, 0, 0.4);
@@ -56,27 +55,36 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  font-family: "MozTT", Sans-serif;
   font-size: 0;
   /* Using font-size: 0; we avoid the unwanted visual space (about 3px)
   created by white-spaces and break lines in the code betewen inline-block elements */
   color: #fff;
-  padding: 110px 25px 0px 25px;
+  padding: 11rem 2.5rem 0 2.5rem;
 }
 
 #overlay-title {
   font-weight: normal;
   font-size: 1.9rem;
   color: #fff;
-  margin: 0 5px -10px 5px;
+  margin: 0 0.5rem 0 0.5rem;
+  padding: 0;
 }
 
 #overlay-text {
-  padding: 10px 5px 0 5px;
-  border-top: 1px solid #686868;	
+  padding: 1rem 0.5rem 0 0.5rem;
+  border-top: 0.1rem solid #686868;
   font-weight: 300;
   font-size: 2.5rem;
   color: #ebebeb;
+}
+
+#overlay-menu {
+  z-index: 100;
+}
+
+/* For overriding the style from BB */
+#overlay-menu.hidden {
+  display: none;
 }
 
 /* Spinner */
@@ -90,28 +98,15 @@ body {
 }
 
 /*
- * spinner animation styles copied from 
- * shared/style_unstable/progress_activity.css 
+ * spinner animation styles copied from
+ * shared/style/progress_activity.css
  */
 #spinner {
   position: absolute;
-  top: calc(50% - 15px);
-  left: calc(50% - 15px);
-  width: 29px;
-  height: 29px;
-  background: url(images/spinner.png) no-repeat center center;
-  animation: 0.9s spinner-animation infinite steps(30);
-  border: none;
+  top: calc(50% - 1.5rem);
+  left: calc(50% - 1.5rem);
 }
 
-@keyframes spinner-animation {
-  from {
-    transform: rotate(1deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 /* Display the names of the songs we scan here */
 #scan-progress {
@@ -130,12 +125,7 @@ body {
 #scan-spinner {
   position: absolute;
   top: 1rem;
-  left: 1rem; 
-  width: 29px;
-  height: 29px;
-  background: url(images/spinner.png) no-repeat center center;
-  animation: 0.9s spinner-animation infinite steps(30);
-  border: none;
+  left: 1rem;
 }
 
 #scan-count {
@@ -149,7 +139,7 @@ body {
   font-size: 1.2rem;
   font-weight: bold;
   text-align: center;
-  padding-top: 1.6rem;
+  padding-top: 1.7rem;
 }
 
 #scan-artist {
@@ -182,12 +172,16 @@ body {
   text-overflow: ellipsis;
 }
 
-body.tiles-mode #title-back {
+body.tiles-mode #title-back,
+body.list-mode #title-back,
+body.search-from-tiles-mode #title-back,
+body.search-from-list-mode #title-back {
   display: none;
 }
 
-body.list-mode #title-back {
-  display: none;
+body.search-from-tiles-mode #title,
+body.search-from-list-mode #title {
+  transform: translateY(-5rem);
 }
 
 body.player-mode #tabs {
@@ -198,20 +192,51 @@ body.tiles-mode #views {
   transform: translateX(0%);
 }
 
-body.list-mode #views {
+body.search-from-tiles-mode #views {
+  transform: translateX(0%) translateY(-5rem);
+}
+
+body.list-mode #views,
+body.picker-mode #views {
   transform: translateX(-100%);
+}
+
+body.search-from-list-mode #views {
+  transform: translateX(-100%) translateY(-5rem);
+}
+
+body.search-from-tiles-mode #search,
+body.search-from-list-mode #search {
+  transform: translateY( calc(-100%) );
+}
+
+body.search-from-tiles-mode #views-tiles,
+body.search-from-list-mode #views-list {
+  overflow-y: hidden;
+}
+
+body.search-from-tiles-mode #tabs,
+body.search-from-list-mode #tabs,
+body.picker-mode #tabs {
+  display: none;
 }
 
 body.sublist-mode #views {
   transform: translateX(-200%);
+  z-index: 20;
 }
 
 body.player-mode #views {
   transform: translateX(-300%);
-  z-index: 30
+  z-index: 30;
 }
 
-body.player-mode #title-player {
+body.picker-mode #views {
+  transition: transform 0ms ease;
+}
+
+body.player-mode #title-player,
+body.picker-mode #title-player {
   display: none;
 }
 
@@ -219,9 +244,12 @@ body.player-mode #title-player {
   background-image: url("./images/now_playing.png");
 }
 
-#search {
-  width: 100%;
-  height: 10%;
+#title-done > .icon-done {
+  background-image: url("./images/IconAction_Done_30x30.png");
+}
+
+#title {
+  transition: transform 300ms ease;
 }
 
 #views {
@@ -229,6 +257,17 @@ body.player-mode #title-player {
   width: 100%;
   height: calc(100% - 5rem);
   background-color: rgba(255, 255, 255, 0.2);
+  transition: transform 300ms ease;
+}
+
+#search {
+  position: relative;
+  width: 100%;
+  height: calc(100% - 3.6rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: -moz-linear-gradient(center top, #303030 0%, #000000 100%) repeat scroll 0 0 transparent;
+  z-index: 10;
   transition: transform 300ms ease;
 }
 
@@ -247,10 +286,11 @@ body.player-mode #title-player {
 #views-tiles,
 #views-list,
 #views-sublist {
-  height: 100%;
+  height: calc(100% - 4.5rem);
   overflow-x: hidden;
   overflow-y: auto;
-  background: -moz-linear-gradient(center top, #303030 0%, #000000 100%) repeat scroll 0 0 transparent;
+  background-color: #0E1214;
+  will-change: scroll-position;
 }
 
 #views-tiles {
@@ -276,6 +316,23 @@ body.player-mode #title-player {
   left: 0%;
 }
 
+/* Make sure the tiles and list views are tall enough that we can scroll the
+ * search box off-screen. */
+#views-tiles-anchor,
+#views-list-anchor {
+  min-height: 100%;
+}
+
+/*
+ * Bug 968456 - Ensure background
+ * scrolls w/ the content
+ */
+#views-tiles-anchor,
+#views-list-anchor,
+#views-sublist-anchor {
+  background-color: #0E1214;
+}
+
 #views-sublist-header,
 #views-sublist-anchor {
   position: relative;
@@ -284,32 +341,37 @@ body.player-mode #title-player {
 }
 
 #views-sublist-header {
-  height: 8rem;
+  height: 8.1rem;
+}
+
+#views-scrollable-sublist-anchor {
+  overflow-x: hidden;
+  overflow-y: auto;
+  width: 100%;
+  height: calc(100% - 8rem);
 }
 
 #views-sublist-anchor {
   width: 100%;
   height: calc(100% - 8rem);
-  overflow-x: hidden;
-  overflow-y: auto;
+  will-change: scroll-position;
 }
 
-#views-sublist-header-default,
+#views-sublist-header-image,
 #views-sublist-header-controls {
   position: relative;
   float: left;
   left: 3rem;
-  border-bottom: solid 1px rgba(255, 255, 255, 0.1);
-}
-
-#views-sublist-header-default {
-  width: 8rem;
-  height: 8rem;
-  overflow: hidden;
+  border-bottom: solid 0.1rem rgba(255, 255, 255, 0.1);
 }
 
 #views-sublist-header-image {
-  position: absolute;
+  width: 8rem;
+  height: 8rem;
+  overflow: hidden;
+  background-clip: content-box;
+  background-size: cover;
+  background-position: center center;
   opacity: 0;
 }
 
@@ -341,6 +403,7 @@ body.player-mode #title-player {
   height: 4rem;
   background-position: center center;
   background-repeat: no-repeat;
+  background-size: 3rem;
 }
 
 #views-sublist-controls-play {
@@ -353,7 +416,7 @@ body.player-mode #title-player {
 
 .album-controls-button {
   border: none;
-  border-radius: 0px;
+  border-radius: 0;
   background: transparent;
   transition: background 200ms ease;
 }
@@ -375,34 +438,54 @@ body.player-mode #title-player {
 }
 
 .tile {
+  position: relative;
   background-position: center;
   background-size: cover;
+
   /* We set a background URL here when the thumbnail loads */
 }
 
+/* Favor scrolling performance over quality while scrolling */
+#views.scroll li.list-item,
+#views.scrolling .tile {
+  image-rendering: -moz-crisp-edges;
+  text-rendering: optimizeSpeed;
+}
+
 .main-tile {
-  width: 318px;
-  height: 318px;
-  border: 1px solid rgba(0, 0, 0, 1);
+  width: 66%;
+  height: 0;
+  padding-bottom: 66%;
   background-color: black;
   overflow: hidden;
 }
 
+.tile:after {
+  display:block;
+  width: 100%;
+  height: 100%;
+  border:0.1rem solid black;
+  -moz-box-sizing: border-box;
+  content: ' ';
+  top: 0;
+  left: 0;
+  position: absolute;
+  pointer-events: none;
+}
+
 .sub-tile {
-  width: 158px;
-  height: 158px;
-  border: 1px solid rgba(0, 0, 0, 1);
+  width: 33%;
+  height: 0;
+  padding-bottom: 33%;
   font-weight: lighter;
   background-color: #303030;
   overflow: hidden;
 }
 
-.main-tile:last-child,
-.sub-tile:last-child {
-  margin-bottom: 4rem;
-}
-
 .tile-container {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   opacity: 1;
@@ -431,7 +514,7 @@ body.player-mode #title-player {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: black 1px 1px;
+  text-shadow: black 0.1rem 0.1rem;
   background-color: rgba(0, 0, 0, 0.5);
 }
 
@@ -458,101 +541,19 @@ body.player-mode #title-player {
 .float-left {
   position: relative;
   float: left;
+  left: 0.5%;
 }
 
 .float-right {
   position: relative;
   float: right;
-}
-
-.default-album-0 {
-  background-image: url('./images/AlbumArt1_small.png');
-  background-size: 100% 100%;
-}
-
-.default-album-1 {
-  background-image: url('./images/AlbumArt2_small.png');
-  background-size: 100% 100%;
-}
-
-.default-album-2 {
-  background-image: url('./images/AlbumArt3_small.png');
-  background-size: 100% 100%;
-}
-
-.default-album-3 {
-  background-image: url('./images/AlbumArt4_small.png');
-  background-size: 100% 100%;
-}
-
-.default-album-4 {
-  background-image: url('./images/AlbumArt5_small.png');
-  background-size: 100% 100%;
-}
-
-.default-album-5 {
-  background-image: url('./images/AlbumArt6_small.png');
-  background-size: 100% 100%;
-}
-
-.default-album-6 {
-  background-image: url('./images/AlbumArt7_small.png');
-  background-size: 100% 100%;
-}
-
-.default-album-7 {
-  background-image: url('./images/AlbumArt8_small.png');
-  background-size: 100% 100%;
-}
-
-.default-album-8 {
-  background-image: url('./images/AlbumArt9_small.png');
-  background-size: 100% 100%;
-}
-
-.default-album-9 {
-  background-image: url('./images/AlbumArt10_small.png');
-  background-size: 100% 100%;
-}
-
-/* 320x480 phones */
-@media (orientation: portrait) and (width: 320px),
-       (orientation: landscape) and (width: 480px) {
-
-  .main-tile {
-    width: 210px;
-    height: 210px;
-  }
-
-  .sub-tile {
-    width: 104px;
-    height: 104px;
-  }
-
-  .float-right {
-    right: 2px;
-  }
-}
-
-/* 480x800 phones */
-@media (orientation: portrait) and (width: 480px),
-       (orientation: landscape) and (width: 800px) {
-
-  .main-tile {
-    width: 318px;
-    height: 318px;
-  }
-
-  .sub-tile {
-    width: 158px;
-    height: 158px;
-  }
+  right: 0.5%;
 }
 
 #player-cover {
   position: relative;
   width: 100%;
-  height: calc(100% - 10rem);
+  height: calc(100% - 9.1rem);
   overflow: hidden;
 }
 
@@ -566,17 +567,21 @@ body.player-mode #title-player {
   }
 }
 
-.fadeIn {  
+.fadeIn {
   animation-name: fadeIn;
-  animation-duration: 1500ms;
+  animation-duration: 500ms;
   animation-timing-function: ease-in-out;
   animation-fill-mode: forwards;
-  animation-delay: 500ms;
+  animation-delay: 50ms;
 }
 
 #player-cover-image {
   position: absolute;
+  width: 100%;
+  height: 100%;
   opacity: 0;
+  background-position: center;
+  background-size: cover;
 }
 
 #player-cover.slideOut #player-cover-caption {
@@ -608,56 +613,76 @@ body.player-mode #title-player {
   overflow: hidden;
   text-overflow: ellipsis;
   text-indent: 3rem;
-  text-shadow: black 1px 1px;
+  text-shadow: black 0.1rem 0.1rem;
   line-height: 2.5rem;
 }
 
 #player-cover-artist {
-  width: 100%;
+  width: 75%;
   height: auto;
   text-align: left;
   font-size: 1.9rem;
 }
 
 #player-cover-album {
-  width: 100%;
+  width: 75%;
   height: auto;
   text-align: left;
   font-size: 1.7rem;
+}
+
+#player-cover-artist.hidden-cover-share,
+#player-cover-album.hidden-cover-share {
+  width: 100%;
+}
+
+#player-cover-share {
+  width: calc(25% - 2rem);
+  height: 80%;
+  padding: 0;
+  border-radius: 3.5rem;
+  margin: 0 1rem;
+  font-weight: 500;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: 3rem;
+  background-image: url("./images/iconaction_media_share_30x30.png");
+  position: absolute;
+  top: 10%;
+  right: -2%;
+  z-index: 1;
 }
 
 #player-cover-buttons {
   bottom: calc(-100% + 5rem);
 }
 
-#player-album-shuffle, 
-#player-album-rating, 
+#player-album-shuffle,
+#player-album-rating,
 #player-album-repeat {
   position: relative;
   float: left;
 }
 
-#player-album-shuffle, 
+#player-album-shuffle,
 #player-album-repeat {
   top: 10%;
-  width: calc(25% - 20px);
+  width: calc(25% - 2rem);
   height: 80%;
-  padding: 0px;
-  border-radius: 35px;
-  margin: 0 10px;
+  padding: 0;
+  border-radius: 3.5rem;
+  margin: 0 1rem;
   font-weight: 500;
   background-position: center center;
   background-repeat: no-repeat;
+  background-size: 3rem;
 }
 
 #player-album-shuffle {
   background-image: url("./images/IconAction_Media_ShuffleOff_30x30.png");
 }
 
-#player-album-shuffle:disabled {
-  background-image: url("./images/IconAction_Media_ShuffleOn_30x30.png");
-}
-
+#player-album-shuffle:disabled,
 #player-album-shuffle.shuffle-on {
   background-image: url("./images/IconAction_Media_ShuffleOn_30x30.png");
 }
@@ -666,6 +691,7 @@ body.player-mode #title-player {
   background-image: url("./images/IconAction_Media_RepeatOff_30x30.png");
 }
 
+#player-album-repeat:disabled,
 #player-album-repeat.repeat-list {
   background-image: url("./images/IconAction_Media_RepeatList_30x30.png");
 }
@@ -698,6 +724,7 @@ button::-moz-focus-inner {
   background-position: center center;
   background-repeat: no-repeat;
   background-color: transparent;
+  background-size: 2.2rem;
 }
 
 .star-on {
@@ -706,130 +733,129 @@ button::-moz-focus-inner {
 
 #player-seek {
   position: relative;
-  width: 100%;
-  height: 4.5rem;
-  background: url('./images/scroll_bar_bg.png');
-  background-position: center center;
-  background-repeat: no-repeat;
-  background-size: 100% 2.1rem;
-  background-color: #151515;
-  overflow: hidden;
+  height: 4.2rem;
+  font-size: 0;
+  background-color: rgba(0,0,0, 0.85);
 }
 
-#player-seek-elapsed, 
-#player-seek-bar, 
+#player-seek.disabled {
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+#player-seek-elapsed,
+#player-seek-bar,
 #player-seek-remaining {
+  display: inline-block;
   position: relative;
-  float: left;
+  vertical-align: top;
 }
 
-#player-seek-elapsed, 
-#player-seek-remaining {  
-  top: calc(50% - 0.69rem);
-  width: 18%;
-  line-height: 1.38rem;
+#player-seek-elapsed,
+#player-seek-remaining {
+  width: 5.3rem;
+  line-height: 4.2rem;
   font-size: 1.4rem;
-  font-weight: 500;
-  color: #a1afb2;
-  text-align: center;
+  font-weight: 400;
+  color: #e7e7e7;
+}
+
+#player-seek-elapsed {
+  padding-left: 1.5rem;
+}
+
+#player-seek-remaining {
+  text-align: right;
+  padding-right: 1.5rem;
 }
 
 #player-seek-bar {
-  width: 60%;
+  display: inline-block;
+  width: calc(100% - 13.6rem);
   height: 100%;
-  padding: 0 2%;
+  z-index: 1;
 }
 
 #player-seek-bar-progress {
   pointer-events: none;
   -moz-appearance: none;
   position: absolute;
-  top: calc(50% - 0.15rem);
-  left: 2.5%;
-  width: 95%;
-  height: 0.3rem;
-  border-radius: 5px;
-  border-width: 0px;
-  box-shadow: 1px 1px rgba(255, 255, 255, 0.2);
-  background: url("./images/timeline.png");
-  background-position: center center;
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
+  top: calc(50% - 0.1rem);
+  left: 0;
+  height: 0.1rem;
+  border-width: 0;
+  border-radius: 0;
+  background-color: #a6b4b7;
 }
 
 #player-seek-bar-progress::-moz-progress-bar {
-  border-radius: 5px;
-  background: url("./images/timeline_filled.png");
-  background-position: center center;
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
+  height: 0.3rem;
+  margin-top: -0.1rem;
+  background-color: #00CAF2;
 }
 
 #player-seek-bar-indicator {
   position: absolute;
-  top: calc(50% - 4.05rem);
-  width: 6.5rem;
-  height: 6.5rem;
-  border-radius: 50%;
-  background-image: url("./images/scrubber.png");
-  background-position: center center;
-  background-repeat: no-repeat;
-  background-color: transparent;
-  border: solid 0.8rem transparent;
-  transition: background-color 300ms ease,
-              border 300ms ease;
+  top: calc(50% - 1.15rem);
+  width: 2.3rem;
+  height: 2.3rem;
   pointer-events: none;
 }
 
-#player-seek-bar-indicator.highlight {
-  /* background-image does not support transition
-   * so here we use background-color and border on a div
-   * to draw an image just like
-   * url("./images/scrubber_pressed.png")
-   * that image is also committed
-   * if UX wants to use the original image
-   */
-  background-color: rgba(0, 180, 225, 0.85);
-  border: solid 0.8rem rgba(0, 0, 0, 0.3);
+#player-seek-bar-indicator:after {
+  content: "";
+  position: absolute;
+  top: calc(50% - 1.25rem);
+  left: calc(50% - 1.15rem);
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  border: 0.1rem solid #ffffff;
+  background-color: #ffffff;
+}
+
+
+#player-seek-bar-indicator.highlight:before {
+  content: "";
+  position: absolute;
+  top: calc(50% - 3.05rem);
+  left: calc(50% - 3.05rem);
+  width: 6.1rem;
+  height: 6.1rem;
+  border-radius: 50%;
+  background-color: #00CAF2;
 }
 
 #player-controls {
   position: relative;
-  width: 100%;
-  height: 5.5rem;
+  height: 4.8rem;
+  font-size: 0;
+  vertical-align: top;
+  border-top: 0.1rem solid rgba(255,255,255, 0.1);
+  background-color: #000;
   overflow: hidden;
-  background: rgba(0, 0, 0, 1);
 }
 
-#player-controls-previous, 
-#player-controls-play, 
+#player-controls-previous,
+#player-controls-play,
 #player-controls-next {
   position: relative;
-  float: left;
   height: 100%;
-  padding: 0px;
-  border-width: 0px;
+  padding: 0;
   font-weight: 500;
-  overflow: hidden;
   background-position: center center;
   background-repeat: no-repeat;
-}
-
-#player-controls-previous, 
-#player-controls-next {
-  width: 30%;
-}
-
-#player-controls-play {
-  width: 40%;
+  background-size: 3rem;
 }
 
 #player-controls-previous {
   background-image: url("./images/IconAction_Media_SkipBackwards_30x30.png");
+  width: 33%;
 }
 
 #player-controls-play {
   background-image: url("./images/IconAction_Media_Pause_30x30.png");
+  width: 34%;
 }
 
 #player-controls-play.is-pause {
@@ -838,12 +864,13 @@ button::-moz-focus-inner {
 
 #player-controls-next {
   background-image: url("./images/IconAction_Media_SkipForward_30x30.png");
+  width: 33%;
 }
 
 .player-controls-button {
   color: #FFFFFF;
   border: none;
-  border-radius: 0px;
+  border-radius: 0;
   background: transparent;
   transition: background 200ms ease;
 }
@@ -851,7 +878,7 @@ button::-moz-focus-inner {
   background: transparent;
 }
 .player-controls-button:active {
-  background: rgb(0, 138, 170);
+  background: #00caf2;
 }
 .player-controls-button:disabled {
   opacity: 0.3;
@@ -860,65 +887,40 @@ button::-moz-focus-inner {
   background: transparent;
 }
 
-
 #tabs {
   position: absolute;
   bottom: 0;
   width: 100%;
-  height: 4rem;
   z-index: 20;
-  background: rgba(0, 0, 0, 0.75);
 }
 
-#tabs-mix,
-#tabs-playlists,
-#tabs-artists,
-#tabs-albums {
-  position: relative;
-  float: left;
-  width: 25%;
-  height: 100%;
-  padding: 0px;
-  font-size: 1.7rem;
-  background-position: center center;
-  background-repeat: no-repeat;
+#tabs a {
+  outline: none;
 }
 
-#tabs-mix {
-  background-image: url("./images/IconAction_Camera_GridView_30x30.png");
+#mix[role="tab"] a {
+  background-image: url("./images/iconaction_media_gridview.png");
 }
 
-#tabs-playlists {
-  background-image: url("./images/IconAction_Media_PlayList_30x30.png");
+#playlists[role="tab"] a {
+  background-image: url("./images/iconaction_media_playlistfilter.png");
 }
 
-#tabs-artists {
-  background-image: url("./images/IconAction_Media_ArtistFilter_30x30.png");
+#artists[role="tab"] a {
+  background-image: url("./images/iconaction_media_artistfilter.png");
 }
 
-#tabs-albums {
-  background-image: url("./images/IconAction_Media_AlbumFilter_30x30.png");
+#albums[role="tab"] a {
+  background-image: url("./images/iconaction_media_albumfilter.png");
 }
 
-.tabs-button {
-  border: none;
-  border-radius: 0px;
-  background: transparent;
-  transition: background 200ms ease;
-}
-.tabs-button:hover {
-  background: transparent;
-}
-.tabs-button:active {
-  background: rgb(0, 138, 170);
-}
-.tabs-button:disabled {
-  
+#songs[role="tab"] a {
+  background-image: url("./images/iconaction_media_songsfilter.png");
 }
 
 .player-cover-button {
   border: none;
-  border-radius: 0px;
+  border-radius: 0;
   background: transparent;
   transition: background 200ms ease;
 }
@@ -939,10 +941,6 @@ button::-moz-focus-inner {
   display: none;
 }
 
-li:last-child {
-  padding-bottom: 4rem;
-}
-
 li.list-header {
   list-style-type: none;
   position: relative;
@@ -952,7 +950,7 @@ li.list-header {
   line-height: 2.5rem;
   font-size: 1.9rem;
   color: rgb(0, 138, 170);
-  border-bottom: solid 1px rgba(255, 255, 255, 0.1);
+  border-bottom: solid 0.1rem rgba(255, 255, 255, 0.1);
   pointer-events: none;
 }
 
@@ -960,6 +958,9 @@ li.list-item {
   list-style-type: none;
   position: relative;
   width: 100%;
+  background-size: contain;
+  background-position: calc(100% - 2.5rem) -0.1rem;
+  background-repeat: no-repeat;
 }
 
 li.list-item a {
@@ -968,20 +969,20 @@ li.list-item a {
   text-decoration: none;
   outline: none;
   margin: 0;
-  text-shadow: black 1px 1px;
+  text-shadow: black 0.1rem 0.1rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   width: 100%;
   height: 6rem;
-  background: transparent;
-  transition: background 200ms ease;
+  background-color: transparent;
+  transition: background-color 200ms ease;
 }
 
 li.list-item a:active {
   color: black;
-  text-shadow: rgba(255, 255, 255, 0.5) 1px 1px;
-  background: rgb(0, 138, 170);
+  text-shadow: rgba(255, 255, 255, 0.5) 0.1rem 0.1rem;
+  background-color: rgba(52,140,158, .6);
 }
 
 /* title width is 100% - 1rem(padding) - 6rem(albumArt) */
@@ -1031,7 +1032,7 @@ li.list-item a:active {
   line-height: 6rem;
   font-size: 1.9rem;
   color: white;
-  border-bottom: solid 1px rgba(255, 255, 255, 0.1);
+  border-bottom: solid 0.1rem rgba(255, 255, 255, 0.1);
 }
 
 .list-playlist-icon {
@@ -1043,6 +1044,7 @@ li.list-item a:active {
   background-position: center center;
   background-repeat: no-repeat;
   background-image: url("./images/IconAction_Media_ShuffleOn_30x30.png");
+  background-size: 3rem;
   pointer-events: none;
 }
 
@@ -1071,28 +1073,46 @@ li.list-item a:active {
   padding-right: 0.5rem;
   font-size: 1.9rem;
   color: white;
-  border-bottom: solid 1px rgba(255, 255, 255, 0.1);
+  border-bottom: solid 0.1rem rgba(255, 255, 255, 0.1);
 }
 
 .list-song-length {
   right: 0;
   width: 5rem;
   padding-right: 0.5rem;
-  border-bottom: solid 1px rgba(255, 255, 255, 0.1);
+  border-bottom: solid 0.1rem rgba(255, 255, 255, 0.1);
 }
 
-.list-image-parent {
-  position: absolute;
-  right: 2.5rem;
-  top: 0px;
-  height: 6rem;
-  width: 6rem;
-  overflow: hidden;
-  background-color: #8a9699;
-  box-shadow: 0 0 1px black;
-  pointer-events: none;
+form[role="search"] {
+  background: url(/shared/style/headers/images/ui/dark/subheader.png);
 }
 
-.list-image {
-  position: absolute;
+form[role="search"] button {
+  background: url(/shared/style/headers/images/ui/dark/separator.png) no-repeat scroll 2rem center transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  float: left;
+  width: calc(2rem + 2px);
+}
+
+.search-highlight {
+  background-color: rgb(0, 138, 170);
+}
+
+form p input + button[type="reset"] {
+  width: 4rem;
+  padding: 1rem;
+}
+
+#info-banner {
+  z-index: -1;
+  opacity: 0;
+  transition: all 600ms ease;
+}
+
+#info-banner.visible {
+  z-index: 100;
+  opacity: 1;
+  transition: all 600ms ease;
 }

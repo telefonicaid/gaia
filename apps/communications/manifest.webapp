@@ -12,8 +12,9 @@
       "launch_path": "/dialer/index.html#keyboard-view",
       "name": "Phone",
       "icons": {
-        "120": "/dialer/style/icons/Dialer.png",
-        "60": "/dialer/style/icons/60/Dialer.png"
+        "60": "/dialer/style/icons/Dialer_60.png",
+        "90": "/dialer/style/icons/Dialer_90.png",
+        "120": "/dialer/style/icons/Dialer_120.png"
       },
       "locales": {
         "ar": {
@@ -38,8 +39,9 @@
       "launch_path": "/contacts/index.html",
       "name": "Contacts",
       "icons": {
-        "120": "/contacts/style/icons/Contacts.png",
-        "60": "/contacts/style/icons/60/Contacts.png"
+        "60": "/contacts/style/icons/Contacts_60.png",
+        "90": "/contacts/style/icons/Contacts_90.png",
+        "120": "/contacts/style/icons/Contacts_120.png"
       },
       "locales": {
         "ar": {
@@ -68,6 +70,7 @@
   },
   "permissions": {
     "telephony":{},
+    "bluetooth":{},
     "voicemail":{},
     "contacts":{ "access": "readwrite" },
     "mobileconnection":{},
@@ -79,17 +82,38 @@
     "wifi-manage":{},
     "time": {},
     "audio-channel-telephony":{},
-    "audio-channel-ringer":{},
-    "browser":{}
+    "idle":{},
+    "storage": {},
+    "device-storage:sdcard": { "access": "readcreate" },
+    "phonenumberservice": {}
   },
-  "orientation": "portrait-primary",
+  "orientation": "default",
   "activities": {
     "pick": {
       "filters": {
-        "type": ["webcontacts/contact","webcontacts/email"]
+        "type": {
+          "required": true,
+          "value": ["webcontacts/contact","webcontacts/email","webcontacts/tel"]
+        }
        },
       "disposition": "inline",
       "href": "/contacts/index.html?pick",
+      "returnValue": true
+    },
+    "import": {
+      "filters": {
+        "type": "text/vcard"
+      },
+      "disposition": "inline",
+      "href": "/contacts/index.html?open",
+      "returnValue": true
+    },
+    "open": {
+      "filters": {
+        "type": "webcontacts/contact"
+      },
+      "disposition": "inline",
+      "href": "/contacts/index.html?open",
       "returnValue": true
     },
     "new": {
@@ -110,7 +134,8 @@
     },
     "dial": {
       "filters": {
-        "type": "webtelephony/number"
+        "type": "webtelephony/number",
+        "number": { "pattern":"[\\d\\s+#*().-]{0,50}" }
       },
       "href": "/dialer/index.html#keyboard-view",
       "disposition": "window"
@@ -123,5 +148,26 @@
      { "notification": "/dialer/index.html#keyboard-view" },
      { "telephony-new-call": "/dialer/index.html#keyboard-view" },
      { "ussd-received": "/dialer/index.html#keyboard-view" }
-  ]
+  ],
+  "redirects": [
+    {"from": "facebook",
+    "to": "/redirects/redirect.html"},
+    {"from": "facebook_dialogs",
+    "to": "/redirects/dialogs_end.html"},
+    {"from": "facebook_logout",
+    "to": "/redirects/dialogs_end.html"},
+    {"from": "live",
+    "to": "/redirects/redirect.html"},
+    {"from": "gmail",
+    "to": "/redirects/redirect.html"}
+  ],
+  "datastores-owned": {
+    "Gaia_Facebook_Friends": {
+      "description": "Imported Facebook Friends"
+    }
+  },
+  "icons": {
+        "30": "/style/icons/communication_30.png",
+        "45": "/style/icons/communication_45.png"
+  }
 }

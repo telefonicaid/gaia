@@ -1,79 +1,179 @@
-'use strict';
+define(function() {
 
-var StopWatch = {
-  _elapsed: 0,
+  'use strict';
 
-  get actionButton() {
-    delete this.actionButton;
-    var id = 'stopwatch-action-button';
-    return this.actionButton = document.getElementById(id);
-  },
+  var priv = new WeakMap();
 
-  get resetButton() {
-    delete this.resetButton;
-    return this.actionButton = document.getElementById('reset-button');
-  },
+  function Defaults() {
+    this.startTime = 0;
+    this.totalElapsed = 0;
+    this.state = Stopwatch.RESET;
+    this.laps = [];
+  }
 
-  get tickerView() {
-    delete this.tickerView;
-    return this.tickerView = document.getElementById('stopwatch-ticker-view');
-  },
+  /**
+   * Stopwatch
+   *
+   * Create new or revive existing stopwatch objects.
+   *
+   * @param {Object} opts Optional stopwatch object to create or revive
+   *                      a new or existing stopwatch object.
+   *                 - startTime, number time in ms.
+   *                 - totalElapsed, number time in ms.
+   *                 - isStarted, started state boolean.
+   *                 - laps, array of lap objects (lap = {time:, duration:}).
+   */
+  function Stopwatch(opts = {}) {
+    var defaults = new Defaults();
+    var obj = {};
 
-  get chronoView() {
-    delete this.chronoView;
-    return this.chronoView = document.getElementById('stopwatch-chrono-view');
-  },
+    obj.startTime = opts.startTime || defaults.startTime;
+    obj.totalElapsed = opts.totalElapsed || defaults.totalElapsed;
+    obj.state = opts.state || defaults.state;
+    obj.laps = opts.laps ? opts.laps.slice() : defaults.laps;
 
-  execute: function sw_execute(action) {
-    if (!this[action]) {
-      return;
+    priv.set(this, obj);
+  }
+
+  Stopwatch.RUNNING = 'RUNNING';
+  Stopwatch.PAUSED = 'PAUSED';
+  Stopwatch.RESET = 'RESET';
+
+  Stopwatch.prototype = {
+
+    constructor: Stopwatch,
+
+    getState: function() {
+      var sw = priv.get(this);
+      return sw.state;
+    },
+
+    setState: function(state) {
+      var sw = priv.get(this);
+      sw.state = state;
+    },
+
+    /**
+    * start Starts the stopwatch, either from a reset or paused state
+    */
+    start: function sw_start() {
+      var sw = priv.get(this);
+      if (sw.state === Stopwatch.RUNNING) {
+        return;
+      }
+      var now = Date.now() - sw.totalElapsed;
+      sw.startTime = now;
+      this.setState(Stopwatch.RUNNING);
+    },
+
+    /**
+    * getElapsedTime Calculates the total elapsed duration since the
+    *                stopwatch was started
+    * @return {Number} return total elapsed duration.
+    */
+    getElapsedTime: function sw_getElapsedTime() {
+      var sw = priv.get(this);
+      var elapsed = 0;
+      if (sw.state === Stopwatch.RUNNING) {
+        elapsed = Date.now() - sw.startTime;
+      } else {
+        elapsed = sw.totalElapsed;
+      }
+      return elapsed;
+    },
+
+    /**
+    * pause Pauses the stopwatch
+    */
+    pause: function sw_pause() {
+      var sw = priv.get(this);
+      if (sw.state === Stopwatch.PAUSED) {
+        return;
+      }
+      sw.totalElapsed = Date.now() - sw.startTime;
+      this.setState(Stopwatch.PAUSED);
+    },
+
+    /**
+    * nextLap Calculates the duration of the next lap.
+    * @return {object} return an object containing:
+    *         duration - the duration of this lap in ms.
+    *         time - the start time of this lap in ms from epoch.
+    */
+    nextLap: function sw_nextLap() {
+      var sw = priv.get(this);
+      var now;
+      if (sw.state === Stopwatch.RUNNING) {
+        now = Date.now();
+      } else {
+        now = sw.startTime + sw.totalElapsed;
+      }
+
+      var lastLapTime;
+      var newLap = {};
+
+      if (sw.laps.length > 0) {
+        lastLapTime = sw.laps[sw.laps.length - 1].time;
+      } else {
+        lastLapTime = 0;
+      }
+
+      newLap.duration = now - (sw.startTime + lastLapTime);
+      newLap.time = now - sw.startTime;
+
+      return newLap;
+    },
+
+    /**
+    * lap Calculates a new lap duration since the last lap time,
+    *     and mutates `priv[this].laps` to contain the new value.
+    *     If the stopwatch isn't currently running, returns 0.
+    * @return {number} return the lap duration in ms.
+    */
+    lap: function sw_lap() {
+      var sw = priv.get(this);
+      if (sw.state !== Stopwatch.RUNNING) {
+        return 0;
+      }
+      var nl = this.nextLap();
+      sw.laps.push(nl);
+      return nl;
+    },
+
+    /**
+    * getLaps Returns an array of laps, sorted by oldest first
+    * @return {Array} return an array of laps.
+    */
+    getLaps: function sw_getLaps() {
+      var sw = priv.get(this);
+      return sw.laps.map(function(lap) {
+        return lap;
+      });
+    },
+
+    /**
+    * reset Resets the stopwatch back to 0, clears laps
+    */
+    reset: function sw_reset() {
+      priv.set(this, new Defaults());
+    },
+
+    /**
+    * toSerializable Returns a serializable object for persisting Stopwatch data
+    * @return {Object} A serializable object.
+    */
+    toSerializable: function sw_toSerializable() {
+      var sw = priv.get(this);
+      var obj = {};
+      for (var i in sw) {
+        if (sw.hasOwnProperty(i)) {
+          obj[i] = Array.isArray(sw[i]) ? sw[i].slice() : sw[i];
+        }
+      }
+      return obj;
     }
 
-    this[action]();
-  },
+  };
 
-  start: function sw_start() {
-    this.actionButton.dataset.action = 'stop';
-
-    this.updateChrono(this._elapsed);
-    this.tickerView.classList.add('running');
-
-    this._startTime = Date.now();
-    this._ticker = setInterval(function sw_updateChrono(self) {
-      var elapsed = Date.now() - self._startTime + self._elapsed;
-      self.updateChrono(elapsed);
-    }, 500, this);
-  },
-
-  stop: function sw_stop() {
-    this.actionButton.dataset.action = 'start';
-    this.tickerView.classList.remove('running');
-
-    this._elapsed += Date.now() - this._startTime;
-    clearInterval(this._ticker);
-    delete this._ticker;
-    delete this._startTime;
-  },
-
-  reset: function sw_reset() {
-    this.stop();
-    this._elapsed = 0;
-    this.updateChrono(this._elapsed);
-  },
-
-  updateChrono: function sw_updateChrono(elapsed) {
-    var f = new navigator.mozL10n.DateTimeFormat();
-    var currentValue = this.chronoView.innerHTML;
-    var newValue = f.localeFormat(elapsed, '%M:%S');
-    if (currentValue != newValue)
-      this.chronoView.innerHTML = newValue;
-  }
-};
-
-window.addEventListener('load', function onLoad() {
-  window.removeEventListener('load', onLoad);
-
-  StopWatch.actionButton.onclick = StopWatch.start.bind(StopWatch);
-  StopWatch.resetButton.onclick = StopWatch.reset.bind(StopWatch);
+  return Stopwatch;
 });
-

@@ -1,214 +1,116 @@
-/* swiper-area */
-#swiper-area {
-  bottom: 0;
-  height: 6rem;
+/* Lockscreen slider - Need to move duplicate styling in other proper place */
+#lockscreen-area {
+  position: absolute;
+  height: 11.2rem;
   left: 0;
-  position: absolute;
   right: 0;
+  bottom: 0;
 }
 
-/* swiper-area-hangup */
-.swiper-icon:after {
-  content: "";
-  display: block;
-  height: 2.2rem;
-  margin: -1.1rem;
+.lockscreen-icon-area {
+  height: 10rem;
   position: absolute;
-  top: 1.9rem;
-  width: 1.2rem;
-}
-
-#swiper-area-hangup > div {
-  background-image: url("images/hangup_icon.png");
-  background-position: center;
-  background-repeat: no-repeat;
-  margin-left: 4.2rem;
-  margin-right: auto;
+  border-style: none;
   transition: opacity 0.5s ease;
 }
 
-.touched #swiper-area-hangup > div {
+.lockscreen-icon {
+  margin-top: 2rem;
+  width: 6rem;
+  height: 6rem;
+
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 3rem;
+
+  pointer-events: none;
+}
+
+.lockscreen-icon-area.dark .lockscreen-icon{
+  opacity: 0.65;
+}
+
+#lockscreen-area-slide {
+  text-align: center;
+  width: calc(100%);
+}
+
+.touched .lockscreen-icon {
   transition: none;
 }
 
-#swiper-area-hangup:active > div {
-  background-image: url("images/hangup_icon_pressed.png");
-  background-color: #F80000;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-.swiper-icon-left {
-  left: 0;
-  border-top: 1px solid #F80000;
-}
-.swiper-icon-right > div {
-  border: 2px solid #82C82D;
-}
-.swiper-icon-left > div {
-  border: 2px solid #F80000;
+.lockscreen-icon-right {
+  right: calc(50% - 14rem);
 }
 
-.swiper-icon {
-  margin-top: 2rem;
-  border-radius: 3.2rem;
-  width: 6.4rem;
-  height: 6.4rem;
-  background-color: rgba(0, 0, 0, 0.7);
-  -moz-box-sizing: border-box;
-  pointer-events: none;
+.lockscreen-icon-left {
+  left: calc(50% - 14rem);
 }
 
-.touched .swiper-rail {
-  opacity: 1;
+@media (min-width:768px) {
+  .lockscreen-icon-right {
+    right: calc(50% - 20.5rem);
+  }
+
+  .lockscreen-icon-left {
+    left: calc(50% - 20.5rem);
+  }
 }
 
-.swiper-icon-area {
-  width: -moz-calc(50%);
-  height: 100%;
-  position: absolute;
-  background-image: linear-gradient(to bottom,
-                    rgba(0,0,0,0.8), rgba(0,0,0,0.2) 20%);
-  pointer-events: none;
+:-moz-any(.touched, #screen:not(.locked), #screen.attention, #lockscreen:not([data-panel="main"]))
+:-moz-any(#lockscreen-left-arrow, #lockscreen-right-arrow) {
+  display: none;
+  animation: none;
 }
 
-.triggered .swiper-icon-area {
+.lockscreen-icon-left, .lockscreen-icon-right {
+  z-index: 16;
   pointer-events: auto;
 }
 
-/* swiper-area-pickup */
-#swiper-area-pickup > div {
-  background-image: url("images/pickup_icon.png");
-  background-position: center;
-  background-repeat: no-repeat;
-  margin-right: 4.2rem;
-  margin-left: auto;
-  transition: opacity 0.5s ease;
+/* Compensation for the effects after enabling the pointer-event attribute. */
+.lockscreen-icon-left:active, .lockscreen-icon-right:active {
+  background: none;
 }
 
-.touched #swiper-area-pickup > div {
+.lockscreen-icon-left > div {
+  background-image: url('images/hangup_icon.png');
+}
+
+.lockscreen-icon-right > div {
+  background-image: url('images/pickup_icon.png');
+}
+
+.touched #lockscreen-icon-container {
   transition: none;
 }
 
-#swiper-area-pickup:active > div {
-  background-image: url("images/pickup_icon_pressed.png");
-  background-color: #82C82D;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-.swiper-icon-right {
-  right: 0;
-  border-top: 1px solid #83C72B;
-}
-
-/* swiper-area-handle */
-#swiper-area-handle {
-  opacity: 1;
-  position: absolute;
-  background-image: url('images/handle.png');
-  background-repeat: no-repeat;
-  background-position: center;
-  border-top: 1px solid transparent;
-  top: 0;
-  height: 0.9rem;
-  width: 100%;
-  transition: opacity 0.5s ease;
-}
-
-.touched #swiper-area-handle {
+.touched .lockscreen-icon-area {
   transition: none;
 }
 
-/* swiper */
-#swiper-wrapper{
-  display: inline-block;
-}
-
-#swiper-wrapper.hide{
-  display: none;
-}
-
-#swiper-icon-container {
+#lockscreen-canvas-wrapper {
   position: absolute;
+  bottom: 0.75rem;
+  z-index: 8;
   width: 100%;
-  bottom: -8rem;
+}
+
+/* Need to override original lockscreen icon container */
+#lockscreen-icon-container {
+  background: rgba(0, 0, 0, 0.4);
+  position: absolute;
+  bottom: 0;
+  width: 100%;
   height: 10rem;
   pointer-events: none;
-  padding-top: 2rem;
-  transition:
-    transform 0.5s ease,
-    opacity 0.5s ease;
 }
 
-.touched #swiper-icon-container {
-  transition: none;
+/* Additional styling for lockscreen icon */
+.lockscreen-icon-right.triggered > div {
+  background-image: url("images/pickup_icon_pressed.png");
 }
 
-@keyframes swiper-elastic {
-  0%, 100% {
-    transform: translateY(0);
-    animation-timing-function: ease-out;
-  }
-  50% {
-    transform: translateY(-5rem);
-    animation-timing-function: ease-in;
-  }
-}
-
-.elastic #swiper-icon-container {
-  animation: swiper-elastic 1s 1;
-}
-
-.triggered #swiper-icon-container {
-  transform: translateY(-8rem);
-  opacity: 1;
-}
-
-.triggered #swiper-area-pickup > div {
-  opacity: 1;
-}
-
-.triggered #swiper-area-hangup > div {
-  opacity: 1;
-}
-
-.triggered #swiper-area-handle {
-  opacity: 0;
-}
-
-@keyframes swiper-elastic {
-  0%, 60%, 100% {
-    transform: translateY(0);
-    animation-timing-function: ease-out;
-  }
-  30% {
-    transform: translateY(-5rem);
-    animation-timing-function: ease-in;
-  }
-  80% {
-    transform: translateY(-1.5rem);
-    animation-timing-function: ease-in;
-  }
-}
-
-@keyframes swiper-elastic-icon {
-  0%, 60%, 100% {
-    opacity: 0.1;
-    animation-timing-function: ease-out;
-  }
-  30% {
-    opacity: 0.5;
-    animation-timing-function: ease-in;
-  }
-  80% {
-    opacity: 0.4;
-    animation-timing-function: ease-in;
-  }
-}
-
-.elastic .swiper-icon {
-  animation: swiper-elastic-icon 1.3s infinite;
-}
-
-.elastic #swiper-icon-container {
-  animation: swiper-elastic 1.3s infinite;
+.lockscreen-icon-left.triggered > div {
+  background-image: url("images/hangup_icon_pressed.png");
 }

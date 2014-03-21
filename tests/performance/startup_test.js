@@ -1,55 +1,79 @@
 'use strict';
 
-require('/tests/js/app_integration.js');
-require('/tests/js/integration_helper.js');
-require('/tests/performance/performance_helper.js');
+var assert = require('assert');
 
-function GenericIntegration(device) {
-  AppIntegration.apply(this, arguments);
-}
+var App = require('./app');
+var PerformanceHelper = requireGaia('/tests/performance/performance_helper.js');
+var MarionetteHelper = requireGaia('/tests/js-marionette/helper.js');
 
-var [manifestPath, entryPoint] = window.mozTestInfo.appPath.split('/');
+var manifestPath, entryPoint;
 
-GenericIntegration.prototype = {
-  __proto__: AppIntegration.prototype,
-  appName: window.mozTestInfo.appPath,
-  manifestURL: 'app://' + manifestPath + '.gaiamobile.org/manifest.webapp',
-  entryPoint: entryPoint
-};
+var arr = mozTestInfo.appPath.split('/');
+manifestPath = arr[0];
+entryPoint = arr[1];
 
+marionette('startup test > ' + mozTestInfo.appPath + ' >', function() {
 
-suite(window.mozTestInfo.appPath + ' >', function() {
-  var device;
   var app;
-
-  MarionetteHelper.start(function(client) {
-    app = new GenericIntegration(client);
-    device = app.device;
+  var client = marionette.client({
+    settings: {
+      'ftu.manifestURL': null
+    }
   });
+
+  var performanceHelper;
+  var isHostRunner = (process.env.MARIONETTE_RUNNER_HOST == 'marionette-device-host');
+
+  app = new App(client, mozTestInfo.appPath);
+  if (app.skip) {
+    return;
+  }
 
   setup(function() {
-    yield IntegrationHelper.unlock(device); // it affects the first run otherwise
-    yield PerformanceHelper.registerLoadTimeListener(device);
-  });
-
-  teardown(function() {
-    yield PerformanceHelper.unregisterLoadTimeListener(device);
-  });
-
-  test('startup time', function() {
     // Mocha timeout for this test
     this.timeout(100000);
     // Marionnette timeout for each command sent to the device
-    yield device.setScriptTimeout(10000);
+    client.setScriptTimeout(10000);
 
-    for (var i = 0; i < PerformanceHelper.kRuns; i++) {
-      yield IntegrationHelper.delay(device, PerformanceHelper.kSpawnInterval);
-      yield app.launch();
-      yield app.close();
-    }
+    MarionetteHelper.unlockScreen(client);
+  });
 
-    var results = yield PerformanceHelper.getLoadTimes(device);
+  test('startup time', function() {
+
+    performanceHelper = new PerformanceHelper({ app: app });
+
+    PerformanceHelper.registerLoadTimeListener(client);
+
+    var memStats = [];
+    performanceHelper.repeatWithDelay(function(app, next) {
+      app.launch();
+      if (isHostRunner) {
+        // we can only collect memory if we have a host device (adb)
+        var memUsage = performanceHelper.getMemoryUsage(app);
+        assert.ok(memUsage, 'couldn\'t collect mem usage');
+        memStats.push(memUsage);
+      }
+      app.close();
+    });
+
+    var results = PerformanceHelper.getLoadTimes(client);
+    assert.ok(results, 'empty results');
+
+    results = results.filter(function(element) {
+      if (element.src.indexOf('app://' + manifestPath) !== 0) {
+        return false;
+      }
+      if (entryPoint && element.src.indexOf(entryPoint) === -1) {
+        return false;
+      }
+      return true;
+    }).map(function(element) {
+      return element.time;
+    });
 
     PerformanceHelper.reportDuration(results);
+    PerformanceHelper.reportMemory(memStats);
+
+    PerformanceHelper.unregisterLoadTimeListener(client);
   });
 });

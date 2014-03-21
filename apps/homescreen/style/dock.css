@@ -1,20 +1,20 @@
 #footer {
+  min-height: 7.5rem;
   width: 100%;
-  height: 7.5rem;
-  position: fixed;
+  position: absolute;
   bottom: 0;
   z-index: 10000;
-  background-image: url('../resources/images/footer/background.png');
-  background-size: 100%;
-  overflow: hidden;
+  background-color: rgba(0,0,0,.4);
+  overflow: visible;
 }
 
 #footer .dockWrapper {
-  width: -moz-calc(7 * 8rem);
+  width: 175%;
   height: 100%;
 }
 
 #footer ol {
+  width: 100%;
   height: 100%;
   padding: 0;
   margin: 0;
@@ -25,8 +25,8 @@
 #footer li {
   height: 100%;
   position: relative;
-  width: 8rem;
-  display: inline-block;
+  width: calc(100% / 7);
+  float: left;
   text-align: center;
 }
 
@@ -40,6 +40,10 @@
   margin-top: .5rem;
   pointer-events: none;
 }
+/* Collection "ring" alignment */
+#footer ol > li[data-is-collection = 'true'] > div::before {
+  margin-top: 0.8rem;
+}
 
 /* Option to delete apps */
 #footer li span.options {
@@ -49,9 +53,46 @@
   width: calc(100% - .5rem);
   height: 2.6rem;
   z-index: 2;
-  background: url(../resources/images/delete.png) no-repeat left top;
+  background: url(../resources/images/delete.png) no-repeat left top / 2.4rem;
 }
 
 #footer li > div > *:not(img) {
   display: none;
+}
+
+/* For tablet+ Device */
+@media (min-width: 768px) {
+  #footer {
+    height: 16.9rem;
+  }
+
+  #footer ol {
+    margin-top: 3.49rem;
+  }
+
+  #footer > div li,
+  #footer > div.scrollable li {
+    width: 15rem;
+  }
+}
+
+@media (min-width: 768px) and (orientation: landscape) {
+  #footer .dockWrapper {
+    width: 160%;
+  }
+
+  #footer li {
+    width: calc(100% / 8);
+  }
+
+  #footer > div li,
+  #footer > div.scrollable li {
+    width: 17.5rem;
+  }
+
+  #footer li span.options {
+    width: calc(50% - .5rem);
+    height: 4.5rem;
+    background: url(../resources/images/delete.png) no-repeat left top / 4.5rem;
+  }
 }

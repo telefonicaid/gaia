@@ -1,34 +1,6 @@
 
 'use strict';
 
-// Return a time string in format Today|Yesterday|<WeekDay>, hh:mm
-// if timestamp is a valid date. If not, it returns Never.
-function formatTime(timestamp) {
-  if (!timestamp) {
-    return _('never');
-  }
-
-  var dateFormatter = new navigator.mozL10n.DateTimeFormat();
-  var time = dateFormatter.localeFormat(timestamp, _('shortTimeFormat'));
-  var date = dateFormatter.localeFormat(timestamp, '%a');
-  var dateDay = parseInt(dateFormatter.localeFormat(timestamp, '%u'), 10);
-  var now = new Date();
-  var nowDateDay = parseInt(dateFormatter.localeFormat(now, '%u'), 10);
-
-  if (nowDateDay === dateDay) {
-    date = _('today');
-  } else if ((nowDateDay === dateDay + 1) ||
-            (nowDateDay === 1 && dateDay === 7)) {
-    date = _('yesterday');
-  }
-
-  return navigator.mozL10n.get('day-hour-format', {
-    day: date,
-    time: time
-  });
-
-}
-
 // Return a balance string in format DD.XX or -- if balance is null
 function formatBalance(balance) {
   var formattedBalance = '--';
@@ -44,55 +16,61 @@ function formatBalance(balance) {
 // Format data using magnitude localization
 // It exepcts a pair with the value and the unit
 function formatData(dataArray) {
-  return _('magnitude', { value: dataArray[0], unit: dataArray[1] });
+  return isNaN(dataArray[0]) ? '' :
+                    _('magnitude', { value: dataArray[0], unit: dataArray[1] });
 }
 
 // Return a fixed point data value in KB/MB/GB
 function roundData(value, positions) {
   positions = (typeof positions === 'undefined') ? 2 : positions;
   if (value < 1000) {
-    return [value.toFixed(positions), 'B'];
+    return [value.toFixed(positions), _('B')];
   }
 
   if (value < 1000000) {
-    return [(value / 1000).toFixed(positions), 'KB'];
+    return [(value / 1000).toFixed(positions), _('KB')];
   }
 
   if (value < 1000000000) {
-    return [(value / 1000000).toFixed(positions), 'MB'];
+    return [(value / 1000000).toFixed(positions), _('MB')];
   }
 
-  return [(value / 1000000000).toFixed(positions), 'GB'];
+  return [(value / 1000000000).toFixed(positions), _('GB')];
 }
 
-function getPositions(value) {
+function getPositions(value, deltaPositions) {
+  deltaPositions = (typeof deltaPositions === 'undefined') ? 0 : deltaPositions;
+
+  if (parseInt(value) === value) {
+    return 0;
+  }
   if (value < 10) {
-    return 2;
+    return 2 + deltaPositions;
   }
   if (value < 100) {
-    return 1;
+    return 1 + deltaPositions;
   }
   return 0;
 }
 
-function smartRound(value) {
-  var positions;
+function smartRound(value, deltaPositions) {
+  deltaPositions = (typeof deltaPositions === 'undefined') ? 0 : deltaPositions;
   if (value < 1000) {
-    return [value.toFixed(getPositions(value)), 'B'];
+    return [value.toFixed(getPositions(value, deltaPositions)), _('B')];
   }
 
   if (value < 1000000) {
     var kbytes = value / 1000;
-    return [kbytes.toFixed(getPositions(kbytes)), 'KB'];
+    return [kbytes.toFixed(getPositions(kbytes, deltaPositions)), _('KB')];
   }
 
   if (value < 1000000000) {
     var mbytes = value / 1000000;
-    return [mbytes.toFixed(getPositions(mbytes)), 'MB'];
+    return [mbytes.toFixed(getPositions(mbytes, deltaPositions)), _('MB')];
   }
 
   var gbytes = value / 1000000000;
-  return [gbytes.toFixed(getPositions(gbytes)), 'GB'];
+  return [gbytes.toFixed(getPositions(gbytes, deltaPositions)), _('GB')];
 }
 
 // Return a padded data value in MG/GB
@@ -118,3 +96,83 @@ function computeTelephonyMinutes(activity) {
   return Math.ceil(activity.calltime / 60000);
 }
 
+var Formatting = (function() {
+
+  var MINUTE = 60 * 1000;
+  var HOUR = 60 * MINUTE;
+  var DAY = 24 * HOUR;
+  function getDaysOfDifference(a, b) {
+    return Math.floor((a.getTime() - b.getTime()) / DAY);
+  }
+
+  return {
+    /*
+     * Used with a Date and a format string, it is the same than using
+     * `l10n.localeFormat()`.
+     *
+     * If format is not provided, default format is assumed to be:
+     *   "Today|Yesterday|<WeekDay>, hh:mm"
+     *
+     */
+    formatTime: function(timestamp, format) {
+      if (!timestamp) {
+        return _('never');
+      }
+
+      var now = new Date(), then = new Date(timestamp);
+      var dateFormatter = new navigator.mozL10n.DateTimeFormat();
+      if (format) {
+        return dateFormatter.localeFormat(then, format);
+      }
+
+      var date, time;
+      var daysOfDifference = getDaysOfDifference(now, then);
+      if (daysOfDifference === 0) {
+        date = _('today');
+
+      } else if (daysOfDifference === 1) {
+        date = _('yesterday');
+
+      } else {
+        date = dateFormatter.localeFormat(timestamp, '%a');
+      }
+
+      time = dateFormatter.localeFormat(timestamp, _('shortTimeFormat'));
+      return _('day-hour-format', {
+        day: date,
+        time: time
+      });
+    },
+
+    /*
+     * Returns a human friendly string describing time transcurred since the
+     * present moment to the timestamp passed as parameter in minutes or hours.
+     *
+     * If timestamps is yesterday or a day before yesterday, it is shown as
+     * in `Formatting.formatTime()`
+     */
+    formatTimeSinceNow: function(timestamp) {
+      var now = new Date(), then = new Date(timestamp);
+
+      var formattedTime = this.formatTime(timestamp);
+      if (getDaysOfDifference(now, then) > 0) {
+        return formattedTime;
+      }
+
+      var age = now - then;
+      if (age < MINUTE) {
+        formattedTime = _('minutes-ago-short', { value: 0 });
+
+      } else if (age < HOUR) {
+        var minutes = Math.floor(age / MINUTE);
+        formattedTime = _('minutes-ago-short', { value: minutes });
+
+      } else if (age < DAY) {
+        var hours = Math.floor(age / HOUR);
+        formattedTime = _('hours-ago-short', { value: hours });
+      }
+
+      return formattedTime;
+    }
+  };
+}());

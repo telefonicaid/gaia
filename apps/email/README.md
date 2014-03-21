@@ -1,3 +1,34 @@
+## Front-End Notes ##
+
+The email front end code dynamically loads each card implementation, and uses
+HTML cached in a document cookie as part of startup. The cached HTML is just
+for the first card the user will see when launching the app. By using the
+cached HTML, it allows for a quick display to the user while the rest of the
+UI and back-end (which runs in a web worker) starts up.
+
+Once real data is available from the back-end, the cached HTML is removed and
+the card with the real data is inserted.
+
+This means the index.html file is fairly sparse. It just contains one script
+tag to inject the cached HTML into the DOM, and that script triggers the load
+of the main app JS after injecting the cached HTML.
+
+The main app JS is built using the Makefile in the email directory. The email
+app uses a module loader plugins to load templates: the 'tmpl!...' dependencies,
+which in turn depend on 'text!...' dependencies. These loader plugins
+participate in the build by leveraging special "pluginBuilder" modules,
+tmpl_builder.js and text_builder.js respectively. Since those builder modules
+support a few JS build environments, they contain extra code in them, but
+they are not actually loaded during the runtime of application, just during the
+build process.
+
+Since it has its own custom build processes, the usual Gaia build processes
+do not result in much extra optimization. The Gaia build process for the
+localizations still occurs, and the full collection of JS strings for the
+translations are inlined, but the HTML DOM is not pre-localized, as each card
+HTML is stored in its own .html file that is loaded on demand when the card
+is needed.
+
 ## Back-End Code Location ##
 
 The e-mail back-end is not developed in this repository.  All of the code in
@@ -81,3 +112,36 @@ the permissions were added.
 Start the b2g-desktop instance to serve the e-mail app on port 8080.
 
 Browse to http://email.gaiamobile.org:8080/ or whatever URL you used above.
+
+## Build Notes ##
+
+The email app takes advantage of some features in the gaia build system to do
+some optimizations:
+
+* Apps can define an app-specific Makefile in their directory. This is run
+before the rest of the general Gaia build steps. Email uses this to create
+a directory in `gaia/build_stage/email` and runs some optimizations around
+JS and CSS concatenation.
+* The Gaia build system knows to use `gaia/build_stage/email` to do the rest of
+the Gaia build steps because email specifies the "dir" in the `gaia_build.json`
+in this directory.
+* Since the shared resources referenced by email are not listed in the HTML,
+but as CSS @imports or via JS module dependencies, the email Makefile
+runs `email/build/make_gaia_shared.js` to generate a `gaia_shared.json` file
+in the `gaia/build_stage/email` directory to list out the shared items use by
+the email app. `gaia_shared.json` is used by the general Gaia build system to
+know what shared resources to keep. The Gaia build system also does HTML file
+scanning to find shared resources too.
+
+For DEBUG=1 builds, the email source directory is used as-is, and the shared
+resources are magically linked in via the Gaia build system.
+
+When using GAIA_OPTIMIZE=1, which is set by `make production`, the email build
+runs some uglify2 minification on the files. This can take a while, so if you
+are doing multiple, rapid edit-device push cycles you should not use this.
+
+If you want to give snapshots of builds, say for UX reviews, you should use
+the contents of the `gaia/build_stage/email` directory as it will be a fully
+functional snapshot.
+
+

@@ -39,7 +39,7 @@ if (!fb.sync) {
         for (var c = 0; c < arguments.length; c++) {
           theArgs.push(arguments[c]);
         }
-        window.console.log.apply(this, theArgs);
+        window.console.log.apply(window.console, theArgs);
       }
     }
 
@@ -108,6 +108,11 @@ if (!fb.sync) {
           changed = 0;
           totalToChange = m.data.totalToChange;
           nextTimestamp = m.data.queryTimestamp;
+          var newFriendNumber = m.data.newFriendNumber;
+          if (newFriendNumber) {
+            debug('New friend number: ', newFriendNumber);
+            fb.utils.setCachedNumFriends(newFriendNumber);
+          }
 
           debug('Total to be changed: ', totalToChange);
 
@@ -127,14 +132,19 @@ if (!fb.sync) {
       var uid = fb.getFriendUid(contact);
       var updatedFbData = fbFriendsDataByUid[uid];
 
-      if (data.photo) {
-        var fbInfo = {};
-        fbInfo.photo = [data.photo];
-        fb.setFriendPictureUrl(fbInfo, updatedFbData.pic_big);
-        updatedFbData.fbInfo = fbInfo;
+      if (!data.photo) {
+        updateFbFriend(data.contactId, updatedFbData);
+        return;
       }
 
-      updateFbFriend(data.contactId, updatedFbData);
+      utils.thumbnailImage(data.photo, function gotTumbnail(thumbnail) {
+        var fbInfo = {};
+        fbInfo.photo = [data.photo, thumbnail];
+        fb.setFriendPictureUrl(fbInfo, updatedFbData.pic_big);
+        updatedFbData.fbInfo = fbInfo;
+
+        updateFbFriend(data.contactId, updatedFbData);
+      });
     }
 
     function onsuccessCb() {
@@ -155,9 +165,9 @@ if (!fb.sync) {
       }
       cfdata.fbInfo.bday = birthDate;
 
-      var address = fb.getAddress(cfdata);
+      var address = fb.getAddresses(cfdata);
       if (address) {
-        cfdata.fbInfo.adr = [address];
+        cfdata.fbInfo.adr = address;
       }
 
       if (cfdata.shortTelephone) {
@@ -300,7 +310,8 @@ if (!fb.sync) {
                 imgNeedsUpdate: forceUpdate,
                 timestamp: ts,
                 access_token: access_token,
-                operationsTimeout: fb.operationsTimeout
+                operationsTimeout: fb.operationsTimeout,
+                targetPictureSize: importUtils.getPreferredPictureDetail()
               }
             });
           });
@@ -448,7 +459,8 @@ if (!fb.sync) {
               data: {
                 access_token: access_token,
                 uids: toBeUpdated,
-                operationsTimeout: fb.operationsTimeout
+                operationsTimeout: fb.operationsTimeout,
+                targetPictureSize: importUtils.getPreferredPictureDetail()
               }
             });
           });

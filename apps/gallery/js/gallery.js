@@ -47,24 +47,42 @@ function $(id) { return document.getElementById(id); }
 // UI elements
 var thumbnails = $('thumbnails');
 
-// Only one of these three elements will be visible at a time
-var thumbnailListView = $('thumbnail-list-view');
-var thumbnailSelectView = $('thumbnail-select-view');
 var fullscreenView = $('fullscreen-view');
-var editView = $('edit-view');
-var pickView = $('pick-view');
-var cropView = $('crop-view');
 
-// These are the top-level view objects.
-// This array is used by setView()
-var views = [
-  thumbnailListView, thumbnailSelectView, fullscreenView, editView,
-  pickView, cropView
-];
+// These are the top-level view class which are defined in
+// gallery_tablet.css
+// This object is used by setView()
+
+// Layout Mode Transition:
+// list <-> selection
+// list <-> fullscreen <-> edit/crop
+// (activity) pick <-> crop
+const LAYOUT_MODE = {
+  list: 'thumbnailListView',
+  select: 'thumbnailSelectView',
+  fullscreen: 'fullscreenView',
+  edit: 'editView',
+  pick: 'pickView',
+  crop: 'cropView'
+};
+
 var currentView;
 
 // This will be set to "ltr" or "rtl" when we get our localized event
 var languageDirection;
+
+// Register orientation watcher in ScreenLayout
+ScreenLayout.watch('portrait', '(orientation: portrait)');
+var isPortrait = ScreenLayout.getCurrentLayout('portrait');
+var isPhone = ScreenLayout.getCurrentLayout('tiny');
+
+var fullscreenButtonIds = ['back', 'delete', 'edit', 'share', 'camera', 'info'];
+var fullscreenButtons = {};
+for (var i = 0; i < fullscreenButtonIds.length; i++) {
+  var name = 'fullscreen-' + fullscreenButtonIds[i] + '-button';
+  name += (isPhone ? '-tiny' : '-large');
+  fullscreenButtons[fullscreenButtonIds[i]] = document.getElementById(name);
+}
 
 // This array holds information about all the image and video files we
 // know about. Each array element is an object that includes a
@@ -72,6 +90,7 @@ var languageDirection;
 // the photo and video databases, and has elements added and removed when
 // we receive create and delete events from the media databases.
 var files = [];
+var thumbnailList;
 
 var currentFileIndex = 0;       // What file is currently displayed
 var editedPhotoIndex;
@@ -94,17 +113,29 @@ var visibilityMonitor;
 
 var loader = LazyLoader;
 
+// Flag that indicates that we've edited a picture and just saved it
+var hasSaved = false;
+
+// We store the last focused thumbnail so that we can quickly get the
+// selected thumbnails.
+var lastFocusedThumbnail = null;
+
+var currentOverlay;  // The id of the current overlay or null if none.
+
 // The localized event is the main entry point for the app.
 // We don't do anything until we receive it.
-window.addEventListener('localized', function showBody() {
-  window.removeEventListener('localized', showBody);
-
+navigator.mozL10n.ready(function showBody() {
   // Set the 'lang' and 'dir' attributes to <html> when the page is translated
   document.documentElement.lang = navigator.mozL10n.language.code;
   document.documentElement.dir = navigator.mozL10n.language.direction;
 
   // <body> children are hidden until the UI is translated
   document.body.classList.remove('hidden');
+
+  // load frame_script.js for preview mode and show loading background
+  if (!isPhone) {
+    loader.load('js/frame_scripts.js');
+  }
 
   // Now initialize the rest of the app. But don't re-initialize if the user
   // switches languages when the app is already running
@@ -113,32 +144,32 @@ window.addEventListener('localized', function showBody() {
 });
 
 function init() {
-  // We only need clicks and move event coordinates
-  MouseEventShim.trackMouseMoves = false;
-
   // Clicking on the select button goes to thumbnail select mode
   $('thumbnails-select-button').onclick =
-    setView.bind(null, thumbnailSelectView);
+    setView.bind(null, LAYOUT_MODE.select);
 
   // Clicking on the cancel button goes from thumbnail select mode
   // back to thumbnail list mode
-  $('thumbnails-cancel-button').onclick = setView.bind(null, thumbnailListView);
+  $('thumbnails-cancel-button').onclick =
+    setView.bind(null, LAYOUT_MODE.list);
 
   // Clicking on the pick back button cancels the pick activity.
   $('pick-back-button').onclick = cancelPick;
 
   // In crop view, the back button goes back to pick view
   $('crop-back-button').onclick = function() {
-    setView(pickView);
+    setView(LAYOUT_MODE.pick);
     cleanupCrop();
   };
 
   // In crop view, the done button finishes the pick
-  $('crop-done-button').onclick = finishPick;
+  $('crop-done-button').onclick = cropAndEndPick;
 
-  // The camera buttons should both launch the camera app
-  $('fullscreen-camera-button').onclick = launchCameraApp;
+  // The camera buttons should launch the camera app
+  fullscreenButtons.camera.onclick = launchCameraApp;
+
   $('thumbnails-camera-button').onclick = launchCameraApp;
+  $('overlay-camera-button').onclick = launchCameraApp;
 
   // Clicking on the delete button in thumbnail select mode deletes all
   // selected items
@@ -147,14 +178,17 @@ function init() {
   // Clicking on the share button in select mode shares all selected images
   $('thumbnails-share-button').onclick = shareSelectedItems;
 
+  $('overlay-cancel-button').onclick = function() {
+    cancelPick();
+  };
   // Handle resize events
   window.onresize = resizeHandler;
 
   // If we were not invoked by an activity, then start off in thumbnail
-  // list mode, and fire up the image and video mediadb objects.
+  // list mode, and fire up the MediaDB object.
   if (!navigator.mozHasPendingMessage('activity')) {
-    initDB(true);
-    setView(thumbnailListView);
+    initDB();
+    setView(LAYOUT_MODE.list);
   }
 
   // Register a handler for activities. This will take care of the rest
@@ -165,17 +199,31 @@ function init() {
     case 'browse':
       // The 'browse' activity is the way we launch Gallery from Camera.
       // If this was a cold start, then the db needs to be initialized.
-      if (!photodb)
-        initDB(true);  // Initialize both the photo and video databases
-      // Always switch to the list of thumbnails.
-      setView(thumbnailListView);
+      if (!photodb) {
+        initDB();  // Initialize the media database
+        setView(LAYOUT_MODE.list);
+      }
+      else {
+        // If the gallery was already running we we arrived here via a
+        // browse activity, then the user is probably coming to us from the
+        // camera, and she probably wants to see the list of thumbnails.
+        // If we're currently displaying a single image, switch to the
+        // thumbnails. But if the user left the gallery in the middle of
+        // an edit or in the middle of making a selection, then returning
+        // to the thumbnail list would cause her to lose work, so in those
+        // cases we don't change anything and let the gallery resume where
+        // the user left it.  See Bug 846220.
+        if (currentView === LAYOUT_MODE.fullscreen)
+          setView(LAYOUT_MODE.list);
+      }
       break;
     case 'pick':
       if (pendingPick) // I don't think this can really happen anymore
         cancelPick();
+      pendingPick = a; // We need pendingPick set before calling initDB()
       if (!photodb)
-        initDB(false); // Don't include videos when picking photos!
-      startPick(a);
+        initDB();
+      startPick();
       break;
     }
   });
@@ -183,31 +231,38 @@ function init() {
 
 // Initialize MediaDB objects for photos and videos, and set up their
 // event handlers.
-function initDB(include_videos) {
+function initDB() {
   photodb = new MediaDB('pictures', metadataParserWrapper, {
-    mimeTypes: ['image/jpeg', 'image/png'],
     version: 2,
     autoscan: false,     // We're going to call scan() explicitly
-    batchHoldTime: 150,  // Batch files during scanning
-    batchSize: PAGE_SIZE // Max batch size: one screenful
+    batchHoldTime: 2000, // Batch files during scanning
+    batchSize: 3         // Max batch size when scanning
   });
 
-  if (include_videos) {
-    videostorage = navigator.getDeviceStorage('videos');
-  }
+  // This is where we find videos once the photodb notifies us that a
+  // new video poster image has been detected. Note that we need this
+  // even during a pick activity when we're not displaying videos
+  // because we might still might find and parse metadata for new
+  // videos during the scanning process.
+  videostorage = navigator.getDeviceStorage('videos');
 
   var loaded = false;
-  function metadataParserWrapper(file, onsuccess, onerror) {
+  function metadataParserWrapper(file, onsuccess, onerror, bigFile) {
     if (loaded) {
-      metadataParser(file, onsuccess, onerror);
+      metadataParser(file, onsuccess, onerror, bigFile);
       return;
     }
 
     loader.load('js/metadata_scripts.js', function() {
       loaded = true;
-      metadataParser(file, onsuccess, onerror);
+      metadataParser(file, onsuccess, onerror, bigFile);
     });
   }
+
+  // show dialog in upgradestart, when it finished, it will turned to ready.
+  photodb.onupgrading = function(evt) {
+    showOverlay('upgrade');
+  };
 
   // This is called when DeviceStorage becomes unavailable because the
   // sd card is removed or because it is mounted for USB mass storage
@@ -215,6 +270,12 @@ function initDB(include_videos) {
   // We don't need one of these handlers for the video db, since both
   // will get the same event at more or less the same time.
   photodb.onunavailable = function(event) {
+    // Switch back to the thumbnail view. If we were viewing or editing an image
+    // it might not be there anymore when the MediaDB becomes available again.
+    setView(LAYOUT_MODE.list);
+
+    // If storage becomes unavailble (e.g. the user starts a USB Mass Storage
+    // Lock the user out of the app, and tell them why
     var why = event.detail;
     if (why === MediaDB.NOCARD)
       showOverlay('nocard');
@@ -224,22 +285,53 @@ function initDB(include_videos) {
 
   photodb.onready = function() {
     // Hide the nocard or pluggedin overlay if it is displayed
-    if (currentOverlay === 'nocard' || currentOverlay === 'pluggedin')
+    if (currentOverlay === 'nocard' || currentOverlay === 'pluggedin' ||
+        currentOverlay === 'upgrade')
       showOverlay(null);
 
-    initThumbnails(include_videos);
+    initThumbnails();
   };
 
   photodb.onscanstart = function onscanstart() {
+    // Prevents user to edit images when scanning pictures from storage
+    fullscreenButtons.edit.classList.add('disabled');
     // Show the scanning indicator
     $('progress').classList.remove('hidden');
     $('throbber').classList.add('throb');
   };
 
   photodb.onscanend = function onscanend() {
+    // Allows the user to edit images when scanning is finished
+    fullscreenButtons.edit.classList.remove('disabled');
+
+    if (currentOverlay === 'scanning')
+      showOverlay('emptygallery');
+    else if (!isPhone && !currentFrame.displayingImage &&
+             !currentFrame.displayingVideo) {
+      // focus on latest one if client hasn't clicked any of
+      // them
+      showFile(0);
+    }
+
     // Hide the scanning indicator
     $('progress').classList.add('hidden');
     $('throbber').classList.remove('throb');
+  };
+
+  // On devices with internal and external device storage, this handler is
+  // triggered when the user removes the sdcard. MediaDB remains usable
+  // and we'll get a bunch of deleted events for the files that are no longer
+  // available. But we need to listen to this event so we can switch back
+  // to the list of thumbnails. We don't want to be left viewing or editing
+  // a photo that is no longer available.
+  photodb.oncardremoved = function oncardremoved() {
+    // If the user pulls the sdcard while trying to pick an image, give up
+    if (pendingPick) {
+      cancelPick();
+      return;
+    }
+
+    setView(LAYOUT_MODE.list);
   };
 
   // One or more files was created (or was just discovered by a scan)
@@ -262,7 +354,7 @@ function getVideoFile(filename, callback) {
   };
   req.onerror = function() {
     console.error('Failed to get video file', filename);
-  }
+  };
 }
 
 // This comparison function is used for sorting arrays and doing binary
@@ -284,14 +376,20 @@ function compareFilesByDate(a, b) {
 // when the sdcard becomes available again after a USB mass storage
 // session or an sdcard replacement.
 //
-function initThumbnails(include_videos) {
+function initThumbnails() {
   // If we've already been called once, then we've already got thumbnails
   // displayed. There is no need to re-enumerate them, so we just go
   // straight to scanning for new files
   if (visibilityMonitor) {
-    scan();
+    photodb.scan();
     return;
   }
+
+  // configure the template id for template group
+  ThumbnailDateGroup.Template = new Template('thumbnail-group-header');
+
+  // For gallery group view initialise ThumbnailList object
+  thumbnailList = new ThumbnailList(ThumbnailDateGroup, thumbnails);
 
   // Keep track of when thumbnails are onscreen and offscreen
 /*
@@ -316,15 +414,15 @@ function initThumbnails(include_videos) {
   var minimumScrollDelta = 4000;
 
   visibilityMonitor =
-    monitorChildVisibility(thumbnails,
-                           visibilityMargin,    // extra space top and bottom
-                           minimumScrollDelta,  // min scroll before we do work
-                           thumbnailOnscreen,   // set background image
-                           thumbnailOffscreen); // remove background image
+    monitorTagVisibility(thumbnails, 'li',
+                         visibilityMargin,    // extra space top and bottom
+                         minimumScrollDelta,  // min scroll before we do work
+                         thumbnailOnscreen,   // set background image
+                         thumbnailOffscreen); // remove background image
 
 
   // Handle clicks on the thumbnails we're about to create
-  thumbnails.onclick = thumbnailClickHandler;
+  thumbnails.addEventListener('click', thumbnailClickHandler);
 
   // We need to enumerate both the photo and video dbs and interleave
   // the files they return so that everything is in chronological order
@@ -337,7 +435,7 @@ function initThumbnails(include_videos) {
   photodb.enumerate('date', null, 'prev', function(fileinfo) {
     if (fileinfo) {
       // For a pick activity, don't display videos
-      if (!include_videos && fileinfo.metadata.video)
+      if (pendingPick && fileinfo.metadata.video)
         return;
 
       batch.push(fileinfo);
@@ -358,14 +456,15 @@ function initThumbnails(include_videos) {
 
   function thumb(fileinfo) {
     files.push(fileinfo);              // remember the file
-    var thumbnail = createThumbnail(files.length - 1); // create its thumbnail
-    thumbnails.appendChild(thumbnail); // display the thumbnail
+    // Create the thumbnail view for this file
+    // and insert it at the right spot
+    thumbnailList.addItem(fileinfo);
   }
 
   function done() {
     flush();
     if (files.length === 0) { // If we didn't find anything
-      showOverlay('emptygallery');
+      showOverlay('scanning');
     }
     // Now that we've enumerated all the photos and videos we already know
     // about go start looking for new photos and videos.
@@ -373,7 +472,38 @@ function initThumbnails(include_videos) {
   }
 }
 
+//
+// getFileIndex return position of a file thumbnail in gallery view
+// It first find thumbnail's position within its own group
+// then add the sizes of previous groups
+function getFileIndex(filename) {
+  // Get the group of the file
+  var fileGroup = thumbnailList.groupMap[filename];
+  if (!fileGroup) {
+    console.error('file group does not exist in thumbnail List', filename);
+    return -1;
+  }
+  var index = 0;
+  // Get the thumbnailItem of the file
+  var thumbnail = thumbnailList.thumbnailMap[filename];
+   // Get the index of the file in its own group
+  index = fileGroup.thumbnails.indexOf(thumbnail);
+  if (index < 0) {
+    console.error('filename does not exist in thumbnail list', filename);
+    return -1;
+  }
+  // Add to index the sizes of previous groups
+  for (var n = 0; n < thumbnailList.itemGroups.length; n++) {
+    if (thumbnailList.itemGroups[n].groupID === fileGroup.groupID) {
+      break;
+    }
+    index += thumbnailList.itemGroups[n].getCount();
+  }
+  return index;
+}
+
 function fileDeleted(filename) {
+  var fileIndex = currentFileIndex;
   // Find the deleted file in our files array
   for (var n = 0; n < files.length; n++) {
     if (files[n].name === filename)
@@ -384,43 +514,36 @@ function fileDeleted(filename) {
     return;
 
   // Remove the image from the array
-  var deletedImageData = files.splice(n, 1)[0];
+  files.splice(n, 1)[0];
 
   // Remove the corresponding thumbnail
-  var thumbnailElts = thumbnails.querySelectorAll('.thumbnail');
-  URL.revokeObjectURL(thumbnailElts[n].dataset.backgroundImage.slice(5, -2));
-  thumbnails.removeChild(thumbnailElts[n]);
-
-  // Change the index associated with all the thumbnails after the deleted one
-  // This keeps the data-index attribute of each thumbnail element in sync
-  // with the files[] array.
-  for (var i = n + 1; i < thumbnailElts.length; i++) {
-    thumbnailElts[i].dataset.index = i - 1;
-  }
+  thumbnailList.removeItem(filename);
 
   // Adjust currentFileIndex, too, if we have to.
-  if (n < currentFileIndex)
-    currentFileIndex--;
+  if (n < fileIndex)
+    fileIndex--;
 
   // If we remove the last item in files[],
   // we need to show the previous image, not the next image.
-  if (currentFileIndex >= files.length)
-    currentFileIndex = files.length - 1;
+  if (fileIndex >= files.length)
+    fileIndex = files.length - 1;
 
   if (n < editedPhotoIndex)
     editedPhotoIndex--;
 
-  // If we're in fullscreen mode, then the only way this function
-  // gets called is when we delete the currently displayed photo. This means
-  // that we need to redisplay.
-  if (currentView === fullscreenView && files.length > 0) {
-    showFile(currentFileIndex);
+  // If we're in fullscreen mode or has preview screen, then the only way
+  // this function gets called is when we delete the currently displayed photo.
+  // This means that we need to redisplay.
+  if (files.length > 0 && (currentView === LAYOUT_MODE.fullscreen)) {
+    showFile(fileIndex);
+  } else {
+    updateFocusThumbnail(fileIndex);
   }
 
   // If there are no more photos show the "no pix" overlay
   if (files.length === 0) {
-    if (currentView !== pickView)
-      setView(thumbnailListView);
+    if (currentView !== LAYOUT_MODE.pick)
+      setView(LAYOUT_MODE.list);
     showOverlay('emptygallery');
   }
 }
@@ -440,85 +563,71 @@ function deleteFile(n) {
   if (fileinfo.metadata.video) {
     videostorage.delete(fileinfo.metadata.video);
   }
+
+  // If the metdata parser saved a preview image for this photo,
+  // delete that, too.
+  if (fileinfo.metadata.preview && fileinfo.metadata.preview.filename) {
+    // We use raw device storage here instead of MediaDB because that is
+    // what MetadataParser.js uses for saving the preview.
+    var pictures = navigator.getDeviceStorage('pictures');
+    pictures.delete(fileinfo.metadata.preview.filename);
+  }
 }
 
 function fileCreated(fileinfo) {
-  var insertPosition;
+  // If the new file is a video and we're handling an image pick activity
+  // then we won't display the new file.
+  if (pendingPick && fileinfo.metadata.video)
+    return;
 
-  // If we were showing the 'no pictures' overlay, hide it
-  if (currentOverlay === 'emptygallery')
-    showOverlay(null);
+  // The fileinfo object that MediaDB sends us has a thumbnail blob in it,
+  // fresh from the metadata parser. This blob has been stored in the db, but
+  // the copy we have is still a memory-backed blob. We need to be using a
+  // file backed blob here so that we don't leak memory if the user scans a
+  // fresh sdcard full of hundreds of photos. So we go get the db record out
+  // of the database. It should be an exact copy of what we already have,
+  // except that the thumbnail will be file-backed instead of memory-backed.
+  photodb.getFileInfo(fileinfo.name, function(fileinfo) {
+    var insertPosition;
 
-  // If this new image is newer than the first one, it goes first
-  // This is the most common case for photos, screenshots, and edits
-  if (files.length === 0 || fileinfo.date > files[0].date) {
-    insertPosition = 0;
-  }
-  else {
-    // Otherwise we have to search for the right insertion spot
-    insertPosition = binarysearch(files, fileinfo, compareFilesByDate);
-  }
+    // If we were showing the 'no pictures' overlay, hide it
+    if (currentOverlay === 'emptygallery' || currentOverlay === 'scanning')
+      showOverlay(null);
 
-  // Insert the image info into the array
-  files.splice(insertPosition, 0, fileinfo);
+    // Create a thumbnailItem for this image and insert it at the right spot
+    var thumbnailItem = thumbnailList.addItem(fileinfo);
+    insertPosition = getFileIndex(fileinfo.name);
+    if (insertPosition < 0)
+      return;
 
-  // Create a thumbnail for this image and insert it at the right spot
-  var thumbnail = createThumbnail(insertPosition);
-  var thumbnailElts = thumbnails.querySelectorAll('.thumbnail');
-  if (thumbnailElts.length === 0)
-    thumbnails.appendChild(thumbnail);
-  else
-    thumbnails.insertBefore(thumbnail, thumbnailElts[insertPosition]);
+    // Insert the image info into the array
+    files.splice(insertPosition, 0, fileinfo);
 
-  // increment the index of each of the thumbnails after the new one
-  for (var i = insertPosition; i < thumbnailElts.length; i++) {
-    thumbnailElts[i].dataset.index = i + 1;
-  }
+    if (currentFileIndex >= insertPosition)
+      currentFileIndex++;
+    if (editedPhotoIndex >= insertPosition)
+      editedPhotoIndex++;
 
-  if (currentFileIndex >= insertPosition)
-    currentFileIndex++;
-  if (editedPhotoIndex >= insertPosition)
-    editedPhotoIndex++;
-
-  // Redisplay the current photo if we're in photo view. The current
-  // photo should not change, but the content of the next or previous frame
-  // might. This call will only make changes if the filename to display
-  // in a frame has actually changed.
-  if (currentView === fullscreenView) {
-    showFile(currentFileIndex);
-  }
-}
-
-// Assuming that array is sorted according to comparator, return the
-// array index at which element should be inserted to maintain sort order
-function binarysearch(array, element, comparator, from, to) {
-  if (comparator === undefined)
-    comparator = function(a, b) {
-      if (a < b)
-        return -1;
-      if (a > b)
-        return 1;
-      return 0;
-    };
-
-  if (from === undefined)
-    return binarysearch(array, element, comparator, 0, array.length);
-
-  if (from === to)
-    return from;
-
-  var mid = Math.floor((from + to) / 2);
-
-  var result = comparator(element, array[mid]);
-  if (result < 0)
-    return binarysearch(array, element, comparator, from, mid);
-  else
-    return binarysearch(array, element, comparator, mid + 1, to);
+    // Redisplay the current photo if we're in photo view. The current
+    // photo should not change, but the content of the next or previous frame
+    // might. This call will only make changes if the filename to display
+    // in a frame has actually changed.
+    if (currentView === LAYOUT_MODE.fullscreen) {
+      if (hasSaved) {
+        showFile(0);
+      } else {
+        showFile(currentFileIndex);
+      }
+    }
+    hasSaved = false;
+  });
 }
 
 // Make the thumbnail for image n visible
 function scrollToShowThumbnail(n) {
-  var selector = 'li[data-index="' + n + '"]';
+  if (!files[n])
+    return;
+  var selector = 'li[data-filename="' + files[n].name + '"]';
   var thumbnail = thumbnails.querySelector(selector);
   if (thumbnail) {
     var screenTop = thumbnails.scrollTop;
@@ -543,88 +652,100 @@ function scrollToShowThumbnail(n) {
 function setView(view) {
   if (currentView === view)
     return;
-
+  // define each view's layout based on data-view of body
+  document.body.classList.remove(currentView);
+  document.body.classList.add(view);
   // Do any necessary cleanup of the view we're exiting
   switch (currentView) {
-  case thumbnailSelectView:
-    // Clear the selection, if there is one
-    Array.forEach(thumbnails.querySelectorAll('.selected.thumbnail'),
-                  function(elt) { elt.classList.remove('selected'); });
-    break;
-  case fullscreenView:
-    // Clear the frames to release the memory they're holding and
-    // so that we don't see a flash of the old image when we return
-    // to fullscreen view
-    previousFrame.clear();
-    currentFrame.clear();
-    nextFrame.clear();
-    delete previousFrame.filename;
-    delete currentFrame.filename;
-    delete nextFrame.filename;
-
-    // If we're leaving fullscreen, then we were just viewing a photo
-    // or video, so make sure its thumbnail is fully on the screen.
-    // XXX: do we need to defer this?
-    scrollToShowThumbnail(currentFileIndex);
-
-    break;
+    case LAYOUT_MODE.select:
+      // Clear the selection, if there is one
+      Array.forEach(thumbnails.querySelectorAll('.selected.thumbnail'),
+                    function(elt) { elt.classList.remove('selected'); });
+      if (!isPhone)
+        showFile(currentFileIndex);
+      break;
+    case LAYOUT_MODE.fullscreen:
+      if (!isPhone && (view === LAYOUT_MODE.list) && !isPortrait) {
+        // we'll reuse and resize the fullscreen window
+        // when go back to thumbnailList mode from fullscreen
+        // and also does editView in landscape
+        resizeFrames();
+      } else {
+        // Clear the frames to release the memory they're holding and
+        // so that we don't see a flash of the old image when we return
+        // to fullscreen view
+        clearFrames();
+      }
+      break;
   }
-
-  // Show the specified view, and hide the others
-  for (var i = 0; i < views.length; i++) {
-    if (views[i] === view)
-      views[i].classList.remove('hidden');
-    else
-      views[i].classList.add('hidden');
-  }
-
-  // Now do setup for the view we're entering
-  // In particular, we've got to set the thumbnail class appropriately
-  // for each view
   switch (view) {
-  case thumbnailListView:
-    thumbnails.className = 'list';
-    break;
-  case thumbnailSelectView:
-    thumbnails.className = 'select';
-    // Set the view header to a localized string
-    clearSelection();
-    break;
-  case pickView:
-    thumbnails.className = 'pick';
-    break;
-  case fullscreenView:
-    thumbnails.className = 'offscreen';
-    // Show the toolbar
-    fullscreenView.classList.remove('toolbarhidden');
-    break;
-  default:
-    thumbnails.className = 'offscreen';
-    break;
+    case LAYOUT_MODE.list:
+      // If we're going to fullscreen, then we were just viewing a photo
+      // or video, so make sure its thumbnail is fully on the screen.
+      // XXX: do we need to defer this?
+      scrollToShowThumbnail(currentFileIndex);
+      if (currentView === LAYOUT_MODE.fullscreen) {
+        // only do it when we back from fullscreen.
+        setNFCSharing(false);
+      }
+      break;
+    case LAYOUT_MODE.fullscreen:
+      resizeFrames();
+      setNFCSharing(true);
+      break;
+    case LAYOUT_MODE.select:
+      clearSelection();
+      // When entering select view, we pause the video
+      if (!isPhone && currentFrame.video && !isPortrait)
+        currentFrame.video.pause();
+      break;
+    case LAYOUT_MODE.edit:
+      setNFCSharing(false);
+      break;
   }
 
+  // We reuse the fullscreen dom for preview and fullscreen dom,
+  // so the title must be changed while switching
+  if (!isPhone) {
+    if (view !== LAYOUT_MODE.fullscreen) {
+      $('fullscreen-title').textContent =
+        navigator.mozL10n.get('preview');
+    } else {
+      $('fullscreen-title').textContent =
+        navigator.mozL10n.get('gallery');
+    }
+  }
   // Remember the current view
   currentView = view;
 }
 
-//
-// Create a thumbnail element
-//
-function createThumbnail(imagenum) {
-  var li = document.createElement('li');
-  li.dataset.index = imagenum;
-  li.classList.add('thumbnail');
+function setNFCSharing(enable) {
+  if (!window.navigator.mozNfc) {
+    return;
+  }
 
-  var fileinfo = files[imagenum];
-  // We revoke this url in imageDeleted
-  var url = URL.createObjectURL(fileinfo.metadata.thumbnail);
-
-  // We set the url on a data attribute and let the onscreen
-  // and offscreen callbacks below set and unset the actual
-  // background image style. This means that we don't keep
-  // images decoded if we don't need them.
-  li.dataset.backgroundImage = 'url("' + url + '")';
-  return li;
+  if (enable) {
+    // If we have NFC, we need to put the callback to have shrinking UI.
+    window.navigator.mozNfc.onpeerready = function(event) {
+      // The callback function is called when user confirm to share the
+      // content, send it with NFC Peer.
+      var fileInfo = files[currentFileIndex];
+      if (fileInfo.metadata.video) {
+        // share video
+        getVideoFile(fileInfo.metadata.video, function(file) {
+          navigator.mozNfc.getNFCPeer(event.detail).sendFile(file);
+        });
+      } else {
+        // share photo
+        photodb.getFile(fileInfo.name, function(file) {
+          navigator.mozNfc.getNFCPeer(event.detail).sendFile(file);
+        });
+      }
+    };
+  } else {
+    // We need to remove onpeerready while out of fullscreen view.
+    window.navigator.mozNfc.onpeerready = null;
+  }
 }
 
 // monitorChildVisibility() calls this when a thumbnail comes onscreen
@@ -646,12 +767,13 @@ function thumbnailOffscreen(thumbnail) {
 var pendingPick;
 var pickType;
 var pickWidth, pickHeight;
+var pickedFile;
 var cropURL;
 var cropEditor;
 
-function startPick(activityRequest) {
-  pendingPick = activityRequest;
-  pickType = activityRequest.source.data.type;
+function startPick() {
+  pickType = pendingPick.source.data.type;
+
   if (pendingPick.source.data.width && pendingPick.source.data.height) {
     pickWidth = pendingPick.source.data.width;
     pickHeight = pendingPick.source.data.height;
@@ -659,36 +781,127 @@ function startPick(activityRequest) {
   else {
     pickWidth = pickHeight = 0;
   }
-  // We need this for cropping the photo
-  loader.load('js/ImageEditor.js', function() {
-    setView(pickView);    
+  // We need frame_scripts and ImageEditor for cropping the photo
+  loader.load(['js/frame_scripts.js', 'js/ImageEditor.js'], function() {
+    setView(LAYOUT_MODE.pick);
   });
 }
 
+// Called when the user clicks on a thumbnail in pick mode
 function cropPickedImage(fileinfo) {
-  setView(cropView);
+  pickedFile = fileinfo;
 
-  photodb.getFile(fileinfo.name, function(file) {
+  // Do we actually want to allow the user to crop the image?
+  var nocrop = pendingPick.source.data.nocrop;
+
+  if (nocrop) {
+    // If we're not cropping we don't want the word "Crop" in the title bar
+    // XXX: UX will probably get rid of this title bar soon, anyway.
+    $('crop-header').textContent = '';
+  }
+
+  setView(LAYOUT_MODE.crop);
+
+  // Before the picked image is loaded, the done button is disabled
+  // to avoid users picking a black/empty image.
+  $('crop-done-button').disabled = true;
+  photodb.getFile(pickedFile.name, function(file) {
     cropURL = URL.createObjectURL(file);
-    cropEditor = new ImageEditor(cropURL, $('crop-frame'), {}, function() {
+
+    var previewURL;
+    var previewData = pickedFile.metadata.preview;
+    if (!previewData) {
+      // If there is no preview at all, this is a small image and
+      // it is its own preview. Just crop with the full-size image
+      startCrop();
+    }
+    else if (previewData.filename) {
+      // If there is an external preview file, use that. This means that
+      // the EXIF preview was not big enough
+      var storage = navigator.getDeviceStorage('pictures');
+      var getreq = storage.get(previewData.filename);
+      getreq.onsuccess = function() {
+        startCrop(URL.createObjectURL(getreq.result));
+      };
+      // If we fail to get the preview file, just use the full-size image
+      getreq.onerror = function() {
+        startCrop();
+      };
+    }
+    else {
+      // Otherwise, use the internal EXIF preview.
+      // This should be the normal case.
+      startCrop(URL.createObjectURL(file.slice(previewData.start,
+                                               previewData.end,
+                                               'image/jpeg')));
+    }
+
+    function startCrop(previewURL) {
+      cropEditor = new ImageEditor(cropURL, $('crop-frame'), {},
+                                   cropEditorReady, previewURL);
+    }
+
+    function cropEditorReady() {
+      // Enable the done button so that users can finish picking image.
+      $('crop-done-button').disabled = false;
+      // If the initiating app doesn't want to allow the user to crop
+      // the image, we don't display the crop overlay. But we still use
+      // this image editor to preview the image.
+      if (nocrop) {
+        // Set a fake crop region even though we won't display it
+        // so that getCroppedRegionBlob() works.
+        cropEditor.cropRegion.left = cropEditor.cropRegion.top = 0;
+        cropEditor.cropRegion.right = cropEditor.dest.w;
+        cropEditor.cropRegion.bottom = cropEditor.dest.h;
+        return;
+      }
+
       cropEditor.showCropOverlay();
       if (pickWidth)
         cropEditor.setCropAspectRatio(pickWidth, pickHeight);
       else
         cropEditor.setCropAspectRatio(); // free form cropping
-    });
+    }
   });
 }
 
-function finishPick() {
-  cropEditor.getCroppedRegionBlob(pickType, pickWidth, pickHeight,
-                                  function(blob) {
-                                    pendingPick.postResult({
-                                      type: pickType,
-                                      blob: blob
-                                    });
-                                    cleanupPick();
-                                  });
+function cropAndEndPick() {
+  if (Array.isArray(pickType)) {
+    if (pickType.length === 0 ||
+        pickType.indexOf(pickedFile.type) !== -1 ||
+        pickType.indexOf('image/*') !== -1) {
+      pickType = pickedFile.type;
+    }
+    else if (pickType.indexOf('image/png') !== -1) {
+      pickType = 'image/png';
+    }
+    else {
+      pickType = 'image/jpeg';
+    }
+  }
+  else if (pickType === 'image/*') {
+    pickType = pickedFile.type;
+  }
+
+  // If we're not changing the file type or resizing the image and if
+  // we're not cropping, or if the user did not crop, then we can just
+  // use the file as it is.
+  if (pickType === pickedFile.type &&
+      !pickWidth && !pickHeight &&
+      (pendingPick.source.data.nocrop || !cropEditor.hasBeenCropped())) {
+    photodb.getFile(pickedFile.name, endPick);
+  }
+  else {
+    cropEditor.getCroppedRegionBlob(pickType, pickWidth, pickHeight, endPick);
+  }
+}
+
+function endPick(blob) {
+  pendingPick.postResult({
+    type: pickType,
+    blob: blob
+  });
+  cleanupPick();
 }
 
 function cancelPick() {
@@ -710,7 +923,8 @@ function cleanupCrop() {
 function cleanupPick() {
   cleanupCrop();
   pendingPick = null;
-  setView(thumbnailListView);
+  pickedFile = null;
+  setView(LAYOUT_MODE.list);
 }
 
 // XXX If the user goes to the homescreen or switches to another app
@@ -718,8 +932,8 @@ function cleanupPick() {
 // Remove this code when https://github.com/mozilla-b2g/gaia/issues/2916
 // is fixed and replace it with an onerror handler on the activity to
 // switch out of pickView.
-window.addEventListener('mozvisibilitychange', function() {
-  if (document.mozHidden && pendingPick)
+window.addEventListener('visibilitychange', function() {
+  if (document.hidden && pendingPick)
     cancelPick();
 });
 
@@ -728,30 +942,60 @@ window.addEventListener('mozvisibilitychange', function() {
 // Event handlers
 //
 
-
 // Clicking on a thumbnail does different things depending on the view.
-// In thumbnail list mode, it displays the image. In thumbanilSelect mode
-// it selects the image. In pick mode, it finishes the pick activity
-// with the image filename
+// 1. On pickView -> go to cropMode
+// 2. On large/selectView -> update preview image
+// 3. On tiny/large with listView -> go to fullscreen image
 function thumbnailClickHandler(evt) {
   var target = evt.target;
   if (!target || !target.classList.contains('thumbnail'))
     return;
 
-  if (currentView === thumbnailListView || currentView === fullscreenView) {
-    loader.load('js/frame_scripts.js', function() {
-      showFile(parseInt(target.dataset.index));
-    });
-  }
-  else if (currentView === thumbnailSelectView) {
+  var index = getFileIndex(target.dataset.filename);
+  if (currentView === LAYOUT_MODE.pick && index >= 0) {
+      cropPickedImage(files[index]);
+  } else if (currentView === LAYOUT_MODE.select) {
     updateSelection(target);
-  }
-  else if (currentView === pickView) {
-    cropPickedImage(files[parseInt(target.dataset.index)]);
+  } else {
+    loader.load('js/frame_scripts.js', function() {
+      if (isPortrait || isPhone) {
+        setView(LAYOUT_MODE.fullscreen);
+      }
+      showFile(index);
+    });
   }
 }
 
+// On large screen, we outline the picture we're focusing on and
+// update the currentFileIndex.
+function updateFocusThumbnail(n) {
+  var previousIndex = currentFileIndex;
+  currentFileIndex = n;
+  if (isPhone)
+    return;
+
+  // If file is delted on select mode, the currentFileIndex may
+  // be the same as previousIndex. We need to hightlight it again.
+  var newTarget =
+    thumbnailList.thumbnailMap[files[currentFileIndex].name];
+  if (newTarget)
+    newTarget.htmlNode.classList.add('focus');
+
+  if (previousIndex === currentFileIndex)
+    return;
+  var oldTarget =
+    files[previousIndex] ?
+    thumbnailList.thumbnailMap[files[previousIndex].name] :
+    undefined;
+  if (oldTarget)
+    oldTarget.htmlNode.classList.remove('focus');
+}
+
 function clearSelection() {
+  if (!isPhone) {
+    // Clear preview screen on large device.
+    clearFrames();
+  }
   selectedFileNames = [];
   selectedFileNamesToBlobs = {};
   $('thumbnails-delete-button').classList.add('disabled');
@@ -770,11 +1014,16 @@ function updateSelection(thumbnail) {
   // Now update the list of selected filenames and filename->blob map
   // based on whether we selected or deselected the thumbnail
   var selected = thumbnail.classList.contains('selected');
-  var index = parseInt(thumbnail.dataset.index);
+  var index = getFileIndex(thumbnail.dataset.filename);
+  if (index < 0)
+    return;
+
   var filename = files[index].name;
 
   if (selected) {
     selectedFileNames.push(filename);
+    // currentFileIndex point to the last selected fileIndex
+    updateFocusThumbnail(index);
     if (files[index].metadata.video) {
       getVideoFile(files[index].metadata.video, function(file) {
         selectedFileNamesToBlobs[filename] = file;
@@ -786,12 +1035,28 @@ function updateSelection(thumbnail) {
         selectedFileNamesToBlobs[filename] = file;
       });
     }
+    if (!isPhone)
+      showFile(currentFileIndex);
   }
   else {
     delete selectedFileNamesToBlobs[filename];
     var i = selectedFileNames.indexOf(filename);
     if (i !== -1)
       selectedFileNames.splice(i, 1);
+
+    if (currentFileIndex === index && !isPhone) {
+      if (i > 0) {
+        // show the last selected image of selectedFileNames.
+        var lastSelected = selectedFileNames[i - 1];
+        var lastSelectedIndex = getFileIndex(lastSelected);
+        updateFocusThumbnail(lastSelectedIndex);
+        showFile(currentFileIndex);
+      } else {
+        // If selectedFileNames is empty, we clear preview
+        // screen.
+        clearFrames();
+      }
+    }
   }
 
   // Now update the UI based on the number of selected thumbnails
@@ -810,12 +1075,24 @@ function updateSelection(thumbnail) {
 }
 
 function launchCameraApp() {
+  fullscreenButtons.camera.classList.add('disabled');
+  $('thumbnails-camera-button').classList.add('disabled');
+  $('overlay-camera-button').classList.add('disabled');
+
   var a = new MozActivity({
     name: 'record',
     data: {
       type: 'photos'
     }
   });
+
+  // Wait 2000ms before re-enabling the Camera buttons to prevent
+  // hammering them and causing a crash (Bug 957709)
+  window.setTimeout(function() {
+    fullscreenButtons.camera.classList.remove('disabled');
+    $('thumbnails-camera-button').classList.remove('disabled');
+    $('overlay-camera-button').classList.remove('disabled');
+  }, 2000);
 }
 
 function deleteSelectedItems() {
@@ -823,20 +1100,22 @@ function deleteSelectedItems() {
   if (selected.length === 0)
     return;
 
-  var msg = navigator.mozL10n.get('delete-n-items?', {n: selected.length});
-  if (confirm(msg)) {
-    // XXX
+  Dialogs.confirm({
+    message: navigator.mozL10n.get('delete-n-items?', {n: selected.length}),
+    cancelText: navigator.mozL10n.get('cancel'),
+    confirmText: navigator.mozL10n.get('delete'),
+    danger: true
+  }, function() { // onSuccess
     // deleteFile is O(n), so this loop is O(n*n). If used with really large
     // selections, it might have noticably bad performance.  If so, we
     // can write a more efficient deleteFiles() function.
     for (var i = 0; i < selected.length; i++) {
       selected[i].classList.toggle('selected');
-      deleteFile(parseInt(selected[i].dataset.index));
+      deleteFile(getFileIndex(selected[i].dataset.filename));
     }
     clearSelection();
-  }
+  });
 }
-
 
 // Clicking on the share button in select mode shares all selected images
 function shareSelectedItems() {
@@ -906,21 +1185,28 @@ function share(blobs) {
 // This happens when the user rotates the phone.
 // When we used mozRequestFullscreen, it would also happen
 // when we entered or left fullscreen mode.
+// As a workaround for Bug 961636, use resize event handler
+// in place of screenlayoutchange event handler.
 function resizeHandler() {
-  //
-  // When we enter or leave fullscreen mode, we get two resize events.
-  // When we get the first one, we don't know what our new size is, so
-  // we just ignore it. XXX: we're not using fullscreen mode anymore,
-  // but it seems safer to leave this code in.
-  //
-  if (fullscreenView.offsetWidth === 0 && fullscreenView.offsetHeight === 0)
-    return;
+  isPortrait = ScreenLayout.getCurrentLayout('portrait');
 
-  if (currentView === fullscreenView) {
-    currentFrame.resize();
-    previousFrame.reset();
-    nextFrame.reset();
+  // In list view when video is playing, if user rotate screen from
+  // landscape to portrait, the video pause.
+  // Check if currentFrame is undefined for cases where frame_script.js
+  // is not loaded e.g. if a user rotates phone
+  // in list mode before opening an image.
+  if (currentView === LAYOUT_MODE.list && isPortrait &&
+      typeof currentFrame !== 'undefined' && currentFrame.video) {
+    currentFrame.video.pause();
+  }
 
+  // We'll need to resize and reposition frames for below cases, since
+  // the size of container has been changed.
+  if (currentView === LAYOUT_MODE.fullscreen ||
+      (!isPhone && !isPortrait &&
+        (currentView === LAYOUT_MODE.list ||
+          currentView === LAYOUT_MODE.select))) {
+    resizeFrames();
     // We also have to reposition the frames to get the next and previous
     // frames the correct distance away from the current frame
     setFramesPosition();
@@ -930,31 +1216,9 @@ function resizeHandler() {
 //
 // Overlay messages
 //
-var currentOverlay;  // The id of the current overlay or null if none.
-
-//
-// If id is null then hide the overlay. Otherwise, look up the localized
-// text for the specified id and display the overlay with that text.
-// Supported ids include:
-//
-//   nocard: no sdcard is installed in the phone
-//   pluggedin: the sdcard is being used by USB mass storage
-//   emptygallery: no pictures found
-//
-// Localization is done using the specified id with "-title" and "-text"
-// suffixes.
-//
 function showOverlay(id) {
   currentOverlay = id;
-
-  if (id === null) {
-    $('overlay').classList.add('hidden');
-    return;
-  }
-
-  $('overlay-title').textContent = navigator.mozL10n.get(id + '2-title');
-  $('overlay-text').textContent = navigator.mozL10n.get(id + '2-text');
-  $('overlay').classList.remove('hidden');
+  Dialogs.showOverlay(id);
 }
 
 // XXX
@@ -963,3 +1227,14 @@ function showOverlay(id) {
 // make it opaque to touch events. Without this, it does not prevent
 // the user from interacting with the UI.
 $('overlay').addEventListener('click', function dummyHandler() {});
+
+
+// Change the thumbnails quality while scrolling using the scrollstart/scrollend
+// events from shared/js/scroll_detector.js.
+window.addEventListener('scrollstart', function onScrollStart(e) {
+  thumbnails.classList.add('scrolling');
+});
+
+window.addEventListener('scrollend', function onScrollEnd(e) {
+  thumbnails.classList.remove('scrolling');
+});

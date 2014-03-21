@@ -1,18 +1,11 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('models/calendar.js');
-  requireLib('views/calendar_colors.js');
-});
-
-suite('views/calendar_colors', function() {
+suiteGroup('Views.CalendarColors', function() {
 
   var subject;
   var model;
   var app;
   var store;
 
-  setup(function() {
-    this.timeout(5000);
-
+  setup(function(done) {
     app = testSupport.calendar.app();
     store = app.store('Calendar');
     subject = new Calendar.Views.CalendarColors();
@@ -21,6 +14,19 @@ suite('views/calendar_colors', function() {
       _id: '1xx',
       localDisplayed: true
     });
+
+    app.db.open(done);
+  });
+
+  teardown(function(done) {
+    testSupport.calendar.clearStore(
+      app.db,
+      ['calendars'],
+      function() {
+        app.db.close();
+        done();
+      }
+    );
   });
 
   test('initialization', function() {
@@ -48,23 +54,44 @@ suite('views/calendar_colors', function() {
 
   suite('#render', function() {
     var calledWith;
-    var first = {};
-    var second = {};
+    var first;
+    var second;
 
-    setup(function() {
-      calledWith = [];
-      subject.updateRule = function(item) {
-        calledWith.push(item);
+    setup(function(done) {
+      first = Factory('calendar', { _id: 'first' });
+      second = Factory('calendar', { _id: 'second' });
+
+      var trans = app.db.transaction('calendars', 'readwrite');
+      trans.oncomplete = function() {
+        done();
       };
 
-      store.cached[0] = first;
-      store.cached[1] = second;
+      trans.onerror = function(e) {
+        done(e);
+      };
+
+      store.persist(first, trans);
+      store.persist(second, trans);
+    });
+
+    setup(function(done) {
+      calledWith = {};
+      subject.updateRule = function(item) {
+        calledWith[item._id] = item;
+      };
 
       subject.render();
+      subject.onrender = done;
     });
 
     test('calls update', function() {
-      assert.deepEqual(calledWith, [first, second]);
+      assert.hasProperties(
+        first, calledWith.first, 'displays first'
+      );
+
+      assert.hasProperties(
+        second, calledWith.second, 'displays second'
+      );
     });
 
   });
@@ -75,7 +102,8 @@ suite('views/calendar_colors', function() {
     setup(function() {
       calls = {
         add: [],
-        remove: []
+        remove: [],
+        preremove: []
       };
 
       subject.updateRule = function(item) {
@@ -85,12 +113,21 @@ suite('views/calendar_colors', function() {
       subject.removeRule = function(item) {
         calls.remove.push(item);
       };
+
+      subject.hideCalendar = function(item) {
+        calls.preremove.push(item);
+      };
     });
 
     test('type: persist', function() {
       store.emit('persist', model._id, model);
 
       assert.deepEqual(calls.add, [model]);
+    });
+
+    test('type: preremove', function() {
+      store.emit('preRemove', model._id);
+      assert.deepEqual(calls.preremove, [model._id]);
     });
 
     test('type: remove', function() {
@@ -137,6 +174,29 @@ suite('views/calendar_colors', function() {
       assert.equal(rules.length, 2, 'should remove css rules');
     });
 
+  });
+
+  suite('#hideCalendar', function() {
+    setup(function() {
+      subject.hideCalendar(model._id);
+    });
+
+    test('hides display', function() {
+      // check that the actual style is flushed to the dom...
+      var bgRule = subject._styles.cssRules[0];
+
+      // it may do the RGB conversion so its not strictly equal...
+      assert.ok(
+        bgRule.style.backgroundColor,
+        'should have set background color'
+      );
+
+      var displayRule = subject._styles.cssRules[1];
+      assert.equal(
+        displayRule.style.display, 'none',
+        'should set display to none'
+      );
+    });
   });
 
   suite('#updateRule', function() {

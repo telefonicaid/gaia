@@ -17,7 +17,7 @@ section.valueselector [role="dialog"]:before {
   display: inline-block;
   height: 100%;
   vertical-align: middle;
-  width: 1px;
+  width: 0.1rem;
 }
 
 section.valueselector [role="dialog"] {
@@ -31,7 +31,6 @@ section.valueselector [role="dialog"] {
   background-size: auto auto, 100% 100%;
   bottom: 0;
   color: #FFFFFF;
-  font-family: "MozTT",Sans-serif;
   left: 0;
   overflow: hidden;
   padding: 1.5rem 0 7rem;
@@ -54,7 +53,6 @@ section.valueselector [role="dialog"] > .center {
 section.valueselector [role="dialog"] h3 {
   border-bottom: 0.1rem solid #686868;
   color: #FFFFFF;
-  font-family: 'MozTT',Sans-serif;
   font-size: 1.6rem;
   font-weight: normal;
   line-height: 1em;
@@ -64,23 +62,22 @@ section.valueselector [role="dialog"] h3 {
 
 section.valueselector [role="dialog"] ul {
   margin: -1rem -4rem 0;
-  max-height: 37rem;
+  max-height: 36rem;
   overflow: auto;
   padding: 0 4rem;
   position: relative;
 }
 
 section.valueselector [role="dialog"] li {
-  border-bottom: 1px solid #666666;
+  border-bottom: 0.1rem solid #666666;
   color: #FFFFFF;
-  font-family: 'MozTT',Sans-serif;
   font-size: 2.2rem;
   font-weight: lighter;
   height: 5.9rem;
   line-height: 5.9rem;
   list-style: none outside none;
   margin: 0;
-  padding-bottom: 1px;
+  padding-bottom: 0.1rem;
   position: relative;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -93,7 +90,11 @@ section.valueselector [role="dialog"] li > * {
 
 section.valueselector [role="dialog"] li label, section.valueselector [role="dialog"] li label span {
   color: #FFFFFF;
-  display: block;
+  /*
+  Override building blocks switch style for the span, using
+  display: inline instead of block. See bug 950588 for details.
+  */
+  display: inline;
   text-decoration: none;
 }
 
@@ -113,7 +114,7 @@ section.valueselector [role="dialog"] li input {
   top: 0;
 }
 
-section.valueselector [role="dialog"] li label span {
+section.valueselector [role="dialog"] li label span:after {
   /* Overwrite the building blocks switch style here */
   background: none;
   top: calc((100% - 2.2rem) / 2);
@@ -121,7 +122,7 @@ section.valueselector [role="dialog"] li label span {
 
 section.valueselector menu:not([type="toolbar"]) {
   background: url("images/pattern.png") repeat scroll left top #2D2D2D;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 0.1rem solid rgba(255, 255, 255, 0.1);
   bottom: 0;
   display: block;
   left: 0;
@@ -136,11 +137,10 @@ section.valueselector menu:not([type="toolbar"]) {
 section.valueselector button {
   -moz-box-sizing: border-box;
   background: url("images/default.png") repeat-x scroll left bottom #FAFAFA;
-  border: 1px solid #9F9F9F;
+  border: 0.1rem solid #9F9F9F;
   border-radius: 0.3rem 0.3rem 0.3rem 0.3rem;
   color: #333333;
   display: inline-block;
-  font-family: 'MozTT',Sans-serif;
   font-size: 1.6rem;
   font-weight: 600;
   height: 3.8rem;
@@ -151,7 +151,7 @@ section.valueselector button {
   text-align: center;
   text-decoration: none;
   text-overflow: ellipsis;
-  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.3);
+  text-shadow: 0.1rem 0.1rem 0 rgba(255, 255, 255, 0.3);
   vertical-align: middle;
   white-space: nowrap;
   width: 100%;

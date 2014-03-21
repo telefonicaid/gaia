@@ -1,12 +1,8 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('ext/uuid.js');
-  requireLib('timespan.js');
-  requireLib('event_mutations.js');
-  requireLib('provider/abstract.js');
-  requireLib('provider/local.js');
-});
+requireLib('timespan.js');
 
-suite('provider/local', function() {
+var uuid;
+
+suiteGroup('Provider.Local', function() {
 
   var subject;
   var app;
@@ -136,7 +132,6 @@ suite('provider/local', function() {
           find(event._id, function(busytime, event) {
             done(function() {
               assert.deepEqual(event, event);
-              assert.deepEqual(busytimes.factory(event), busytime);
               assert.hasProperties(addTime, busytime);
             });
           });
@@ -193,7 +188,10 @@ suite('provider/local', function() {
         });
 
         test('busytime', function(done) {
-          assert.hasProperties(busytime, busytimes.factory(event));
+          assert.hasProperties(busytime, {
+            eventId: event._id, calendarId: event.calendarId
+          });
+
           busytimes.count(function(err, count) {
             done(function() {
               assert.equal(count, 1);

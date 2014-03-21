@@ -1,71 +1,137 @@
 
 'use strict';
 
-const Homescreen = (function() {
+var Homescreen = (function() {
   var mode = 'normal';
   var origin = document.location.protocol + '//homescreen.' +
     document.location.host.replace(/(^[\w\d]+.)?([\w\d]+.[a-z]+)/, '$2');
-  var _ = navigator.mozL10n.get;
   setLocale();
+  var iconGrid = document.getElementById('icongrid');
+
   navigator.mozL10n.ready(function localize() {
     setLocale();
     GridManager.localize();
   });
 
-  var initialized = false, landingPage;
+  var initialized = false;
+  onConnectionChange(navigator.onLine);
 
-  // Initialize the various components.
-  PaginationBar.init('.paginationScroller');
-
-  function initialize(lPage) {
+  function initialize(lPage, onInit) {
     if (initialized) {
       return;
     }
 
+    PaginationBar.init('.paginationScroller');
+
     initialized = true;
-    landingPage = lPage;
 
-    window.addEventListener('hashchange', function() {
-      if (document.location.hash != '#root')
-        return;
+    var swipeSection = Configurator.getSection('swipe');
+    var options = {
+      gridSelector: '.apps',
+      dockSelector: '.dockWrapper',
+      tapThreshold: Configurator.getSection('tap_threshold'),
+      // It defines the threshold to consider a gesture like a swipe. Number
+      // in the range 0.0 to 1.0, both included, representing the screen width
+      swipeThreshold: swipeSection.threshold,
+      swipeFriction: swipeSection.friction,
+      swipeTransitionDuration: swipeSection.transition_duration
+    };
 
-      if (Homescreen.isInEditMode()) {
-        exitFromEditMode();
-      } else {
-        GridManager.goToPage(landingPage);
-      }
-    });
+    GridManager.init(options, function gm_init() {
+      window.addEventListener('hashchange', function() {
+        if (!window.location.hash.replace('#', '')) {
+          return;
+        }
 
-    var tapThreshold = Configurator.getSection('tap_threshold');
-    if (typeof(tapThreshold) === 'undefined') {
-      tapThreshold = 10;
-    }
+        // this happens when the user presses the 'home' button
+        if (Homescreen.didEvmePreventHomeButton()) {
+          // nothing to do here, just prevent any other actions
+        } else if (Homescreen.isInEditMode()) {
+          exitFromEditMode();
+        } else {
+          GridManager.goToLandingPage();
+        }
+        GridManager.ensurePanning();
+      });
 
-    GridManager.init('.apps', '.dockWrapper', tapThreshold, function gm_init() {
       PaginationBar.show();
       if (document.location.hash === '#root') {
-        // Switch to the first page only if the user has not already start to pan
-        // while home is loading
-        GridManager.goToPage(landingPage);
+        // Switch to the first page only if the user has not already
+        // start to pan while home is loading
+        GridManager.goToLandingPage();
       }
-      DragDropManager.init();
-      Wallpaper.init();
+
+      document.body.addEventListener('contextmenu', onContextMenu);
+      IconManager.init(Configurator.getSection('tap_effect_delay'));
+
+      if (typeof onInit === 'function') {
+        onInit();
+      }
     });
+  }
+
+  function onContextMenu(evt) {
+    var target = evt.target;
+
+    if ('isIcon' in target.dataset) {
+      // Grid or Dock manager will resolve the current event
+      var manager = target.parentNode === DockManager.page.olist ? DockManager :
+                                                                   GridManager;
+      manager.contextmenu(evt);
+      if (Homescreen.isInEditMode()) {
+        iconGrid.addEventListener('click', onClickHandler);
+      }
+    } else if (!Homescreen.isInEditMode()) {
+      GridManager.cancelPanning();
+      // No long press over an icon neither edit mode
+      evt.preventDefault();
+      var contextMenuEl = document.getElementById('contextmenu-dialog');
+
+      var searchPage = Configurator.getSection('search_page');
+      if (searchPage && searchPage.enabled) {
+        LazyLoader.load(['style/contextmenu.css',
+                         'shared/style/action_menu.css',
+                         contextMenuEl,
+                         'js/contextmenu.js'
+                         ], function callContextMenu() {
+                          navigator.mozL10n.translate(contextMenuEl);
+                          ContextMenuDialog.show();
+                        }
+        );
+      } else {
+        // only wallpaper
+        LazyLoader.load(['shared/js/omadrm/fl.js', 'js/wallpaper.js'],
+                      function callWallpaper() {
+                        Wallpaper.contextmenu();
+                      });
+      }
+    }
+  }
+  // dismiss edit mode by tapping in an area of the view where there is no icon
+  function onClickHandler(evt) {
+    if (!('isIcon' in evt.target.dataset)) {
+      exitFromEditMode();
+    }
   }
 
   function exitFromEditMode() {
+    iconGrid.removeEventListener('click', onClickHandler);
     Homescreen.setMode('normal');
-    GridManager.markDirtyState();
-    ConfirmDialog.hide();
-    GridManager.goToPage(GridManager.pageHelper.getCurrentPageNumber());
+    GridManager.exitFromEditMode();
+    if (typeof ConfirmDialog !== 'undefined') {
+      ConfirmDialog.hide();
+    }
+    if (typeof EditDialog !== 'undefined') {
+      EditDialog.hide();
+    }
   }
 
-  document.addEventListener('mozvisibilitychange', function mozVisChange() {
-    if (document.mozHidden && Homescreen.isInEditMode()) {
+  document.addEventListener('visibilitychange', function mozVisChange() {
+    if (document.hidden && Homescreen.isInEditMode()) {
       exitFromEditMode();
     }
 
-    if (document.mozHidden == false) {
+    if (document.hidden == false) {
       setTimeout(function forceRepaint() {
         var helper = document.getElementById('repaint-helper');
         helper.classList.toggle('displayed');
@@ -76,12 +142,14 @@ const Homescreen = (function() {
   window.addEventListener('message', function hs_onMessage(event) {
     if (event.origin === origin) {
       var message = event.data;
-      switch (message.type) {
-        case Message.Type.ADD_BOOKMARK:
-          var app = new Bookmark(message.data);
-          GridManager.install(app);
-          break;
-      }
+      LazyLoader.load('js/message.js', function loaded() {
+        switch (message.type) {
+          case Message.Type.ADD_BOOKMARK:
+            var app = new Bookmark(message.data);
+            GridManager.install(app);
+            break;
+        }
+      });
     }
   });
 
@@ -91,52 +159,57 @@ const Homescreen = (function() {
     document.documentElement.dir = navigator.mozL10n.language.direction;
   }
 
+  function onConnectionChange(isOnline) {
+    var mode = isOnline ? 'online' : 'offline';
+    document.body.dataset.online = mode;
+  }
+
+  window.addEventListener('online', function onOnline(evt) {
+    onConnectionChange(true);
+  });
+
+  window.addEventListener('offline', function onOnline(evt) {
+    onConnectionChange(false);
+  });
+
   return {
     /*
      * Displays the contextual menu given an app.
      *
-     * @param {Application} app
-     *                      The application object.
+     * @param {Object} Icon object
+     *
      */
-    showAppDialog: function h_showAppDialog(app) {
-      var title, body;
-      var cancel = {
-        title: _('cancel'),
-        callback: ConfirmDialog.hide
-      };
+    showAppDialog: function h_showAppDialog(icon) {
+      LazyLoader.load(['shared/style/buttons.css',
+                       'shared/style/headers.css',
+                       'shared/style/confirm.css',
+                       'style/request.css',
+                       document.getElementById('confirm-dialog'),
+                       'js/request.js'], function loaded() {
+        ConfirmDialog.showApp(icon);
+      });
+    },
 
-      var confirm = {
-        callback: function onAccept() {
-          ConfirmDialog.hide();
-          if (app.isBookmark) {
-            app.uninstall();
-          } else {
-            navigator.mozApps.mgmt.uninstall(app);
-          }
-        },
-        applyClass: 'danger'
-      };
-
-      // Show a different prompt if the user is trying to remove
-      // a bookmark shortcut instead of an app.
-      var manifest = app.manifest || app.updateManifest;
-      if (app.isBookmark) {
-        title = _('remove-title-2', { name: manifest.name });
-        body = _('remove-body', { name: manifest.name });
-        confirm.title = _('remove');
-      } else {
-        // Make sure to get the localized name
-        manifest = new ManifestHelper(manifest);
-        title = _('delete-title', { name: manifest.name });
-        body = _('delete-body', { name: manifest.name });
-        confirm.title = _('delete');
-      }
-
-      ConfirmDialog.show(title, body, cancel, confirm);
+    showEditBookmarkDialog: function h_showEditBookmarkDialog(icon) {
+      var dialog = document.getElementById('edit-dialog');
+      LazyLoader.load(['style/edit_dialog.css',
+                       'shared/style/headers.css',
+                       'shared/style/input_areas.css',
+                       'shared/js/url_helper.js',
+                       dialog,
+                       'js/edit_dialog.js'], function loaded() {
+        navigator.mozL10n.translate(dialog);
+        EditDialog.show(icon);
+      });
     },
 
     isInEditMode: function() {
       return mode === 'edit';
+    },
+
+    didEvmePreventHomeButton: function() {
+      return EvmeFacade && EvmeFacade.onHomeButtonPress &&
+              EvmeFacade.onHomeButtonPress();
     },
 
     init: initialize,

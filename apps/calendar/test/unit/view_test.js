@@ -1,6 +1,4 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('view.js');
-});
+requireLib('view.js');
 
 suite('view', function() {
 
@@ -16,13 +14,14 @@ suite('view', function() {
     ].join('');
 
     document.body.appendChild(el);
-    subject.selectors: {
+
+    subject = new Calendar.View();
+
+    subject.selectors = {
+      element: '#view',
       errors: 'section[role="status"] .errors',
       status: 'section[role="status"]'
     };
-
-
-    subject = new Calendar.View('#view');
   });
 
   teardown(function() {
@@ -101,6 +100,22 @@ suite('view', function() {
 
   });
 
+  suite('#idForModel', function() {
+    test('string', function() {
+      assert.equal(
+        subject.idForModel('prefix-', 1),
+        'prefix-1'
+      );
+    });
+
+    test('object', function() {
+      assert.equal(
+        subject.idForModel('prefix-', { _id: 2 }),
+        'prefix-2'
+      );
+    });
+  });
+
   suite('#delegate', function() {
     var element;
     var triggerEvent;
@@ -158,7 +173,7 @@ suite('view', function() {
     });
 
     test('miss - on element', function(done) {
-      subject.delegate(element, 'click', function() {
+      subject.delegate(element, 'click', null, function() {
         done(new Error('should not triger'));
       });
 
@@ -170,7 +185,7 @@ suite('view', function() {
     });
 
     test('miss - on child', function(done) {
-      subject.delegate(element, 'click', function() {
+      subject.delegate(element, 'click', null, function() {
         done(new Error('should not triger'));
       });
 
@@ -186,19 +201,41 @@ suite('view', function() {
 
   });
 
-  test('#displayErrors', function() {
-    var errors = [{ name: 'foo' }];
-    subject.showErrors(errors);
+  suite('#showErrors', function() {
 
-    var list = subject.status.classList;
-    var errors = subject.errors.textContent;
+    test('successfuly display', function() {
+      var errors = [{ name: 'error-default' }];
+      subject.showErrors(errors);
 
-    assert.ok(errors);
-    assert.include(errors, 'foo');
+      var list = subject.status.classList;
+      var errors = subject.errors.textContent;
 
-    assert.ok(list.contains(subject.activeClass));
-    triggerEvent(subject.status, 'animationend');
-    assert.ok(!list.contains(subject.activeClass));
+      assert.ok(errors);
+      assert.include(errors, navigator.mozL10n.get('error-default'));
+
+      assert.ok(list.contains(subject.activeClass));
+      testSupport.calendar.triggerEvent(subject.status, 'animationend');
+      assert.ok(!list.contains(subject.activeClass));
+    });
+
+    /**
+     * Verifies that built in errors map to a l10n field.
+     */
+    function verifyBuiltIn(error, expectedID) {
+      test('show built-in error: Calendar.Error.' + error, function() {
+        var err = new Calendar.Error[error]();
+        var msg = navigator.mozL10n.get(expectedID) || expectedID;
+
+        subject.showErrors(err);
+        assert.equal(subject.errors.textContent, msg);
+        subject.hideErrors();
+      });
+    }
+
+    verifyBuiltIn('Authentication', 'error-unauthenticated');
+    verifyBuiltIn('ServerFailure', 'error-internal-server-error');
+    verifyBuiltIn('ServerFailure', 'error-internal-server-error');
+
   });
 
   test('#onactive', function() {

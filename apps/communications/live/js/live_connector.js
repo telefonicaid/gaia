@@ -4,11 +4,13 @@ if (!window.LiveConnector) {
     var CONTACTS_RESOURCE = 'me/contacts';
     var PICTURE_RESOURCE = '/picture';
 
+    var LIVE_CATEGORY = 'live';
+
     var itemsTypeMap = {
       'personal': 'personal',
       'mobile': 'mobile',
       'business': 'work',
-      'other': 'another',
+      'other': 'other',
       'preferred': 'personal'
     };
 
@@ -25,24 +27,17 @@ if (!window.LiveConnector) {
       return out;
     }
 
-
-    function LiveConnector() {
+    function getURI(liveContact) {
+      return 'urn:uuid:' + (liveContact.user_id || liveContact.id);
     }
 
-    function sortContacts(contactsList) {
-      contactsList.sort(function(a,b) {
-        var out = 0;
-        if (a.last_name && b.last_name) {
-          out = a.last_name.localeCompare(b.last_name);
-        }
-        else if (b.last_name) {
-          out = 1;
-        }
-        else if (a.last_name) {
-          out = -1;
-        }
-        return out;
-      });
+    function resolveURI(uri) {
+      var components = uri.split(':');
+      // The third element is the user id of the live contact
+      return components[2];
+    }
+
+    function LiveConnector() {
     }
 
     LiveConnector.prototype = {
@@ -50,40 +45,45 @@ if (!window.LiveConnector) {
         var uriElements = [LIVE_ENDPOINT, CONTACTS_RESOURCE, '?',
                            'access_token', '=', access_token];
 
-        // Need to be sorted by the connector
-        var auxCbs = {
-          success: function(response) {
-            sortContacts(response.data);
-            callbacks.success(response);
-          },
-          error: callbacks.error,
-          timeout: callbacks.timeout
-        };
-
-        return Rest.get(uriElements.join(''), auxCbs);
+        return Rest.get(uriElements.join(''), callbacks);
       },
 
       listDeviceContacts: function(callbacks) {
-        // Dummy implementation for the time being
-        callbacks.success([]);
+        var filterOptions = {
+          filterValue: LIVE_CATEGORY,
+          filterOp: 'contains',
+          filterBy: ['category']
+        };
+        var req = navigator.mozContacts.find(filterOptions);
+        req.onsuccess = function() {
+          callbacks.success(req.result);
+        };
+        req.onerror = function() {
+          callbacks.error(req.error);
+        };
       },
 
       getImporter: function(contactsList, access_token) {
         return new window.ContactsImporter(contactsList, access_token, this);
       },
 
-      getCleaner: function(contactsList, access_token) {
+      cleanContacts: function(contactsList, mode, cb) {
         // Just a placeholder for the moment
-        return null;
+        var cleaner = new window.ContactsCleaner(contactsList);
+        window.setTimeout(cleaner.start, 0);
+        cb(cleaner);
       },
 
       adaptDataForShowing: function(source) {
         var out = source;
 
-        out.uid = source.user_id;
-        out.givenName = source.first_name || '';
-        out.familyName = source.last_name || '';
-        out.email1 = source.emails.account;
+        out.uid = source.user_id || source.id;
+        out.givenName = [source.first_name || ''];
+        out.familyName = [source.last_name || ''];
+        out.email1 = source.emails.account || '';
+
+        out.contactPictureUri = [LIVE_ENDPOINT, out.uid,
+                                 PICTURE_RESOURCE, '?type=medium'].join('');
 
         return out;
       },
@@ -95,7 +95,13 @@ if (!window.LiveConnector) {
           name: [liveContact.name || ''],
           tel: [],
           email: [],
-          adr: []
+          adr: [],
+          photo: liveContact.photo,
+          category: [LIVE_CATEGORY],
+          url: [{
+            type: ['source'],
+            value: getURI(liveContact)
+          }]
         };
 
         var byear = liveContact.birth_year;
@@ -103,10 +109,10 @@ if (!window.LiveConnector) {
         var bday = liveContact.birth_day;
         if (bmonth && bday) {
           var birthdate = out.bday = new Date();
-          birthdate.setDate(bday);
-          birthdate.setMonth(bmonth, bday);
+          birthdate.setUTCDate(bday);
+          birthdate.setUTCMonth(bmonth, bday);
           if (byear) {
-            birthdate.setYear(byear);
+            birthdate.setUTCFullYear(byear);
           }
         }
 
@@ -150,20 +156,42 @@ if (!window.LiveConnector) {
       // on the device. That is needed by the generic importer, for live
       // a dummy implementation as we are currently not supporting updates
       getContactUid: function(deviceContact) {
-        return '-1';
+        var out = '-1';
+
+        var url = deviceContact.url;
+        if (Array.isArray(url)) {
+          var targetUrls = url.filter(function(aUrl) {
+            return Array.isArray(aUrl.type) &&
+                                aUrl.type.indexOf('source') !== -1;
+          });
+          if (targetUrls[0]) {
+            out = resolveURI(targetUrls[0].value);
+          }
+        }
+
+        return out;
       },
 
       get name() {
         return 'live';
       },
 
-      downloadContactPicture: function(contact, access_token, callbacks) {
-        var uriElements = [LIVE_ENDPOINT, contact.user_id, PICTURE_RESOURCE,
-                           '?', 'access_token', '=', access_token];
+      get automaticLogout() {
+        return true;
+      },
 
-        return Rest.get(uriElements.join(''), callbacks, {
-          responseType: 'blob'
-        });
+      downloadContactPicture: function(contact, access_token, callbacks) {
+        if (contact.user_id) {
+          var uriElements = [LIVE_ENDPOINT, contact.user_id, PICTURE_RESOURCE,
+                             '?', 'access_token', '=', access_token];
+
+          return Rest.get(uriElements.join(''), callbacks, {
+            responseType: 'blob'
+          });
+        }
+        else {
+          callbacks.success(null);
+        }
       },
 
       startSync: function() {

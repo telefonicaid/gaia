@@ -4,7 +4,7 @@ var DataMobile = {
   key: 'ril.data.enabled',
   apnRetrieved: false,
   init: function dm_init() {
-    var settings = window.navigator.mozSettings;
+    var settings = navigator.mozSettings;
     if (!settings) {
       console.log('Settings is not available');
       return;
@@ -23,50 +23,50 @@ var DataMobile = {
       console.log('Error retrieving ril.data.enabled');
     };
   },
-  toggle: function dm_toggle(status) {
+  toggle: function dm_toggle(status, callback) {
     var options = {};
     options[this.key] = status;
     if (!this.apnRetrieved) {
       // I need to retrieve APN
       var self = this;
-      this.getAPN(function() {
-        DataMobile.settings.createLock().set(options);
-        DataMobile.apnRetrieved = true;
-        DataMobile.isDataAvailable = status;
+      this.getAPN(function apn_recovered() {
+        self.settings.createLock().set(options);
+        self.apnRetrieved = true;
+        self.isDataAvailable = status;
+        if (callback) {
+          callback();
+        }
       });
       return;
     }
     this.settings.createLock().set(options);
+    this.apnRetrieved = true;
     this.isDataAvailable = status;
+    if (callback) {
+      callback();
+    }
   },
   getAPN: function dm_getapn(callback) {
-    // TODO Use 'shared' version
-    var APN_FILE = '/shared/resources/apn.json';
-    var self = this;
-    // Retrieve the list of APN configurations
-    // load and query APN database, then trigger callback on results
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', APN_FILE, true);
-    xhr.responseType = 'json';
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState == 4 && (xhr.status == 200 || xhr.status === 0)) {
-        var mcc = navigator.mozMobileConnection.iccInfo.mcc;
-        var mnc = navigator.mozMobileConnection.iccInfo.mnc;
-        var apnList = xhr.response;
-        var apns = apnList[mcc] ? (apnList[mcc][mnc] || []) : [];
-        var selectedAPN = apns[0];
-        // Set data in 'Settings'
-        var lock = self.settings.createLock();
-        lock.set({ 'ril.data.apn': selectedAPN.apn || '' });
-        lock.set({ 'ril.data.user': selectedAPN.user || '' });
-        lock.set({ 'ril.data.passwd': selectedAPN.password || '' });
-        lock.set({ 'ril.data.httpProxyHost': selectedAPN.proxy || '' });
-        lock.set({ 'ril.data.httpProxyPort': selectedAPN.port || '' });
-        if (callback) {
-          callback();
+    // By the time the APN settings are needed in the FTU before enabling data
+    // calls the system app (through the operator variant logic) might store the
+    // APN settings into the settings database. If not wait for that before
+    // enabling data calls.
+    var _self = this;
+    function ensureApnSettings() {
+      var req = _self.settings.createLock().get('ril.data.apnSettings');
+      req.onsuccess = function loadApn() {
+        var apnSettings = req.result['ril.data.apnSettings'];
+        if (apnSettings) {
+          if (callback) {
+            callback(req.result);
+          }
+          _self.settings.removeObserver('ril.data.apnSettings',
+                                        ensureApnSettings);
         }
-      }
-    };
-    xhr.send();
+      };
+    }
+
+    ensureApnSettings();
+    this.settings.addObserver('ril.data.apnSettings', ensureApnSettings);
   }
 };

@@ -1,0 +1,59 @@
+<element name="mediaStorage" extends="section">
+  <template>
+
+    <header>
+      <a href="#root"><span class="icon icon-back">back</span></a>
+      <h1 data-l10n-id="mediaStorage-header"> Media Storage </h1>
+    </header>
+
+    <div>
+      <ul>
+        <li>
+          <label class="pack-switch">
+            <input id="ums-switch" type="checkbox" data-ignore>
+            <small id="ums-desc">Disabled</small>
+            <span data-l10n-id="enableUSBStorage2">USB storage</span>
+          </label>
+        </li>
+      </ul>
+      <div id="volume-list">
+      </div>
+      <header>
+        <h2 data-l10n-id="advanced">Advanced</h2>
+      </header>
+      <ul>
+        <li>
+          <p data-l10n-id="default-media-location">Default media location</p>
+          <span class="button icon icon-dialog">
+            <select id="defaultMediaLocation" name="device.storage.writable.name">
+            </select>
+          </span>
+        </li>
+        <li data-l10n-id="default-media-location-msg" class="explanation">
+          Choose where photos, videos, music and downloads are stored by default.
+        </li>
+      </ul>
+    </div>
+    <form data-type="confirm" role="dialog" id="format-sdcard-dialog" hidden>
+      <section>
+        <h1 data-l10n-id="format-sdcard-title">Format SD card</h1>
+        <p data-l10n-id="format-sdcard-message">This will erase all data stored on your SD card, such as music and photos.</p>
+      </section>
+      <menu>
+        <button id="format-sdcard-cancel-btn" data-l10n-id="cancel">Cancel</button>
+        <button id="format-sdcard-ok-btn" class="danger" data-l10n-id="format-sdcard-btnformat">Format</button>
+      </menu>
+    </form>
+    <form data-type="confirm" role="dialog" id="default-location-popup-container" hidden>
+      <section>
+        <p data-l10n-id="change-default-location-confirm">Changing the default media storage volume will affect where photos, videos, downloads and other media will be saved to by default. Existing data will remain in its current location.</p>
+      </section>
+      <menu>
+        <button id="default-location-cancel-btn" data-l10n-id="cancel">Cancel</button>
+        <button id="default-location-change-btn" data-l10n-id="change">Change</button>
+      </menu>
+    </form>
+    <script src="js/media_storage.js"></script>
+
+  </template>
+</element>

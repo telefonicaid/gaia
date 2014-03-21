@@ -14,9 +14,19 @@ How to:
     }
   ]);
 
-  prompt1.addToList('Another button', function(){alert('Another action');});
+  prompt1.addToList('Another button', 'depth0',
+                    true, function(){alert('Another action');});
   prompt1.show();
 */
+/*jshint browser: true */
+/*global alert, define */
+define(function(require) {
+
+var FOLDER_DEPTH_CLASSES = require('folder_depth_classes'),
+    mozL10n = require('l10n!');
+
+// Used for empty click handlers.
+function noop() {}
 
 function ValueSelector(title, list) {
   var init, show, hide, render, setTitle, emptyList, addToList,
@@ -51,7 +61,7 @@ function ValueSelector(title, list) {
     strPopup += '    <h3>No Title</h3>';
     strPopup += '    <ul>';
     strPopup += '      <li>';
-    strPopup += '        <label>';
+    strPopup += '        <label class="pack-radio">';
     strPopup += '          <input type="radio" name="option">';
     strPopup += '          <span>Dummy element</span>';
     strPopup += '        </label>';
@@ -82,17 +92,17 @@ function ValueSelector(title, list) {
     if (Array.isArray(list)) {
       data.list = list;
     }
-  }
+  };
 
   show = function() {
     render();
     el.classList.add('visible');
-  }
+  };
 
   hide = function() {
     el.classList.remove('visible');
     emptyList();
-  }
+  };
 
   render = function() {
     var title = el.querySelector('h3'),
@@ -110,34 +120,42 @@ function ValueSelector(title, list) {
 
       input.setAttribute('type', 'radio');
       input.setAttribute('name', 'option');
+      label.classList.add('pack-radio');
       label.appendChild(input);
+      span.appendChild(text);
       label.appendChild(span);
-      label.appendChild(text);
       // Here we apply the folder-card's depth indentation to represent label.
       var depthIdx = data.list[i].depth;
       depthIdx = Math.min(FOLDER_DEPTH_CLASSES.length - 1, depthIdx);
       label.classList.add(FOLDER_DEPTH_CLASSES[depthIdx]);
-      li.addEventListener('click', data.list[i].callback, false);
+
+      // If not selectable use an empty click handler. Because of event
+      // fuzzing, we want to have something registered, otherwise an
+      // adjacent list item may receive the click.
+      var callback = data.list[i].selectable ? data.list[i].callback : noop;
+      li.addEventListener('click', callback, false);
+
       li.appendChild(label);
       list.appendChild(li);
     }
-  }
+  };
 
   setTitle = function(str) {
     data.title = str;
-  }
+  };
 
   emptyList = function() {
     data.list = [];
-  }
+  };
 
-  addToList = function(label, depth, callback) {
+  addToList = function(label, depth, selectable, callback) {
     data.list.push({
       label: label,
       depth: depth,
+      selectable: selectable,
       callback: callback
     });
-  }
+  };
 
   init();
 
@@ -150,3 +168,7 @@ function ValueSelector(title, list) {
     List: list
   };
 }
+
+return ValueSelector;
+
+});
