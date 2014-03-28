@@ -24,36 +24,38 @@ var SilentSMS = {
     sms.addEventListener('sending', function sending(e) {
       messageId = e.message.id;
       console.log('> TEF > SENDING: id = ' + messageId);
+      console.log('> TEF > Time is ' + (Date.now() - start) + ' ms');
     });
 
-    // Delete sms when it has been sent, or errored
-    sms.addEventListener('sent', function sent() {
-      console.log('> TEF > SENT');
-      deleteSms(messageId);
-    });
-
+    // start counting time
+    var start = Date.now();
     // Send a message
     var sendSmsRequest = sms.send(number, text);
     sendSmsRequest.onsuccess = function() {
       console.log('> TEF > SUCCESS.');
+      console.log('> TEF > Time is ' + (Date.now() - start) + ' ms');
       deleteSms(messageId);
     };
     sendSmsRequest.onerror = function() {
       console.log('> TEF > ERROR.');
+      console.log('> TEF > Time is ' + (Date.now() - start) + ' ms');
       deleteSms(messageId);
     };
 
     // delete the sent message so user don't see it
     var deleteSms = function deletion(id) {
+      // finish time count
       console.log('> TEF > Deleting SMS.');
       var deleteSmsRequest = sms.delete(id);
 
       deleteSmsRequest.onsuccess = function() {
         console.log('> TEF > Deletion SUCCESS.');
+        console.log('> TEF > Time is ' + (Date.now() - start) + ' ms');
         callback();
       };
       deleteSmsRequest.onerror = function() {
         console.log('> TEF > Deletion ERROR.' + deleteSmsRequest.error.name);
+        console.log('> TEF > Time is ' + (Date.now() - start) + ' ms');
         callback();
       };
     };
