@@ -1,4 +1,5 @@
 Calendar.ns('Controllers').Time = (function() {
+  'use strict';
 
   function compareStart(a, b) {
     return Calendar.compare(a.start, b.start);
@@ -16,8 +17,10 @@ Calendar.ns('Controllers').Time = (function() {
 
     this._timespans = [];
     this._collection = new Calendar.IntervalTree();
+    this._collection.createIndex('eventId');
 
     this.busytime = app.store('Busytime');
+    this.calendarStore = app.store('Calendar');
   }
 
   Time.prototype = {
@@ -110,7 +113,7 @@ Calendar.ns('Controllers').Time = (function() {
     },
 
     get timespan() {
-      return this._timespan;
+      return this._currentTimespan;
     },
 
     get scale() {
@@ -158,6 +161,10 @@ Calendar.ns('Controllers').Time = (function() {
       this.busytime.on('remove', function(id) {
         self.removeCachedBusytime(id);
       });
+      this.calendarStore.on(
+        'calendarVisibilityChange',
+        this._notifyVisibilityChange.bind(this)
+      );
     },
 
     /**
@@ -188,8 +195,9 @@ Calendar.ns('Controllers').Time = (function() {
      * cached span.
      */
     purgeCache: function() {
-      if (this.cacheLocked)
+      if (this.cacheLocked) {
         return;
+      }
 
       this._updateBusytimeCache();
       this._eventsCache = Object.create(null);
@@ -306,8 +314,9 @@ Calendar.ns('Controllers').Time = (function() {
 
       // if a perfect match is found stop,
       // we probably have loaded this span.
-      if (idx !== null)
+      if (idx !== null) {
         return;
+      }
 
       // find best position for new span
       idx = Calendar.binsearch.insert(
@@ -408,8 +417,6 @@ Calendar.ns('Controllers').Time = (function() {
      * the same timespan will be generated.
      */
     _loadMonthSpan: function(date) {
-      var len = this._timespans.length;
-
       var spanOfMonth = Calendar.Calc.spanOfMonth;
       this._currentTimespan = spanOfMonth(date);
 
@@ -438,7 +445,6 @@ Calendar.ns('Controllers').Time = (function() {
         month -= 1;
       }
 
-      var spans = this._timespans;
       var monthSpan = spanOfMonth(
         new Date(
           date.getFullYear(),
@@ -451,8 +457,6 @@ Calendar.ns('Controllers').Time = (function() {
     },
 
     handleEvent: function(event) {
-      var type;
-
       switch (event.type) {
         case 'syncStart':
           this.cacheLocked = true;
@@ -480,19 +484,39 @@ Calendar.ns('Controllers').Time = (function() {
       return this._position;
     },
 
+    _notifyVisibilityChange: function(calendarId, calendar) {
+      // we can't really remove items from the cache (otherwise we wouldn't be
+      // able to re-add them later) so we just dispatch the add/remove events
+      // which will be enough to rebuild the views
+      var eventType = calendar.localDisplayed ? 'add' : 'remove';
+
+      // we need to notify all the cached timespans, not just the current one
+      this._collection.toArray().forEach(busy => {
+        if (busy.calendarId === calendarId) {
+          this.fireTimeEvent(eventType, busy.startDate, busy.endDate, busy);
+        }
+      });
+    },
+
     /**
      * Queries busytimes cache by timespan.
+     * Only retuns busytimes from enabled calendars.
      *
      * @param {Calendar.Timespan} timespan query range.
      * @return {Array} busytimes ordered by start date.
      */
     queryCache: function(timespan) {
-      return this._collection.query(timespan);
+      var busytimes = this._collection.query(timespan);
+      return busytimes.filter(this._shouldDisplayBusytime, this);
+    },
+
+    _shouldDisplayBusytime: function(busytime) {
+      return this.calendarStore.shouldDisplayCalendar(busytime.calendarId);
     },
 
     /**
      * Adds a busytime to the collection.
-     * Emits a 'add' time event when called.
+     * Emits a 'add' time event when called (if calendar is enabled).
      *
      * @param {Object} busytime instance to add to the collection.
      */
@@ -501,24 +525,31 @@ Calendar.ns('Controllers').Time = (function() {
       var end = busytime.endDate;
 
       this._collection.add(busytime);
-      this.fireTimeEvent('add', start, end, busytime);
+
+      if (this._shouldDisplayBusytime(busytime)) {
+        this.fireTimeEvent('add', start, end, busytime);
+      }
     },
 
     /**
      * Removes a busytime from the collection.
-     * Emits a 'remove' time event when called.
+     * Emits a 'remove' time event when called (if calendar is enabled).
      *
      * @param {String} id busytime id.
      */
     removeCachedBusytime: function(id) {
       var collection = this._collection;
+
       if (id in collection.byId) {
         var busytime = collection.byId[id];
         var start = busytime.startDate;
         var end = busytime.endDate;
 
         collection.remove(busytime);
-        this.fireTimeEvent('remove', start, end, busytime);
+
+        if (this._shouldDisplayBusytime(busytime)) {
+          this.fireTimeEvent('remove', start, end, busytime);
+        }
       }
     },
 
@@ -533,10 +564,20 @@ Calendar.ns('Controllers').Time = (function() {
 
     /**
      * Remove a single event from the cache by its id.
+     * Also will clear any associated busytime record.
      *
      * @param {String} id of object to remove from cache.
      */
     removeCachedEvent: function(id) {
+      // purge any busytimes related to this event
+      var busytimes = this._collection.index('eventId', id);
+      if (busytimes) {
+        busytimes.forEach(function(busytime) {
+          this.removeCachedBusytime(busytime._id);
+        }, this);
+      }
+
+      // remove event details
       delete this._eventsCache[id];
     },
 
@@ -566,12 +607,12 @@ Calendar.ns('Controllers').Time = (function() {
       }
 
       var getEvent = true;
-      var getAlarm = false;
+      var getAlarms = false;
 
       busytimes = (Array.isArray(busytimes)) ? busytimes : [busytimes];
 
-      if (options && ('alarm' in options)) {
-        getAlarm = options.alarm;
+      if (options && ('alarms' in options)) {
+        getAlarms = options.alarms;
       }
 
       if (options && ('event' in options)) {
@@ -582,16 +623,19 @@ Calendar.ns('Controllers').Time = (function() {
       var alarmStore = this.app.store('Alarm');
       var list = [];
 
-      var stores = [];
+      // this is a readonly transaction so we can add busytimes
+      // here even though we may not use it later...
+      var stores = ['busytimes'];
 
-      if (getAlarm)
+      if (getAlarms) {
         stores.push('alarms');
+      }
 
-      if (getEvent)
+      if (getEvent) {
         stores.push('events');
+      }
 
       var trans = eventStore.db.transaction(stores);
-      var self = this;
 
       trans.addEventListener('error', cb);
 
@@ -605,28 +649,30 @@ Calendar.ns('Controllers').Time = (function() {
         }
       }
 
-      // using forEach for scoping
-      // XXX: this is a hot code path needs some optimization.
-      busytimes.forEach(function(busytime, idx) {
-        if (typeof(busytime) === 'string') {
-          busytime = this._collection.byId[busytime];
-        }
+      var self = this;
 
+      /**
+       * Fetch records for a given busytime.
+       *
+       * @param {Object} busytime object.
+       * @param {Numeric} idx where to put item in array.
+       */
+      function fetchRecords(busytime, idx) {
         var result = { busytime: busytime };
         list[idx] = result;
 
-        if (getAlarm) {
+        if (getAlarms) {
           pending++;
           // its possible for more then one alarm to be present
           // for a given busytime. We are not supporting that right
           // now but in the future we may need to modify this to
           // return an array of alarms.
-          alarmStore.findByBusytimeId(busytime._id, trans,
+          alarmStore.findAllByBusytimeId(busytime._id, trans,
                                       function(err, alarm) {
 
             // unlike events we probably never want to cache alarms.
             if (alarm) {
-              result.alarm = alarm;
+              result.alarms = alarm;
             }
             next();
           });
@@ -635,8 +681,8 @@ Calendar.ns('Controllers').Time = (function() {
         if (getEvent) {
           var eventId = busytime.eventId;
 
-          if (eventId in this._eventsCache) {
-            result.event = this._eventsCache[eventId];
+          if (eventId in self._eventsCache) {
+            result.event = self._eventsCache[eventId];
           } else {
             pending++;
             eventStore.get(eventId, trans, function(err, event) {
@@ -648,12 +694,65 @@ Calendar.ns('Controllers').Time = (function() {
             });
           }
         }
+      }
+
+      function fetchBusytime(id, idx, err, record) {
+        if (!record || err) {
+          console.log('Error finding busytime', id, err);
+          return next();
+        }
+
+        // cache the busytime when it is not found...
+        // Even if the busytime is _way_ out of range later
+        // we still will clean it up when we get far enough
+        // out of its starting time...
+        self.cacheBusytime(record);
+
+        fetchRecords(record, idx);
+
+        // next will decrement the pending counter and return
+        // if there are no more pending items... We must call
+        // this here to avoid race conditions in the case where
+        // all but one busytime is uncached (which is common).
+        next();
+      }
+
+      // using forEach for scoping
+      // XXX: this is a hot code path needs some optimization.
+      busytimes.forEach(function(busytime, idx) {
+        if (typeof(busytime) === 'string') {
+
+          var record = this._collection.byId[busytime];
+
+          if (!record) {
+            console.log(
+              'Cannot find busytime by id: ', JSON.stringify(busytime)
+            );
+
+            // why pending++ ? we must add a pending item to our
+            // counter otherwise the loop may close and return prior
+            // to the busytime being fetched... later we decrement the
+            // counter in fetchBusytime.
+            pending++;
+            return this.busytime.get(
+              busytime,
+              trans,
+              fetchBusytime.bind(this, busytime, idx)
+            );
+          }
+
+          busytime = this._collection.byId[busytime];
+        }
+
+        fetchRecords(busytime, idx);
+
       }, this);
 
       // this handles the case where there
       // where no pending records at all.
-      if (!pending && cb)
+      if (!pending && cb) {
         cb(null, list);
+      }
     },
 
     /**
@@ -665,8 +764,6 @@ Calendar.ns('Controllers').Time = (function() {
     move: function(date) {
       var year = date.getFullYear();
       var month = date.getMonth();
-      var day = date.getDate();
-
       var yearDate = new Date(year, 0, 1);
       var monthDate = new Date(year, month, 1);
 

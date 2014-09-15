@@ -1,30 +1,28 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('timespan.js');
-  requireLib('interval_tree.js');
-});
+/*global Factory */
+
+requireLib('timespan.js');
+requireLib('interval_tree.js');
 
 window.page = window.page || {};
 
-suite('controllers/time', function() {
+suite('Controllers.Time', function() {
+  'use strict';
+
   var subject;
   var app;
   var busytimeStore;
   var db;
 
-  function logSpan(span) {
-    if (Array.isArray(span)) {
-      return span.forEach(logSpan);
-    }
-
-    console.log();
-    console.log('START:', new Date(span.start));
-    console.log('END:', new Date(span.end));
-    console.log();
-  }
-
   setup(function(done) {
     app = testSupport.calendar.app();
     subject = new Calendar.Controllers.Time(app);
+
+    subject.calendarStore = {
+      shouldDisplayCalendar: function(id) {
+        return true;
+      },
+      on: function() {}
+    };
 
     busytimeStore = app.store('Busytime');
     db = app.db;
@@ -151,30 +149,51 @@ suite('controllers/time', function() {
     setup(function() {
       span = new Calendar.Timespan(0, Infinity);
       busy = Factory('busytime');
+      event = null;
 
       subject.observeTime(span, function(result) {
         event = result;
       });
+      sinon.stub(subject.calendarStore, 'shouldDisplayCalendar');
+    });
 
-      subject.cacheBusytime(busy);
+    teardown(function() {
+      subject.calendarStore.shouldDisplayCalendar.restore();
     });
 
     test('#cacheBusytime', function() {
+      subject.calendarStore.shouldDisplayCalendar.returns(true);
+
+      subject.cacheBusytime(busy);
+
       assert.equal(event.type, 'add');
       assert.equal(event.data, busy);
 
       var query = subject.queryCache(span);
       assert.equal(query[0], busy);
-    });
 
-    test('remove', function() {
       subject.removeCachedBusytime(busy._id);
 
       assert.equal(event.type, 'remove');
       assert.equal(event.data, busy);
 
-      var query = subject.queryCache(busy);
+      query = subject.queryCache(busy);
       assert.length(query, 0);
+    });
+
+    test('disabled calendar', function() {
+      subject.calendarStore.shouldDisplayCalendar.returns(false);
+
+      subject.cacheBusytime(busy);
+
+      // should not return busytimes from disabled calendars
+      var query = subject.queryCache(span);
+      assert.length(query, 0);
+
+      // should not dispatch event for disabled calendars
+      assert.equal(event, null);
+      subject.removeCachedBusytime(busy._id);
+      assert.equal(event, null);
     });
   });
 
@@ -193,7 +212,7 @@ suite('controllers/time', function() {
     });
 
     test('#cacheEvent', function(done) {
-      subject.findAssociated(busy, function(err, data) {
+      subject.findAssociated(busy, null, function(err, data) {
         var result = data[0];
         done(function() {
           assert.equal(result.event, event);
@@ -201,14 +220,35 @@ suite('controllers/time', function() {
       });
     });
 
-    test('#removeCachedEvent', function(done) {
-      subject.removeCachedEvent(event._id);
-      subject.findAssociated(busy, function(err, data) {
-        var result = data[0];
-        done(function() {
-          assert.notEqual(result.event, event);
-          assert.deepEqual(result.event, event);
+    suite('#removeCachedEvent', function() {
+      test('clear event', function(done) {
+        subject.removeCachedEvent(event._id);
+        subject.findAssociated(busy, function(err, data) {
+          var result = data[0];
+          done(function() {
+            assert.notEqual(result.event, event);
+            assert.deepEqual(result.event, event);
+          });
         });
+      });
+
+      test('clear associated busytime cache', function() {
+        var notAssociated = Factory('busytime', { eventId: 'notme' });
+        var associated = Factory('busytime', { eventId: event._id });
+
+        subject.cacheBusytime(associated);
+        subject.cacheBusytime(notAssociated);
+
+        subject.removeCachedEvent(event._id);
+        assert.isNull(
+          subject._collection.indexOf(associated),
+          'associated'
+        );
+
+        assert.ok(
+          subject._collection.indexOf(notAssociated) != null,
+          'not associated'
+        );
       });
     });
   });
@@ -265,13 +305,13 @@ suite('controllers/time', function() {
     test('everything is cached', function(done) {
       subject.cacheEvent(event);
 
-      var opts = { alarm: true, event: true };
+      var opts = { alarms: true, event: true };
 
       subject.findAssociated(hasAlarm, opts, function(err, data) {
         done(function() {
           assert.ok(!err);
           assert.equal(data[0].event, event);
-          assert.deepEqual(data[0].alarm, alarm);
+          assert.equal(data[0].busytime._id, alarm.busytimeId);
         });
       });
     });
@@ -292,7 +332,19 @@ suite('controllers/time', function() {
       });
     });
 
-    test('when given a busytime id', function(done) {
+    test('when given a busytime id (not cached)', function(done) {
+      subject.findAssociated(hasAlarm._id, function(err, data) {
+        done(function() {
+          assert.length(data, 1, 'has data');
+          var item = data[0];
+
+          assert.equal(item.busytime._id, hasAlarm._id, 'has alarm');
+          assert.equal(item.event._id, event._id, 'has event');
+        });
+      });
+    });
+
+    test('when given a busytime id (cached)', function(done) {
       var expected = {
         busytime: hasAlarm,
         event: event
@@ -337,10 +389,11 @@ suite('controllers/time', function() {
 
     test('no event - with missing alarm', function(done) {
       var expected = {
-        busytime: noAlarm
+        busytime: noAlarm,
+        alarms: []
       };
 
-      var options = { event: false, alarm: true };
+      var options = { event: false, alarms: true };
 
       subject.findAssociated(noAlarm, options, function(err, result) {
         done(function() {
@@ -355,7 +408,7 @@ suite('controllers/time', function() {
       var req = [noAlarm, hasAlarm];
       var options = {
         event: true,
-        alarm: true
+        alarms: true
       };
 
       subject.findAssociated(req, options, function(err, data) {
@@ -371,13 +424,14 @@ suite('controllers/time', function() {
 
           var expectedNoAlarm = {
             event: event,
-            busytime: noAlarm
+            busytime: noAlarm,
+            alarms: []
           };
 
           var expectedAlarm = {
             event: event,
             busytime: hasAlarm,
-            alarm: alarm
+            alarms: [alarm]
           };
 
           assert.deepEqual(
@@ -387,10 +441,16 @@ suite('controllers/time', function() {
           );
 
           assert.deepEqual(
-            resultAlarm,
-            expectedAlarm,
-            'busytime with alarm'
+            resultAlarm.eventId,
+            expectedAlarm.eventId,
+            'busytime with alarm - eventId'
           );
+
+          assert.deepEqual(
+              resultAlarm.busytimeId,
+              expectedAlarm.busytimeId,
+              'busytime with alarm - busytimeId'
+            );
         });
       });
     });
@@ -485,11 +545,6 @@ suite('controllers/time', function() {
 
       subject.observe();
       max = subject._maxTimespans;
-
-      var longSpan = new Calendar.Timespan(
-        new Date(2010, 0, 1),
-        new Date(2013, 0, 1)
-      );
 
       subject.on(
         'purge',
@@ -928,7 +983,6 @@ suite('controllers/time', function() {
     var stored;
     var spanOfMonth;
     var initialMove;
-    var loadResults;
     var loaded;
 
     suiteSetup(function() {
@@ -1089,20 +1143,20 @@ suite('controllers/time', function() {
       // reset timespans
       subject._timespans.length = 0;
 
-      function month(year, month) {
+      function generateSpanOfMonth(year, month) {
         return spanOfMonth(new Date(year, month));
       }
 
       subject.on('loadingComplete', function() {
         done(function() {
           var expected = [
-            month(2010, 11),
-            month(2011, 0),
-            month(2011, 1),
+            generateSpanOfMonth(2010, 11),
+            generateSpanOfMonth(2011, 0),
+            generateSpanOfMonth(2011, 1),
 
-            month(2011, 11),
-            month(2012, 0),
-            month(2012, 1)
+            generateSpanOfMonth(2011, 11),
+            generateSpanOfMonth(2012, 0),
+            generateSpanOfMonth(2012, 1)
           ];
 
           assert.length(subject._timespans, 6);

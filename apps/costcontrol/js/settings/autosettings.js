@@ -1,5 +1,5 @@
-/* -*- Mode: js; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- /
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
+/* global debug */
+/* exported AutoSettings */
 
 'use strict';
 
@@ -8,12 +8,15 @@ var AutoSettings = (function() {
   var OPTION_CONFIGURERS = {
     'select': function _selectConfigurer(guiWidget) {
       var optionName = guiWidget.dataset.option;
-      var text, parent = guiWidget.parentElement;
+      var span, parent = guiWidget.parentElement;
       if (parent.classList.contains('fake-select')) {
-        text = document.createTextNode('');
-        parent.insertBefore(text, parent.firstChild);
+        var firstChild = parent.firstChild;
+        if (!firstChild || firstChild.tagName !== 'SPAN') {
+          span = document.createElement('span');
+          parent.insertBefore(span, parent.firstChild);
+        }
       }
-      guiWidget.addEventListener('change', function _onSelectChange() {
+      guiWidget.addEventListener('blur', function _onSelectChange() {
         debug('Value:', guiWidget.value);
         settings.option(optionName, guiWidget.value);
       });
@@ -22,9 +25,13 @@ var AutoSettings = (function() {
           value = settings.defaultValue(optionName);
         }
         guiWidget.value = value;
-        if (text) {
+        if (span) {
           var selected = guiWidget.options[guiWidget.selectedIndex];
-          text.data = selected.textContent;
+          var l10nId = selected.getAttribute('data-l10n-id');
+          span.textContent = selected.textContent;
+          if (l10nId) {
+            span.setAttribute('data-l10n-id', l10nId);
+          }
         }
       });
     },
@@ -159,8 +166,9 @@ var AutoSettings = (function() {
 
   // Return the <li> wrapping the option
   function getEntryParent(item) {
-    while (item && item.tagName !== 'LI')
+    while (item && item.tagName !== 'LI') {
       item = item.parentNode;
+    }
     return item;
   }
 
@@ -172,7 +180,6 @@ var AutoSettings = (function() {
   // Configure the web page
   var settings, vmanager;
   function initialize(settingsInterface, viewManager, root) {
-    var that = this;
 
     root = root || 'body';
     settings = settingsInterface;

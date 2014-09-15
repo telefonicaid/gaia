@@ -1,12 +1,17 @@
+/*global Factory */
+
+requireLib('models/calendar.js');
+requireLib('models/account.js');
 requireCommon('test/synthetic_gestures.js');
 
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('models/calendar.js');
-  requireLib('templates/calendar.js');
-  requireLib('views/settings.js');
-});
+suiteGroup('Views.Settings', function() {
+  'use strict';
 
-suite('views/settings', function() {
+  ['Provider.Local', 'Provider.Caldav'].forEach(function(name) {
+    suiteSetup(function(done) {
+      Calendar.App.loadObject(name, done);
+    });
+  });
 
   var subject;
   var app;
@@ -14,6 +19,38 @@ suite('views/settings', function() {
   var controller;
   var template;
   var triggerEvent;
+  var account;
+
+  function stageModels(list) {
+    var object = Object.create(null);
+
+    setup(function(done) {
+      account = Factory('account', { _id: 'testacc' });
+
+      var trans = app.db.transaction(
+        ['calendars', 'accounts'], 'readwrite'
+      );
+
+      trans.oncomplete = function() {
+        done();
+      };
+
+      trans.onerror = function(e) {
+        done(e.target.error);
+      };
+
+      app.store('Account').persist(account, trans);
+
+      var model;
+      for (var key in list) {
+        list[key].accountId = account._id;
+        model = Factory('calendar', list[key]);
+        store.persist((object[key] = model), trans);
+      }
+    });
+
+    return object;
+  }
 
   suiteSetup(function() {
     triggerEvent = testSupport.calendar.triggerEvent;
@@ -24,14 +61,32 @@ suite('views/settings', function() {
     el.parentNode.removeChild(el);
   });
 
-  setup(function() {
+  setup(function(done) {
     var div = document.createElement('div');
     div.id = 'test';
     div.innerHTML = [
-      '<div id="time-views"></div>',
       '<div id="settings">',
-        '<button class="sync">sync</button>',
-        '<ul class="calendars"></ul>',
+      '  <header>',
+      '    <button data-l10n-id="back"',
+      '            class="settings-back"></button>',
+      '  </header>',
+      '  <div class="settings-shield"></div>',
+      '  <div class="settings-drawer-container">',
+      '    <div class="settings-drawer">',
+      '      <ol class="calendars">',
+      '      </ol>',
+      '      <div role="toolbar">',
+      '        <button class="settings toolbar-item">',
+      '          <span class="icon"',
+      '                data-l10n-id="advanced-settings-short">Settings</span>',
+      '        </button>',
+      '        <button class="sync update toolbar-item">',
+      '          <span class="icon"',
+      '                data-l10n-id="drawer-sync-button">Sync</span>',
+      '        </button>',
+      '      </div>',
+      '    </div>',
+      '  </div>',
       '</div>'
     ].join('');
 
@@ -44,8 +99,24 @@ suite('views/settings', function() {
 
     subject = new Calendar.Views.Settings({
       app: app,
-      syncProgressTarget: div
+      syncProgressTarget: div,
+      // normally this is higher in production but
+      // we don't need to wait that long in tests.
+      waitBeforePersist: 10
     });
+
+    app.db.open(done);
+  });
+
+  teardown(function(done) {
+    testSupport.calendar.clearStore(
+      app.db,
+      ['accounts', 'calendars'],
+      function() {
+        app.db.close();
+        done();
+      }
+    );
   });
 
   test('initialization', function() {
@@ -54,10 +125,6 @@ suite('views/settings', function() {
     assert.equal(
       subject.element, document.querySelector('#settings')
     );
-  });
-
-  test('#time-views', function() {
-    assert.ok(subject.timeViews);
   });
 
   test('#calendars', function() {
@@ -72,84 +139,192 @@ suite('views/settings', function() {
     assert.ok(subject.syncProgressTarget);
   });
 
-  suite('#_initEvents', function() {
+  suite('#_observeAccountStore', function() {
+    var accounts = testSupport.calendar.dbFixtures(
+      'account',
+      'Account',
+      {
+        sync: { _id: 'sync', providerType: 'Caldav' },
+        nosync: { _id: 'nosync', providerType: 'Local' }
+      }
+    );
 
-    var models;
-    var children;
+    var syncAccount;
+    var accountStore;
+    setup(function(done) {
+      accountStore = app.store('Account');
+      syncAccount = accounts.sync;
 
-    setup(function() {
-      models = {};
-      // render out one model
-      models[1] = {
-        name: 'first',
-        localDisplayed: true,
-        _id: 'one'
-      };
-
-      store._cached = models;
       subject.render();
-      children = subject.calendars.children;
+      subject.onrender = done;
     });
 
-    suite('update', function() {
+    suite('remove', function() {
+      setup(function(done) {
+        accountStore.remove(accounts.sync._id);
+        subject.onupdatesyncbutton = function() {
+          subject.onupdatesyncbutton = null;
+          done();
+        };
+      });
 
-      test('when flagged as _inUpdate', function() {
-        subject._localUpdate = true;
+      suite('add', function() {
+        setup(function(done) {
+          delete syncAccount._id;
 
-        models[1].name = 'foobar';
+          accountStore.persist(syncAccount);
+          subject.onupdatesyncbutton = function() {
+            subject.onupdatesyncbutton = null;
+            done();
+          };
+        });
+      });
+    });
 
-        store.emit('update', 'one', models[1]);
+  });
 
-        assert.notEqual(
-          children[0].textContent,
-          models[1].name,
-          'should not update when marked as _localUpdate'
+  suite('#_observeCalendarStore', function() {
+    var models = subject.calendarList = {
+      first: {
+        localDisplayed: true,
+        _id: 'first',
+        remote: {
+          name: 'first'
+        }
+      },
+      local: {
+        localDisplayed: true,
+        _id: 'local-first',
+        remote: {
+          name: 'this should not be used!!!!'
+        }
+      }
+    };
+
+    var children;
+    setup(function(done) {
+      // we must wait until rendering completes
+      subject.onrender = function() {
+        children = subject.calendars.children;
+        Calendar.nextTick(done);
+      };
+
+      subject.render();
+    });
+
+    suite('calendar update / error', function() {
+      var model;
+      var container;
+
+      setup(function() {
+        model = models.first;
+        container = children[0];
+      });
+
+      test('update with error / without error', function() {
+        model.error = {};
+        store.emit('update', model._id, model);
+
+        assert.ok(
+          container.classList.contains('error'),
+          'has error class'
+        );
+
+        delete model.error;
+        store.emit('update', model._id, model);
+
+        assert.ok(
+          !container.classList.contains('error'),
+          'removes error class'
         );
       });
 
-      test('when not flagged', function() {
+      test('normal flow', function() {
         var check = children[0].querySelector(
           '*[type="checkbox"]'
         );
 
-        models[1].name = 'foo';
-        models[1].localDisplayed = false;
+        model.localDisplayed = false;
+        model.remote.name = 'foo';
 
-        store.emit('update', 'one', models[1]);
+        store.emit('update', model._id, model);
 
-        assert.equal(children[0].textContent, 'foo');
+        assert.equal(children[0].textContent.trim(), 'foo');
         assert.isFalse(
           check.checked
         );
       });
 
+      test('toggle l10n', function() {
+        var check = children[1].querySelector('[type="checkbox"]');
+        assert.ok(
+          check.checked,
+          'should be checked'
+        );
+
+        var model = models.local;
+        model.localDisplayed = false;
+        store.emit('update', model._id, model);
+
+        assert.equal(children[1].textContent.trim(), 'Offline calendar');
+        assert.isFalse(
+          check.checked,
+          'should uncheck'
+        );
+      });
     });
 
-    test('add', function() {
-      models[2] = {
-        name: 'second',
-        localDisplayed: false,
-        _id: 'two'
-      };
+    suite('add', function() {
+      function addModel() {
+        store.emit('add', 'two', model);
+        assert.equal(children.length, 3);
+        var container = children[2];
+        assert.equal(container.textContent.trim(), 'second');
 
-      assert.equal(children.length, 1);
-      store.emit('add', 'two', models[2]);
-      assert.equal(children.length, 2);
+        return container;
+      }
 
-      assert.equal(children[1].textContent, 'second');
+      var model;
+      setup(function() {
+        model = Factory('calendar', {
+          localDisplayed: false,
+          _id: 'two',
+          remote: { name: 'second' }
+        });
+
+        assert.equal(children.length, 2);
+      });
+
+      test('success', function() {
+        var container = addModel();
+        assert.ok(
+          !container.classList.contains('error'),
+          'does not add error'
+        );
+      });
+
+      test('add with error', function() {
+        model.error = {};
+        var container = addModel();
+        assert.ok(
+          container.classList.contains('error'),
+          'has error'
+        );
+      });
+
     });
 
     test('remove', function() {
-      store.emit('remove', 'one');
-      assert.equal(children.length, 0);
+      assert.equal(children.length, 2);
+      store.emit('preRemove', models.first._id);
+      store.emit('remove', models.first._id);
+      assert.equal(children.length, 1);
     });
-
   });
 
   test('sync', function() {
     var controller = app.syncController;
     var calledWith;
-    var el = subject.syncButton;
 
     controller.all = function() {
       calledWith = arguments;
@@ -160,118 +335,160 @@ suite('views/settings', function() {
   });
 
   suite('#_onCalendarDisplayToggle', function() {
-    var model;
-    var checkbox;
-    var calledWith;
-
-    setup(function() {
-      model = Factory('calendar', {
+    var models = stageModels({
+      displayed: {
         localDisplayed: true,
-        _id: 'my-calendar'
-      });
+        _id: 1
+      },
 
-      store._cached = {
-        'my-calendar': model
-      };
+      hidden: {
+        localDisplayed: false,
+        _id: 'hidden'
+      }
+    });
 
+    var checkboxes;
+    setup(function(done) {
       subject.render();
-      checkbox = subject.calendars.querySelector(
-        'input[type="checkbox"]'
-      );
-    });
+      subject.onrender = function() {
+        checkboxes = {};
 
-    setup(function() {
-      store.persist = function() {
-        calledWith = arguments;
+        for (var id in models) {
+          checkboxes[id] = subject.calendars.querySelector(
+            'input[value="' + models[id]._id + '"]'
+          );
+        }
+
+        done();
       };
     });
 
-    test('initial toggle', function() {
-      assert.isTrue(checkbox.checked, 'should be checked initially');
+    function checkAsync(id, value) {
+      Calendar.nextTick(function() {
+        checkboxes[id].checked = !!value;
+        triggerEvent(checkboxes[id], 'change');
+      });
+    }
 
-      checkbox.checked = false;
-      triggerEvent(checkbox, 'change');
+    test('changing display state to false', function(done) {
+      // the goal is to trigger the change event
+      // multiple times but verify we only persist
+      // once...
+      assert.isTrue(
+        checkboxes.displayed.checked, 'begins checked'
+      );
 
-      assert.equal(calledWith[0], model);
-      assert.equal(model.localDisplayed, !!checkbox.checked);
+      // fired when calendar is persisted
+      subject.ondisplaypersist = function(calendar) {
+        done(function() {
+          assert.equal(calendar._id, models.displayed._id);
+          // verify we set it to false and checkbox is hidden.
+          assert.isFalse(calendar.localDisplayed);
+          assert.isFalse(checkboxes.displayed.checked);
+        });
+      };
 
-      var cb = calledWith[1];
-      cb();
-      assert.isTrue(subject._localUpdate);
-      store.emit('persist');
-      assert.isFalse(subject._localUpdate);
-      // verify the handler was removed;
-      subject._localUpdate = true;
-      store.emit('persist');
-      assert.isTrue(subject._localUpdate);
+      checkAsync('displayed', false);
+      checkAsync('displayed', true);
+      checkAsync('displayed', false);
+    });
+
+    test('changing display to true', function(done) {
+      assert.isFalse(
+        checkboxes.hidden.checked,
+        'begins unchecked'
+      );
+
+      checkAsync('hidden', true);
+
+      subject.ondisplaypersist = function(calendar) {
+        done(function() {
+          assert.equal(calendar._id, models.hidden._id);
+          assert.isTrue(calendar.localDisplayed);
+          assert.isTrue(checkboxes.hidden.checked);
+        });
+      };
     });
 
   });
 
   suite('#render', function() {
-    var models = {};
+    testSupport.calendar.dbFixtures(
+      'account',
+      'Account', {
+        one: {
+          _id: 'one',
+          providerType: 'Local'
+        },
 
-    setup(function() {
-      models[1] = {
-        name: 'First',
-        localDisplayed: true,
-        _id: 1
-      };
+        two: {
+          _id: 'two',
+          providerType: 'Caldav'
+        }
+      }
+    );
 
-      models[2] = {
-        name: 'Second',
-        localDisplayed: false,
-        _id: 2
-      };
-      store._cached = models;
-      subject.render();
-    });
+    var calendars = testSupport.calendar.dbFixtures(
+      'calendar',
+      'Calendar', {
+        one: {
+          accountId: 'one',
+          name: 'First',
+          localDisplayed: true,
+          _id: 1
+        },
 
-    test('output', function() {
-      var children = subject.calendars.children;
-      assert.equal(children.length, 2);
+        two: {
+          accountId: 'two',
+          name: 'Second',
+          localDisplayed: false,
+          _id: 2,
+          error: {}
+        }
+      }
+    );
 
-      var one = children[0];
-      var two = children[1];
+    suite('calendars', function() {
+      var one;
+      var two;
+      var children;
 
-      assert.equal(one.textContent, models[1].name);
-      assert.equal(two.textContent, models[2].name);
+      setup(function(done) {
+        subject.onrender = function() {
+          children = subject.calendars.children;
+          one = children[0];
+          two = children[1];
+          done();
+        };
+        subject.render();
+      });
 
-      assert.isTrue(
-        one.querySelector('*[type="checkbox"]').checked
-      );
+      test('number of calendars', function() {
+        assert.equal(children.length, 2);
+      });
 
-      assert.isFalse(
-        two.querySelector('*[type="checkbox"]').checked
-      );
+      test('naming', function() {
+        assert.equal(one.textContent.trim(), calendars.one.name);
+        assert.equal(two.textContent.trim(), calendars.two.name);
+      });
+
+      test('localDisplayed on calendar', function() {
+        assert.isTrue(
+          one.querySelector('*[type="checkbox"]').checked
+        );
+
+        assert.isFalse(
+          two.querySelector('*[type="checkbox"]').checked
+        );
+      });
+
+      test('error on calendar', function() {
+        assert.ok(
+          two.classList.contains('error'),
+          'if error is present in model render shows it'
+        );
+      });
     });
 
   });
-
-  suite('tap to navigate away from settings', function() {
-
-    var calledWith;
-
-    setup(function() {
-      calledWith = null;
-      app.resetState = function() {
-        calledWith = arguments;
-      };
-    });
-
-    test('#onactive', function() {
-      subject.onactive();
-      triggerEvent(subject.timeViews, 'click');
-      assert.ok(calledWith, 'navigates away');
-    });
-
-    test('#oninactive', function() {
-      subject.onactive();
-      subject.oninactive();
-      triggerEvent(subject.timeViews, 'click');
-      assert.ok(!calledWith, 'navigates away');
-    });
-
-  });
-
 });

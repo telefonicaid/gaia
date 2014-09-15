@@ -1,4 +1,5 @@
 Calendar.ns('Utils').AccountCreation = (function() {
+  'use strict';
 
   /**
    * Helper class to create accounts.
@@ -18,8 +19,11 @@ Calendar.ns('Utils').AccountCreation = (function() {
    */
   function AccountCreation(app) {
     this.app = app || Calendar.App;
-
     Calendar.Responder.call(this);
+
+    Calendar.Promise.denodeifyAll(this, [
+      'send'
+    ]);
   }
 
   AccountCreation.prototype = {
@@ -61,24 +65,32 @@ Calendar.ns('Utils').AccountCreation = (function() {
             return;
           }
 
-          self.emit('calendarSync');
+          function syncCalendars(err, calendars) {
+            if (err) {
+              console.log('Error fetch calendar list in account creation');
+              return callback(err);
+            }
 
-          // begin sync of calendars
-          var calendars = calendarStore.remotesByAccount(
-            result._id
-          );
+            self.emit('calendarSync');
 
-          // note we don't wait for any of this to complete
-          // we just begin the sync and let the event handlers
-          // on the sync controller do the work.
-          for (var key in calendars) {
-            self.app.syncController.calendar(
-              result,
-              calendars[key]
-            );
+            // note we don't wait for any of this to complete
+            // we just begin the sync and let the event handlers
+            // on the sync controller do the work.
+            for (var key in calendars) {
+              self.app.syncController.calendar(
+                result,
+                calendars[key]
+              );
+            }
+
+            callback(null, result);
           }
 
-          callback(null, result);
+          // begin sync of calendars
+          calendarStore.remotesByAccount(
+            result._id,
+            syncCalendars
+          );
         });
       });
     }

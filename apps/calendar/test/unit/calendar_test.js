@@ -1,15 +1,28 @@
 requireApp('calendar/js/calendar.js');
 suite('calendar', function() {
+  'use strict';
+
   var subject;
 
   setup(function() {
     subject = Calendar;
   });
 
-  test('#ns', function() {
-    var ns = Calendar.ns('Provider.Calendar');
-    assert.equal(Calendar.Provider.Calendar, ns);
+  suite('#ns', function() {
+    test('create', function() {
+      var ns = Calendar.ns('Provider.Calendar');
+      assert.equal(Calendar.Provider.Calendar, ns);
+    });
+
+    test('check', function() {
+      assert.isTrue(Calendar.ns('App', true), 'has app');
+      assert.isFalse(
+        Calendar.ns('Store.FoobarX', true),
+        'does not have missing'
+      );
+    });
   });
+
 
   test('#compare', function() {
     assert.equal(subject.compare(0, 1), -1);
@@ -65,8 +78,9 @@ suite('calendar', function() {
         var result = fn(list, 3, function(seek, inList) {
           var target = inList[0];
 
-          if (seek === target)
+          if (seek === target) {
             return 0;
+          }
 
           if (seek < target) {
             return -1;

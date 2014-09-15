@@ -1,6 +1,9 @@
 /* DATAUSAGE VIEW */
 #datausage-tab .content {
   padding: 0;
+  height: 100%;
+  padding-bottom: 3rem;
+  box-sizing: border-box;
 }
 
 /* DATA TOGGLE */
@@ -8,28 +11,24 @@
   list-style: none;
   padding: 0;
   margin: 0 1.5rem;
-  border: solid 1px #adadad;
+  border: solid 0.1rem #adadad;
   border-right: none;
   border-left: none;
+  border-bottom: none;
 }
 
 #datausage-tab .toggle-data li {
+  padding-right: 2rem;
   padding-left: 3rem;
-  height: 4rem;
+  height: 3.8rem;
   border-bottom-color: #adadad;
 }
 
-#datausage-tab .toggle-data li p {
-  color: #707070;
-}
-
-#datausage-tab .toggle-data li p:only-child,
-#datausage-tab .toggle-data li p:first-of-type:last-of-type {
-  line-height: 1.8rem;
-}
-
-#datausage-tab .toggle-data li p strong {
-  color: #333;
+#datausage-tab .toggle-data li > span {
+  font-size: 1.9rem;
+  font-weight: normal;
+  height: 100%;
+  line-height: 3.8rem;
 }
 
 #datausage-tab .toggle-data li label {
@@ -39,11 +38,10 @@
   border: none;
 }
 
-#datausage-tab .toggle-data li label span {
+#datausage-tab .toggle-data li label span:after {
   right: 0;
   left: auto;
 }
-
 
 /* Color legend (square) */
 #datausage-tab .toggle-data li:before {
@@ -51,10 +49,10 @@
   width: 1.5rem;
   height: 1.5rem;
   position: absolute;
-  border: solid 1px #979797;
+  border: solid 0.1rem #979797;
   left: 0.5rem;
   top: 50%;
-  margin: -0.95rem 0 0;
+  margin: -0.9rem 0 0;
   transition: background 0.2s ease;
 }
 
@@ -71,6 +69,14 @@
   background: #d4d2d2;
 }
 
+#datausage-tab .toggle-data li .overview {
+  color: #333;
+  font-weight: 500;
+  right: 3.4rem;
+  left: auto;
+  position: absolute;
+}
+
 #datausage-tab .toggle-data li[aria-disabled=true] .overview {
   display: none;
 }
@@ -78,7 +84,8 @@
 /* GRAPHS */
 #datausage-tab section.graph {
   position: relative;
-  height: 30rem;
+  height: 28.5rem;
+  flex: 1;
 }
 
 #datausage-tab section.graph canvas {
@@ -87,4 +94,63 @@
   top: 0;
   width: 100%;
   height: 100%;
+}
+
+/* APPS */
+#datausage-tab #app-usage-no-data {
+  font-size: 1.5rem;
+  font-weight: 500;
+  padding-left: 3rem;
+  padding-right: 3rem;
+}
+
+#datausage-tab .app-item {
+  width: 32rem;
+  padding: 1.9rem 0 0 0;
+  clear: both;
+}
+
+#datausage-tab .app-image {
+  padding: 1.1rem 1.3rem 1.1rem 1.3rem;
+  width: 3rem;
+  height: 3rem;
+  float: left;
+}
+
+#datausage-tab .app-info {
+  width: calc(100% - 11rem);
+  margin-right: 5.4rem;
+  float: right;
+}
+
+#datausage-tab .app-info-row {
+  width: 100%;
+}
+
+#datausage-tab .app-name {
+  text-indent: -0.2rem;
+  padding: 0;
+  font-size: 1.9rem;
+  line-height: 1;
+  font-weight: normal;
+}
+
+#datausage-tab .app-usage-bar {
+  height: 0.3rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0;
+  background-color: #e7e7e7;
+}
+
+#datausage-tab .app-usage-bar-used {
+  background-color: #00caf2;
+  height: 0.3rem;
+  float: left;
+}
+
+#datausage-tab .app-usage-total {
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: #5f5f5f;
 }

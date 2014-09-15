@@ -1,11 +1,11 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('interval_tree.js');
-  requireLib('timespan.js');
-});
+/*global Factory */
+
+requireLib('interval_tree.js');
+requireLib('timespan.js');
 
 suite('interval_tree', function() {
+  'use strict';
 
-  var tree;
   var subject;
   var items;
   var list;
@@ -200,7 +200,7 @@ suite('interval_tree', function() {
       ];
 
       assert.ok(!subject.byId['just after']);
-      assert.ok(!subject.byId['after']);
+      assert.ok(!subject.byId.after);
 
       var ids = subject.items.map(function(item) {
         return item._id;
@@ -446,8 +446,6 @@ suite('interval_tree', function() {
       test('large dataset with gaps', function() {
         var expected = [];
         var i = 0;
-        var id = 0;
-        var list = [];
 
         // create some out of range in lower bounds
         for (i = 0; i < 1021; i++) {
@@ -518,7 +516,6 @@ suite('interval_tree', function() {
       });
 
       test('basic middle query', function() {
-        var begin = window.performance.now();
         var range = new Calendar.Timespan(
           expectedRange.start,
           expectedRange.end
@@ -535,6 +532,62 @@ suite('interval_tree', function() {
         );
       });
 
+    });
+  });
+
+  suite('#createIndex / #index', function() {
+    var one;
+    var two;
+    var three;
+    setup(function() {
+      one = Factory('busytime', { eventId: 'xxx' });
+      two = Factory('busytime', { eventId: 'xxx' });
+      three = Factory('busytime', { eventId: 'xxx' });
+
+      subject.createIndex('eventId');
+
+      subject.add(one);
+      subject.add(two);
+      subject.add(three);
+    });
+
+    test('add', function() {
+      assert.deepEqual(
+        subject.index('eventId', one.eventId),
+        [one, two, three]
+      );
+    });
+
+    test('remove middle', function() {
+      subject.remove(two);
+      assert.deepEqual(
+        subject.index('eventId', one.eventId),
+        [one, three]
+      );
+    });
+
+    test('remove start', function() {
+      subject.remove(one);
+      assert.deepEqual(
+        subject.index('eventId', one.eventId),
+        [two, three]
+      );
+    });
+
+    test('remove end', function() {
+      subject.remove(three);
+      assert.deepEqual(
+        subject.index('eventId', one.eventId),
+        [one, two]
+      );
+    });
+
+    test('remove all', function() {
+      subject.remove(one);
+      subject.remove(two);
+      subject.remove(three);
+
+      assert.ok(!subject.index('eventId', one.eventId));
     });
   });
 });

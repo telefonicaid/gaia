@@ -1,6 +1,4 @@
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- /
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
+/* exported SettingsListener */
 'use strict';
 
 var SettingsListener = {
@@ -10,21 +8,17 @@ var SettingsListener = {
   /* lock stores here */
   _lock: null,
 
+  /* keep record of observers in order to remove them in the future */
+  _observers: [],
+
   /**
    * getSettingsLock: create a lock or retrieve one that we saved.
    * mozSettings.createLock() is expensive and lock should be reused
    * whenever possible.
    */
-
   getSettingsLock: function sl_getSettingsLock() {
-    // Each time there is a getSettingsLock call, we pospone the removal
-    clearTimeout(this._timer);
-    this._timer = setTimeout((function removeLock() {
-      this._lock = null;
-    }).bind(this), 0);
-
     // If there is a lock present we return that
-    if (this._lock) {
+    if (this._lock && !this._lock.closed) {
       return this._lock;
     }
 
@@ -61,9 +55,25 @@ var SettingsListener = {
         req.result[name] : defaultValue);
     }));
 
-    settings.addObserver(name, function settingChanged(evt) {
+    var settingChanged = function settingChanged(evt) {
       callback(evt.settingValue);
+    };
+    settings.addObserver(name, settingChanged);
+    this._observers.push({
+      name: name,
+      callback: callback,
+      observer: settingChanged
+    });
+  },
+
+  unobserve: function sl_unobserve(name, callback) {
+    var settings = window.navigator.mozSettings;
+    var that = this;
+    this._observers.forEach(function(value, index) {
+      if (value.name === name && value.callback === callback) {
+        settings.removeObserver(name, value.observer);
+        that._observers.splice(index, 1);
+      }
     });
   }
 };
-

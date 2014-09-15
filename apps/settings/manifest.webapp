@@ -8,24 +8,34 @@
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
+    "storage":{},
+    "browser": {},
+    "embed-apps": {},
     "mobileconnection":{},
+    "voicemail":{},
     "bluetooth":{},
     "device-storage:pictures":{ "access": "readonly" },
     "device-storage:music":{ "access": "readonly" },
     "device-storage:videos":{ "access": "readonly" },
-    "device-storage:sdcard":{ "access": "readonly" },
+    "device-storage:sdcard":{ "access": "readwrite" },
     "device-storage:apps":{ "access": "readonly" },
     "webapps-manage":{},
+    "open-remote-window":{},
     "permissions":{},
+    "systemXHR": {},
     "settings":{ "access": "readwrite" },
     "wifi-manage":{},
-    "attention":{},
     "time":{},
     "desktop-notification":{},
     "power":{},
     "idle":{},
     "telephony":{},
-    "audio-channel-notification":{}
+    "audio-channel-notification":{},
+    "audio-channel-alarm":{},
+    "downloads":{},
+    "nfc":{ "access": "readonly" },
+    "sms":{},
+    "firefox-accounts": {}
   },
   "activities": {
     "configure": {
@@ -35,13 +45,6 @@
       "disposition": "window"
     }
   },
-  "messages": ["bluetooth-requestconfirmation",
-               "bluetooth-requestpasskey",
-               "bluetooth-requestpincode",
-               "bluetooth-authorize",
-               "bluetooth-cancel",
-               "bluetooth-pairedstatuschanged",
-               "bluetooth-hfp-status-changed"],
   "locales": {
     "ar": {
       "name": "الضبط",
@@ -64,10 +67,23 @@
       "description": "Gaia 設定"
     }
   },
+  "datastores-access": {
+    "download_store": {
+      "readonly": false,
+      "description": "Stores download finished"
+    },
+    "vertical_preferences_store": {
+      "readonly": false,
+      "description": "Vertical homescreen preferences"
+    }
+  },
   "default_locale": "en-US",
   "icons": {
-    "120": "/style/icons/Settings.png",
-    "60": "/style/icons/60/Settings.png"
+    "84": "/style/icons/settings_84.png",
+    "126": "/style/icons/settings_126.png",
+    "142": "/style/icons/settings_142.png",
+    "189": "/style/icons/settings_189.png",
+    "284": "/style/icons/settings_284.png"
   },
-  "orientation": "portrait-primary"
+  "orientation": "default"
 }

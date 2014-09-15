@@ -14,29 +14,52 @@ var frames = $('frames');
 // element, and video player controls within the div, and you can refer to
 // those as currentFrame.image and currentFrame.video.player and
 // currentFrame.video.controls.
-var previousFrame = new MediaFrame($('frame1'));
-var currentFrame = new MediaFrame($('frame2'));
-var nextFrame = new MediaFrame($('frame3'));
+var maxImageSize = CONFIG_MAX_IMAGE_PIXEL_SIZE;
+var previousFrame = new MediaFrame($('frame1'), true, maxImageSize);
+var currentFrame = new MediaFrame($('frame2'), true, maxImageSize);
+var nextFrame = new MediaFrame($('frame3'), true, maxImageSize);
+
+if (CONFIG_REQUIRED_EXIF_PREVIEW_WIDTH) {
+  previousFrame.setMinimumPreviewSize(CONFIG_REQUIRED_EXIF_PREVIEW_WIDTH,
+                                      CONFIG_REQUIRED_EXIF_PREVIEW_HEIGHT);
+  currentFrame.setMinimumPreviewSize(CONFIG_REQUIRED_EXIF_PREVIEW_WIDTH,
+                                     CONFIG_REQUIRED_EXIF_PREVIEW_HEIGHT);
+  nextFrame.setMinimumPreviewSize(CONFIG_REQUIRED_EXIF_PREVIEW_WIDTH,
+                                  CONFIG_REQUIRED_EXIF_PREVIEW_HEIGHT);
+}
 
 // When this variable is set to true, we ignore any user gestures
 // so we don't try to pan or zoom during a frame transition.
 var transitioning = false;
 
-// Clicking on the back button goes back to the thumbnail view
-$('fullscreen-back-button').onclick = setView.bind(null, thumbnailListView);
+// Clicking on the back button will go to the preview view
+// Note that tablet doesn't have a back button, it's bind to header instead,
+// so we don't try to register click event on a non-existent button
+if (fullscreenButtons.back) {
+  fullscreenButtons.back.onclick = setView.bind(null, LAYOUT_MODE.list);
+}
 
 // Clicking the delete button while viewing a single item deletes that item
-$('fullscreen-delete-button').onclick = deleteSingleItem;
+fullscreenButtons.delete.onclick = deleteSingleItem;
 
 // Clicking the Edit button while viewing a photo switches to edit mode
-$('fullscreen-edit-button').onclick = function() {
-  loader.load('js/ImageEditor.js', function() {
-    editPhotoIfCardNotFull(currentFileIndex);
-  });
+fullscreenButtons.edit.onclick = function() {
+  loader.load(['js/ImageEditor.js', 'shared/js/media/crop_resize_rotate.js'],
+              function() {
+                editPhotoIfCardNotFull(currentFileIndex);
+              });
 };
 
 // In fullscreen mode, the share button shares the current item
-$('fullscreen-share-button').onclick = shareSingleItem;
+fullscreenButtons.share.onclick = shareSingleItem;
+
+// Clicking the information button will display information about the photo.
+fullscreenButtons.info.onclick = function() {
+  loader.load(['js/info.js', 'shared/style/confirm.css', 'style/info.css'],
+              function() {
+                showFileInformation(files[currentFileIndex]);
+              });
+};
 
 // Use the GestureDetector.js library to handle gestures.
 // This will generate tap, pan, swipe and transform events
@@ -48,6 +71,14 @@ frames.addEventListener('dbltap', dblTapHandler);
 frames.addEventListener('pan', panHandler);
 frames.addEventListener('swipe', swipeHandler);
 frames.addEventListener('transform', transformHandler);
+
+currentFrame.video.onfullscreentap =
+  previousFrame.video.onfullscreentap =
+  nextFrame.video.onfullscreentap =
+  function fullscreenRequested(ev) {
+    setView(LAYOUT_MODE.fullscreen);
+    resizeFrames();
+  };
 
 // When displaying a photo or video, a tap hides or shows the toolbar.
 // The video player has its own toolbar, so when a video starts playing
@@ -62,19 +93,22 @@ currentFrame.video.onplaying =
   previousFrame.video.onplaying =
   nextFrame.video.onplaying =
   function hideToolbarOnPlay() {
-    this.toolbarWasHidden =
-      fullscreenView.classList.contains('toolbarhidden');
+    this.isToolbarHidden =
+      fullscreenView.classList.contains('toolbar-hidden');
     if (!this.isToolbarHidden)
-      fullscreenView.classList.add('toolbarhidden');
+      fullscreenView.classList.add('toolbar-hidden');
   };
 
 currentFrame.video.onpaused =
   previousFrame.video.onpaused =
   nextFrame.video.onpaused =
   function restoreToolbarOnPause() {
-    if (this.toolbarWasHidden === false)
-      fullscreenView.classList.remove('toolbarhidden');
-    delete this.toolbarWasHidden;
+    this.isToolbarHidden =
+      fullscreenView.classList.contains('toolbar-hidden');
+    if (this.isToolbarHidden === true) {
+      fullscreenView.classList.remove('toolbar-hidden');
+    }
+    delete this.isToolbarHidden;
   };
 
 // Each of the Frame container elements may be subject to animated
@@ -98,14 +132,72 @@ function deleteSingleItem() {
   else {
     msg = navigator.mozL10n.get('delete-photo?');
   }
-  if (confirm(msg)) {
+  // We need to disable NFC sharing when showing delete confirmation dialog
+  setNFCSharing(false);
+
+  Dialogs.confirm({
+    message: msg,
+    cancelText: navigator.mozL10n.get('cancel'),
+    confirmText: navigator.mozL10n.get('delete'),
+    danger: true
+  }, function() { // onSuccess
+    // disable delete and share button to prevent operations while delete item
+    fullscreenButtons.delete.classList.add('disabled');
+    fullscreenButtons.share.classList.add('disabled');
+
     deleteFile(currentFileIndex);
-  }
+    // Enable NFC sharing when done deleting and returns to fullscreen view
+    setNFCSharing(true);
+  }, function() { // onCancel
+    // Enable NFC sharing when cancels delete and returns to fullscreen view
+    setNFCSharing(true);
+  });
 }
 
 // In fullscreen mode, the share button shares the current item
 function shareSingleItem() {
-  share([currentFrame.imageblob || currentFrame.videoblob]);
+  // This is the item we're sharing
+  var fileinfo = files[currentFileIndex];
+
+  // If the item is a video, just share it
+  if (fileinfo.metadata.video) {
+    share([currentFrame.videoblob]);
+  }
+  else {
+    // Otherwise it is an image.
+    // If it does not have any EXIF orientation, and if we don't need
+    // to downsample it, then just share it as it is.
+    if (!fileinfo.metadata.rotation &&
+        !fileinfo.metadata.mirrored &&
+        !CONFIG_MAX_PICK_PIXEL_SIZE) {
+      share([currentFrame.imageblob]);
+    }
+    else {
+      // This is only tricky case. If we are sharing an image that uses
+      // EXIF orientation for correct display, rotate it before sharing
+      // so that the recieving app doesn't have to know about EXIF
+      loader.load(['shared/js/media/crop_resize_rotate.js'],
+                  shareModifiedImage);
+    }
+  }
+
+  function shareModifiedImage() {
+    var metadata = fileinfo.metadata;
+    var button = fullscreenButtons.share;
+    button.classList.add('disabled');
+    showSpinner();
+    cropResizeRotate(currentFrame.imageblob, null,
+                     CONFIG_MAX_PICK_PIXEL_SIZE || null, null, metadata,
+                     function(error, rotatedBlob) {
+                       hideSpinner();
+                       button.classList.remove('disabled');
+                       if (error) {
+                         console.error('Error while rotating image: ', error);
+                         rotatedBlob = currentFrame.imageblob;
+                       }
+                       share([rotatedBlob], currentFrame.imageblob.name);
+                     });
+  }
 }
 
 // In order to distinguish single taps from double taps, we have to
@@ -113,10 +205,13 @@ function shareSingleItem() {
 // coming soon.
 var taptimer = null;
 function tapHandler(e) {
-  // If there is already a timer set, then this is is the second tap
-  // and we're about to get a dbl tap event, so ignore this one
-  if (taptimer)
+  // Ignore tap event if 1. there is already a timer set, then this
+  // is the second tap and we're about to get a double tap event
+  // 2. currentFrame has not yet loaded any image or video.
+  if (taptimer ||
+      (!currentFrame.displayingImage && !currentFrame.displayingVideo))
     return;
+
   // If we don't get a second tap soon, then treat this as a single tap
   taptimer = setTimeout(function() {
     taptimer = null;
@@ -134,16 +229,42 @@ function dblTapHandler(e) {
   doubletapOnPhoto(e);
 }
 
+// Resize all the frames' content, if its container's size is changed
+function resizeFrames() {
+  nextFrame.reset();
+  previousFrame.reset();
+  currentFrame.reset();
+}
+
+// Handle single tap event on frames
+// We manage the display of toolbar on the header and footer after user
+// tap the image or video. If it's in preview mode, it simply switch to
+// fullscreen mode directly.
 function singletap(e) {
-  if (currentView === fullscreenView) {
-    if (currentFrame.displayingImage || currentFrame.video.player.paused) {
-      fullscreenView.classList.toggle('toolbarhidden');
+  if (currentView === LAYOUT_MODE.fullscreen) {
+    if ((currentFrame.displayingImage || currentFrame.video.player.paused) &&
+         isPhone) {
+      fullscreenView.classList.toggle('toolbar-hidden');
     }
+  } else if (currentView === LAYOUT_MODE.list &&
+             !files[currentFileIndex].metadata.video) {
+    // We don't separate cases by screen size, because we don't show
+    // preview screen on tiny device.
+    setView(LAYOUT_MODE.fullscreen);
+    resizeFrames();
   }
 }
 
 // Quick zoom in and out with dbltap events
 function doubletapOnPhoto(e) {
+  // Don't allow zooming while we're still scanning for photos and
+  // have found large photos without previews on the card.  Zooming in
+  // decodes the full-size version of the photo and that can cause OOM
+  // errors if there is also metadata scanning going on with large images.
+  // XXX: Remove this when bug 854795 is fixed.
+  if (photodb.parsingBigFiles)
+    return;
+
   var scale;
   if (currentFrame.fit.scale > currentFrame.fit.baseScale)   // If zoomed in
     scale = currentFrame.fit.baseScale / currentFrame.fit.scale; // zoom out
@@ -213,7 +334,7 @@ function swipeHandler(event) {
   var direction = (frameOffset < 0) ? 1 : -1;
 
   // If we're in a right-to-left locale, reverse those directions
-  if (languageDirection === 'rtl')
+  if (navigator.mozL10n.language.direction === 'rtl')
     direction *= -1;
 
   // Did we pan far enough or swipe fast enough to transition to
@@ -269,6 +390,14 @@ function transformHandler(e) {
   if (transitioning)
     return;
 
+  // Don't allow zooming while we're still scanning for photos and
+  // have found large photos without previews on the card.  Zooming in
+  // decodes the full-size version of the photo and that can cause OOM
+  // errors if there is also metadata scanning going on with large images.
+  // XXX: Remove this when bug 854795 is fixed.
+  if (photodb.parsingBigFiles)
+    return;
+
   currentFrame.zoom(e.detail.relative.scale,
                     e.detail.midpoint.clientX,
                     e.detail.midpoint.clientY);
@@ -306,10 +435,13 @@ function setupFrameContent(n, frame) {
     }
     else {
       // Otherwise, just display the image
-      frame.displayImage(imagefile,
-                         fileinfo.metadata.width,
-                         fileinfo.metadata.height,
-                         fileinfo.metadata.preview);
+      frame.displayImage(
+        imagefile,
+        fileinfo.metadata.width,
+        fileinfo.metadata.height,
+        fileinfo.metadata.preview,
+        fileinfo.metadata.rotation,
+        fileinfo.metadata.mirrored);
     }
   });
 }
@@ -326,6 +458,11 @@ function setFramesPosition() {
     'translateX(' + (frameOffset + width) + 'px)';
   previousFrame.container.style.transform =
     'translateX(' + (frameOffset - width) + 'px)';
+
+  // XXX Bug 1021782 add 'current' class to currentFrame
+  nextFrame.container.classList.remove('current');
+  previousFrame.container.classList.remove('current');
+  currentFrame.container.classList.add('current');
 }
 
 function resetFramesPosition() {
@@ -334,22 +471,39 @@ function resetFramesPosition() {
 }
 
 // Switch from thumbnail list view to single-picture fullscreen view
-// and display the specified file
+// and display the specified file.
 function showFile(n) {
-  setView(fullscreenView); // Switch to fullscreen mode if not already there
+  // Mark what we're focusing on and unmark the old one
+  updateFocusThumbnail(n);
+  updateFrames();
 
+  // Disable the edit button if this is a video or mediaDB is scanning
+  if (files[currentFileIndex].metadata.video ||
+      photodb.scanning)
+    fullscreenButtons.edit.classList.add('disabled');
+  else
+    fullscreenButtons.edit.classList.remove('disabled');
+  // Always bring delete and share button back after show file
+  fullscreenButtons.delete.classList.remove('disabled');
+  fullscreenButtons.share.classList.remove('disabled');
+}
+
+function updateFrames() {
+  var n = currentFileIndex;
   setupFrameContent(n - 1, previousFrame);
   setupFrameContent(n, currentFrame);
   setupFrameContent(n + 1, nextFrame);
-  currentFileIndex = n;
 
   resetFramesPosition();
+}
 
-  // Disable the edit button if this is a video, and enable otherwise
-  if (files[n].metadata.video)
-    $('fullscreen-edit-button').classList.add('disabled');
-  else
-    $('fullscreen-edit-button').classList.remove('disabled');
+function clearFrames() {
+  previousFrame.clear();
+  currentFrame.clear();
+  nextFrame.clear();
+  delete previousFrame.filename;
+  delete currentFrame.filename;
+  delete nextFrame.filename;
 }
 
 // Transition to the next file, animating it over the specified time (ms).
@@ -379,8 +533,8 @@ function nextFile(time) {
   previousFrame = currentFrame;
   currentFrame = nextFrame;
   nextFrame = tmp;
-  currentFileIndex++;
 
+  updateFocusThumbnail(currentFileIndex + 1);
   // Move (transition) the frames to their new position
   resetFramesPosition();
 
@@ -396,11 +550,12 @@ function nextFile(time) {
     previousFrame.reset();
   });
 
-  // Disable the edit button if we're now viewing a video, and enable otherwise
-  if (currentFrame.displayingVideo)
-    $('fullscreen-edit-button').classList.add('disabled');
+  // Disable the edit button if this is a video or
+  // mediaDB is scanning, enable otherwise
+  if (currentFrame.displayingVideo || photodb.scanning)
+    fullscreenButtons.edit.classList.add('disabled');
   else
-    $('fullscreen-edit-button').classList.remove('disabled');
+    fullscreenButtons.edit.classList.remove('disabled');
 }
 
 // Just like nextFile() but in the other direction
@@ -429,8 +584,8 @@ function previousFile(time) {
   nextFrame = currentFrame;
   currentFrame = previousFrame;
   previousFrame = tmp;
-  currentFileIndex--;
 
+  updateFocusThumbnail(currentFileIndex - 1);
   // Move (transition) the frames to their new position
   resetFramesPosition();
 
@@ -444,9 +599,10 @@ function previousFile(time) {
     nextFrame.reset();
   });
 
-  // Disable the edit button if we're now viewing a video, and enable otherwise
-  if (currentFrame.displayingVideo)
-    $('fullscreen-edit-button').classList.add('disabled');
+  // Disable the edit button if we're now viewing a video or mediaDB
+  // is scanning, enable otherwise
+  if (currentFrame.displayingVideo || photodb.scanning)
+    fullscreenButtons.edit.classList.add('disabled');
   else
-    $('fullscreen-edit-button').classList.remove('disabled');
+    fullscreenButtons.edit.classList.remove('disabled');
 }

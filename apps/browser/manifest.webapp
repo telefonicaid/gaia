@@ -3,6 +3,7 @@
   "description": "Gaia Web Browser",
   "launch_path": "/index.html",
   "type": "certified",
+  "role": "system",
   "developer": {
     "name": "The Gaia Team",
     "url": "https://github.com/mozilla-b2g/gaia"
@@ -10,9 +11,16 @@
   "permissions": {
     "browser":{},
     "systemXHR":{},
-    "settings":{ "access": "readonly" },
+    "settings":{ "access": "readwrite" },
     "geolocation" : {},
-    "desktop-notification" : {}
+    "storage": {},
+    "desktop-notification" : {},
+    "audio-capture": {},
+    "video-capture": {},
+    "device-storage:pictures" : { "access": "readwrite" },
+    "device-storage:videos" : { "access": "readwrite" },
+    "device-storage:music" : { "access": "readwrite" },
+    "nfc":{ "access": "readwrite" }
   },
   "locales": {
     "ar": {
@@ -34,14 +42,22 @@
   },
   "default_locale": "en-US",
   "icons": {
-    "120": "/shared/resources/branding/Browser.png",
-    "60": "/shared/resources/branding/Browser.png"
+    "84": "/shared/resources/branding/browser_84.png",
+    "126": "/shared/resources/branding/browser_126.png",
+    "142": "/shared/resources/branding/browser_142.png",
+    "189": "/shared/resources/branding/browser_189.png",
+    "284": "/shared/resources/branding/browser_284.png"
   },
+  "messages": [
+     { "first-run-with-sim": "/index.html" }
+   ],
   "activities": {
-    "view": {
+    "nfc-ndef-discovered": {
       "filters": {
         "type": "url",
-        "url": { "required":true, "regexp":"/^https?:/" }
+        "url": {
+          "required":true, "pattern":"https?:.{1,16384}", "patternFlags":"i"
+         }
       }
     }
   }

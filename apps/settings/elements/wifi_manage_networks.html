@@ -1,0 +1,53 @@
+<element name="wifi-manageNetworks" extends="section">
+  <template>
+
+    <gaia-header>
+      <button type="reset" data-icon="back"><span data-l10n-id="back">Back</span></button>
+      <h1 data-l10n-id="manageNetworks-header"> Manage Networks </h1>
+    </gaia-header>
+
+    <div>
+      <ul>
+        <li>
+          <a>
+            <span data-l10n-id="macAddress"> MAC address </span>
+            <small data-name="deviceinfo.mac"></small>
+          </a>
+        </li>
+      </ul>
+
+      <header>
+        <h2 data-l10n-id="knownNetworks"> Known Networks </h2>
+      </header>
+      <ul class="wifi-knownNetworks">
+      </ul>
+
+      <header>
+        <h2 data-l10n-id="hiddenNetworks"> Hidden Networks </h2>
+      </header>
+      <ul>
+        <li>
+          <label>
+            <button class="icon icon-view joinHidden" data-l10n-id="joinHiddenNetwork">
+              Join Hidden Networks
+            </button>
+          </label>
+        </li>
+      </ul>
+    </div>
+
+    <form role="dialog" data-type="confirm" hidden>
+      <section>
+        <h1 data-l10n-id="forgetNetwork-confirmation">Confirmation</h1>
+        <p data-l10n-id="forgetNetwork-dialog">Forget network?</p>
+      </section>
+      <menu>
+        <button data-l10n-id="cancel" type="reset">Cancel</button>
+        <button data-l10n-id="device-option-confirm" id="confirm-option" class="danger">Confirm</button>
+      </menu>
+    </form>
+
+    <panel data-path="panels/wifi_manage_networks/panel"></panel>
+
+  </template>
+</element>

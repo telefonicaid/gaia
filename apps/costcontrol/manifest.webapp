@@ -14,7 +14,11 @@
     "settings":{ "access": "readonly" },
     "networkstats-manage":{},
     "alarms": {},
-    "telephony": {}
+    "telephony": {},
+    "storage": {},
+    "audio-channel-notification":{},
+    "webapps-manage":{},
+    "device-storage:apps":{ "access": "readonly" }
   },
   "activities": {
     "costcontrol/balance": {
@@ -41,14 +45,18 @@
   },
   "default_locale": "en-US",
   "icons": {
-    "120": "/style/icons/cost-control.png",
-    "60": "/style/icons/60/cost-control.png"
+  "84": "/style/icons/costcontrol_84.png",
+  "126": "/style/icons/costcontrol_126.png",
+  "142": "/style/icons/costcontrol_142.png",
+  "189": "/style/icons/costcontrol_189.png",
+  "284": "/style/icons/costcontrol_284.png"
   },
-  "orientation": "portrait-primary",
+  "orientation": "default",
   "messages": [
      { "sms-received": "/message_handler.html" },
      { "alarm": "/message_handler.html" },
      { "sms-sent": "/message_handler.html" },
+     { "networkstats-alarm": "/message_handler.html" },
      { "telephony-call-ended": "/message_handler.html" },
      { "notification": "/index.html" }
    ]

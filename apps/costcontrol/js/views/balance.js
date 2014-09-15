@@ -1,3 +1,7 @@
+/* global _, BalanceView, TopUpLayoutView, CostControl, ConfigManager,
+          ViewManager, debug, MozActivity, getTopUpTimeout, LazyLoader,
+          sendBalanceThresholdNotification
+*/
 
 /*
  * The balance tab is in charge of show balance details and allows the use
@@ -8,13 +12,18 @@
  * when the user taps on the update button. Furthermore, the balance update
  * can be triggered by a successful top up request.
  */
+'use strict';
 
 var BalanceTab = (function() {
-  'use strict';
 
   var view, updateButton;
   var topUpUSSD, topUp, topUpDialog, topUpCodeInput, sendCode, countdownSpan;
+  var balanceView, topUpLayoutView;
   var costcontrol, initialized;
+
+  function showTopUpWithCode(evt) {
+    topUpWithCode();
+  }
 
   function setupTab() {
     if (initialized) {
@@ -40,18 +49,28 @@ var BalanceTab = (function() {
       topUpCodeInput = document.getElementById('topup-code-input');
       countdownSpan = document.getElementById('top-up-countdown');
 
+      // Subviews
+      topUpLayoutView = new TopUpLayoutView(topUpUSSD, topUp);
+      var balanceConfig = ConfigManager.configuration.balance;
+      balanceView = new BalanceView(
+        document.getElementById('balance-tab-credit'),
+        document.getElementById('balance-tab-time'),
+        balanceConfig ? balanceConfig.minimum_delay : undefined
+      );
+
       window.addEventListener('localized', localize);
 
       // Configure updates
-      document.addEventListener('mozvisibilitychange', updateWhenVisible);
+      document.addEventListener('visibilitychange', updateWhenVisible);
       updateButton.addEventListener('click', lockAndUpdateUI);
       ConfigManager.observe('lowLimit', toogleLimits, true);
+      ConfigManager.observe('lowLimitThreshold', resetNotification, true);
       ConfigManager.observe('lastBalance', onBalance, true);
       ConfigManager.observe('errors', onBalanceTimeout, true);
 
       // Configure top up
       topUpUSSD.addEventListener('click', topUpWithUSSD);
-      topUp.addEventListener('click', topUpWithCode);
+      topUp.addEventListener('click', showTopUpWithCode);
       topUpCodeInput.addEventListener('input', toogleSend);
       sendCode.addEventListener('click', requestTopUp);
       ConfigManager.observe('waitingForTopUp', onConfirmation, true);
@@ -74,19 +93,21 @@ var BalanceTab = (function() {
       return;
     }
 
-    document.removeEventListener('mozvisibilitychange', updateWhenVisible);
+    document.removeEventListener('visibilitychange', updateWhenVisible);
     updateButton.removeEventListener('click', lockAndUpdateUI);
     ConfigManager.removeObserver('lowLimit', toogleLimits);
+    ConfigManager.removeObserver('lowLimitThreshold', resetNotification);
     ConfigManager.removeObserver('lastBalance', onBalance);
     ConfigManager.removeObserver('errors', onBalanceTimeout);
 
     topUpUSSD.removeEventListener('click', topUpWithUSSD);
-    topUp.removeEventListener('click', topUpWithCode);
+    topUp.removeEventListener('click', showTopUpWithCode);
     topUpCodeInput.removeEventListener('input', toogleSend);
     sendCode.removeEventListener('click', requestTopUp);
     ConfigManager.removeObserver('waitingForTopUp', onConfirmation);
     ConfigManager.removeObserver('errors', onTopUpErrors);
 
+    topUpLayoutSet = false;
     initialized = false;
   }
 
@@ -94,7 +115,7 @@ var BalanceTab = (function() {
 
   // On showing the application
   function updateWhenVisible() {
-    if (!document.mozHidden && initialized) {
+    if (!document.hidden && initialized) {
       updateUI();
     } else {
       clearInterval(topUpCountdown);
@@ -111,19 +132,32 @@ var BalanceTab = (function() {
   function toogleLimits(isEnabled, old, key, settings) {
     updateBalance(settings.lastBalance,
                   isEnabled && settings.lowLimitThreshold);
+    if (isEnabled) {
+      sendBalanceThresholdNotification(settings.lastBalance, settings, false);
+      updateBalance(settings.lastBalance, settings.lowLimitThreshold);
+    }
+  }
+
+  // On changing the threshold for low limit
+  function resetNotification() {
+    ConfigManager.setOption({ 'lowLimitNotified': false });
+    ConfigManager.requestAll(function _onSettings(configuration, settings) {
+      updateBalance(settings.lastBalance, settings.lowLimitThreshold);
+      sendBalanceThresholdNotification(settings.lastBalance, settings, false);
+    });
   }
 
   // On balance update received
   function onBalance(balance, old, key, settings) {
     debug('Balance received:', balance);
-    setBalanceMode('default');
+    setBalanceMode();
     updateBalance(balance, settings.lowLimit && settings.lowLimitThreshold);
     debug('Balance updated!');
   }
 
   // On balance timeout
   function onBalanceTimeout(errors) {
-    if (!errors['BALANCE_TIMEOUT']) {
+    if (!errors.BALANCE_TIMEOUT) {
       return;
     }
     debug('Balance timeout!');
@@ -132,7 +166,7 @@ var BalanceTab = (function() {
     setError('balance_error');
 
     // Error handled, disabling
-    errors['BALANCE_TIMEOUT'] = false;
+    errors.BALANCE_TIMEOUT = false;
     ConfigManager.setOption({errors: errors});
   }
 
@@ -140,7 +174,8 @@ var BalanceTab = (function() {
 
   // On tapping Top Up and Pay
   function topUpWithUSSD() {
-    var dialing = new MozActivity({
+    var dialing;
+    dialing = new MozActivity({
       name: 'dial',
       data: {
         type: 'webtelephony/number',
@@ -202,11 +237,10 @@ var BalanceTab = (function() {
     if (isWaiting !== null) {
       return;
     }
-
     debug('TopUp confirmed!');
     setTopUpMode('default');
     topUpCodeInput.value = '';
-    updateButton.click(); // TODO: Check if free before
+    updateUI();
   }
 
   // On top up timeout or incorrect code
@@ -214,12 +248,12 @@ var BalanceTab = (function() {
     debug('ERRORS:', errors);
 
     var mode;
-    if (errors['TOPUP_TIMEOUT']) {
-      errors['TOPUP_TIMEOUT'] = false;
+    if (errors.TOPUP_TIMEOUT) {
+      errors.TOPUP_TIMEOUT = false;
       mode = 'topup_timeout';
     }
-    if (errors['INCORRECT_TOPUP_CODE']) {
-      errors['INCORRECT_TOPUP_CODE'] = false;
+    if (errors.INCORRECT_TOPUP_CODE) {
+      errors.INCORRECT_TOPUP_CODE = false;
       mode = 'incorrect_code';
     }
     debug('Most important error: ', mode);
@@ -233,9 +267,14 @@ var BalanceTab = (function() {
   }
 
   // USER INTERFACE
-
+  var topUpLayoutSet = false;
   function updateUI(force) {
-    ConfigManager.requestSettings(function _onSettings(settings) {
+    ConfigManager.requestAll(function _onSettings(configuration, settings) {
+
+      if (!topUpLayoutSet) {
+        topUpLayoutView.setupLayout(configuration.topup);
+        topUpLayoutSet = true;
+      }
 
       resetTopUpCountdown();
       updateBalance(settings.lastBalance,
@@ -247,9 +286,14 @@ var BalanceTab = (function() {
         updateButton.disabled = false;
         var status = result.status;
         var balance = result.data;
-        setBalanceMode(status === 'error' ? 'warning' : 'updating');
-        if (status === 'error') {
+        var isError = status === 'error' && result.details !== 'minimum_delay';
+        var isUpdating = status !== 'error';
+        if (isError) {
+          setBalanceMode('warning');
           setError(result.details);
+        } else {
+          setBalanceMode(isUpdating ? 'updating' : 'default');
+          setError();
         }
         updateBalance(balance,
                       settings.lowLimit && settings.lowLimitThreshold);
@@ -260,28 +304,14 @@ var BalanceTab = (function() {
   // Update the balance in balance view
   function updateBalance(balance, limit) {
 
-    // Balance not available
     if (!balance) {
       debug('Balance not available');
-      document.getElementById('balance-tab-credit')
-        .innerHTML = _('not-available');
-      document.getElementById('balance-tab-time').innerHTML = '';
+      balanceView.update();
       return;
     }
 
-    // Balance available
-    document.getElementById('balance-tab-credit').innerHTML =
-      _('currency', {
-        value: balance.balance,
-        currency: ConfigManager.configuration.credit.currency
-      });
-
-    // Timestamp
-    var timeContent = formatTimeHTML(balance.timestamp);
-    if (view.classList.contains('updating')) {
-      timeContent = _('updating') + '...';
-    }
-    document.getElementById('balance-tab-time').innerHTML = timeContent;
+    var isUpdating = view.classList.contains('updating');
+    balanceView.update(balance, isUpdating);
 
     // Limits: reaching zero / low limit
     if (balance.balance === 0) {
@@ -315,10 +345,6 @@ var BalanceTab = (function() {
 
     if (mode === 'updating') {
       view.classList.add('updating');
-    }
-
-    if (mode === 'default') {
-      setError(); // remove errors
     }
   }
 
@@ -367,11 +393,11 @@ var BalanceTab = (function() {
 
   var topUpCountdown, countdown;
   function resetTopUpCountdown() {
-    getTopUpTimeout(function (timeout) {
+    getTopUpTimeout(function(timeout) {
       if (!timeout) {
         return;
       }
-      countdown = Math.floor((timeout.getTime() - Date.now())/1000);
+      countdown = Math.floor((timeout.getTime() - Date.now()) / 1000);
       if (countdown < 0) {
         return;
       }
@@ -388,22 +414,27 @@ var BalanceTab = (function() {
           countdown -= 1;
         }
       }, 1000);
-    })
+    });
   }
 
   var ERRORS = {
-    'airplane_mode': { priority: 1, string: 'airplane-mode-error-message' },
-    'no_service': { priority: 2, string: 'no-coverage-error-message' },
+    'airplane_mode': { priority: 1, string: 'airplane-mode-error-message2' },
+    'no_service': { priority: 2, string: 'no-coverage-error-message2' },
     'no_coverage': { priority: 2, string: 'no-coverage-error-message' },
-    'topup_timeout': { priority: 3, string: 'top-up-timed-out' },
-    'balance_error': { priority: 4, string: 'balance-error-message' },
-    'non_free_in_roaming': { priority: 4, string: 'on-roaming-message' }
+    'topup_timeout': { priority: 3, string: 'top-up-timed-out2' },
+    'balance_error': { priority: 4, string: 'balance-error-message2' },
+    'non_free_in_roaming': { priority: 4, string: 'on-roaming-message2' }
   };
   var currentError = '';
 
   // Decide which error should be shown taking in count error priorities
   function setError(error) {
-    debug('Error mode:', error);
+    // Ignore showing message if the message is not registered
+    if (error && !ERRORS[error]) {
+      return;
+    }
+
+    debug('Error mode:', error ? error : 'no error');
     var messageArea = document.getElementById('cost-control-message-area');
     var message = document.getElementById('error-message-placeholder');
 
@@ -422,9 +453,14 @@ var BalanceTab = (function() {
 
   return {
     topUpWithCode: topUpWithCode,
-    initialize: setupTab,
+    initialize: function() {
+      var SCRIPTS_NEEDED = [
+        'js/views/TopUpLayoutView.js',
+        'js/views/BalanceView.js'
+      ];
+      LazyLoader.load(SCRIPTS_NEEDED, setupTab);
+    },
     finalize: finalize
   };
 }());
-
 BalanceTab.initialize();

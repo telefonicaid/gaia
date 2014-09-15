@@ -1,0 +1,9 @@
+{
+  "extends": "../../.jshintrc",
+  "predef": [
+    "define",
+    "require",
+    "Settings",
+    "Promise"
+  ]
+}

@@ -1,3 +1,7 @@
+'use strict';
+
+/* global oauth2, oauthflow */
+
 var fb = window.fb || {};
 
 if (typeof fb.msg === 'undefined') {
@@ -6,8 +10,8 @@ if (typeof fb.msg === 'undefined') {
     var to;
     var message;
     var params = oauthflow.params.facebook;
-    var appId = params['applicationId'];
-    var redirectURI = params['redirectMsg'];
+    var appId = params.applicationId;
+    var redirectURI = params.redirectMsg;
 
     Msg.CID_PARAM = 'contactid';
 
@@ -16,11 +20,11 @@ if (typeof fb.msg === 'undefined') {
       to = uid || to;
       message = msg || message;
       oauth2.getAccessToken(doWallPost, 'wallPost', 'facebook');
-    }
+    };
 
     Msg.sendPrivate = function(uid, msg) {
       // TODO: To be implemented (if we decide to craft our custom UI)
-    }
+    };
 
     // This code is for posting to user's wall. Only will be necessary if
     // we decide to craft our own UI for posting to the wall
@@ -51,12 +55,12 @@ if (typeof fb.msg === 'undefined') {
       req.onsuccess = function() {
         var fbContact = new fb.Contact(req.result);
         callback(fbContact.uid);
-      }
+      };
 
       req.onerror = function() {
         window.console.error('Contacts: Contact not found!');
         callback(null);
-      }
+      };
     }
 
     function openMsgDialog(dialogURI, uid) {
@@ -67,7 +71,7 @@ if (typeof fb.msg === 'undefined') {
       ];
 
       var target = dialogURI + params.join('&');
-      window.open(target);
+      window.open(target, '', 'dialog');
     }
 
     // Use the FB Dialogs functionality for posting to the wall
@@ -78,7 +82,7 @@ if (typeof fb.msg === 'undefined') {
           openMsgDialog(dialogURI, uid);
         }
       });
-    }
+    };
 
     // Use a Web view from Facebook for sending private messages
     // TODO: Check with Facebook why the send message dialog seems not to be
@@ -86,15 +90,16 @@ if (typeof fb.msg === 'undefined') {
     UI.sendPrivateMsg = function(contactId) {
       getFbContactUid(contactId, function ui_sendMsg(uid) {
         if (uid) {
-           window.open('https://m.facebook.com/chat/messages.php?id=' + uid);
+           window.open('https://m.facebook.com/compose_message/?uid=' + uid,
+            '', 'dialog');
         }
       });
-    }
+    };
 
     UI.wallPosted = function(result) {
       UI.end();
       window.console.log(JSON.stringify(result));
-    }
+    };
 
   })(document);
 }

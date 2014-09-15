@@ -1,0 +1,9 @@
+{
+  "external": true,
+  "etag": "\"d4bf89c6db685c64b18c761274284c2edc63ec90f332fd5966021560b59bd40b\"",
+  "installOrigin": "https://marketplace-dev.allizom.org",
+  "manifestURL": "https://marketplace-dev.allizom.org/packaged.webapp",
+  "packageEtag": "\"fdc9d9d1d77a921949c5ac0944eb2cd9853864a31d4ae9bf46d9a3d361fc583f\"",
+  "removable": false,
+  "type": "privileged"
+}

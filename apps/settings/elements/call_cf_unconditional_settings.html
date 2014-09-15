@@ -1,0 +1,27 @@
+<element name="call-cf-unconditionalSettings" extends="section">
+  <template>
+
+    <gaia-header>
+      <button type="reset" data-icon="back"><span data-l10n-id="back">Back</span></button>
+      <h1 data-l10n-id="callForwarding-header"> Call forwarding </h1>
+      <button type="submit"><span data-l10n-id="ok">OK</span></button>
+    </gaia-header>
+
+    <div>
+      <ul id="cf-unconditional-advanced">
+        <li>
+          <p data-l10n-id="cf-alwaysUseThisNumber">Always use this number</p>
+          <input type="tel" id="cf-unconditional-number" data-setting="ril.cf.unconditional.number"/>
+        </li>
+        <li>
+          <label class="pack-switch">
+            <input type="checkbox" data-setting="ril.cf.unconditional.enabled">
+            <span data-l10n-id="callForwardingForward">Forward</span>
+            <small data-l10n-id="callForwardingUnconditionalShort">Always</small>
+          </label>
+        </li>
+      </ul>
+    </div>
+
+  </template>
+</element>

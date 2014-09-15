@@ -1,177 +1,46 @@
-#value-selector {
+.value-selector {
   width: 100%;
-  height: -moz-calc(100% - 20px);
-  top: 20px;
-  left: 0;
-  position: absolute;
-  transition: opacity 0.5s;
-  display: block;
-}
-
-#value-selector[hidden] {
-  opacity: 0;
-  pointer-events: none;
-}
-
-#screen.active-statusbar #value-selector {
-  height: -moz-calc(100% - 40px);
-  top: 40px;
-}
-
-#screen:-moz-full-screen-ancestor #value-seletcor,
-#screen.fullscreen-app #value-selector {
   height: 100%;
   top: 0;
-}
-
-#select-options-buttons,
-#time-picker-buttons,
-#spin-date-picker-buttons {
-  /* from building blocks, core.css - menu:not([type="toolbar"]*/
-  white-space: nowrap;
-  margin: 0;
-  padding: 0;
-  border-top: solid 1px rgba(255, 255, 255, 0.1);
-  background: #2d2d2d url(../themes/default/images/ui/pattern.png) repeat left top;
+  bottom: 0;
+  left: 0;
+  position: absolute;
+  transition: visibility 0.5s, opacity 0.5s;
   display: block;
-  overflow: hidden;
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  text-align: center;
-  font-size: 0; /* to get rid of the spacing between 2 buttons */
 }
 
-#value-selector button:first-child {
-    margin-right: 0rem;
+/*Bug 1050838: when value selector is global, height needs to be explicit for
+               buttons to be visible. */
+.generic-dialog[role="dialog"] .value-selector {
+  height: calc(100% - 7rem);
 }
 
-#select-options-buttons button,
-#time-picker-buttons button,
-#spin-date-picker-buttons button{
-  /* from building block - other/buttons/style.css*/
-  width: calc((100% - 4.5rem) / 2);  /*overridden for 2 buttons*/
-
-  height: 3.8rem;
-  margin: 1.5rem;
-  padding: 0 1.5rem;
-  display: inline-block;
-  vertical-align: middle;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  overflow: hidden;
-  background: #fafafa url(../themes/default/images/ui/default.png) repeat-x left bottom;
-  border: 1px solid #9f9f9f;
-  border-radius: 0.3rem;
-  font-size: 1.6rem;
-  font-family: 'MozTT', Sans-serif;
-  font-weight: 600;
-  line-height: 3.8rem;
-  color: #333;
-  text-align: center;
-  text-shadow: 1px 1px 0 rgba(255,255,255,0.3);
-  text-decoration: none;
-  outline: none;
+#screen.fullscreen-layout-app.software-button-enabled [role="dialog"][data-type="value-selector"] {
+  height: calc(100% - 7rem - var(--software-home-button-height));
 }
 
-/* Affirmative */
-#value-selector button.affirmative {
-  background-image: url(../themes/default/images/ui/affirmative.png);
-  background-color: #00caf2;
-  border-color: #00acce;
+@media (orientation: landscape) {
+  #screen.fullscreen-layout-app.software-button-enabled [role="dialog"][data-type="value-selector"] {
+    height: calc(100% - 7rem);
+  }
 }
 
-#select-options-buttons button.full {
-    width: calc(100% - 4.5rem);
-    margin: 1.5rem;
+#screen.fullscreen-layout-app.software-button-enabled .generic-dialog[role="dialog"] .value-selector {
+  height: calc(100% - 7rem - var(--software-home-button-height));
 }
 
-/*active class used to complement the "return false" in onmousedown effect */
-#value-selector button.active,
-button.affirmative.active {
-    border-color: #008aaa;
-    background: #008aaa;
-    color: #333;
+
+@media (orientation: landscape) {
+  #screen.fullscreen-layout-app.software-button-enabled .generic-dialog[role="dialog"] .value-selector {
+    height: calc(100% - 7rem);
+  }
 }
 
-#value-selector-container li > label {
-    pointer-events: none;
+.value-selector[hidden] {
+  visibility: hidden;
+  opacity: 0;
 }
 
-#value-selector-container li.active label span {
-    background: none repeat scroll 0 0 #00ABCC;
-    color: #FFFFFF !important;
+.value-selector-container li > label {
+  pointer-events: none;
 }
-
-#time-picker-popup,
-#spin-date-picker-popup {
-  top: 0px;
-  padding: 0 0 7rem;  /*remove the top padding*/
-
-  /* from building blocks, core.css - [role=dialog]*/
-  background: url(../themes/default/images/ui/pattern.png) repeat left top, url(../themes/default/images/ui/gradient.png) no-repeat left top;
-  background-size: auto auto, 100% 100%;
-  overflow: hidden;
-  position: absolute;
-  z-index: 100;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  white-space: nowrap;
-  padding: 0 0 7rem;  /*remove the top padding*/
-  font-family: "MozTT", Sans-serif;
-  color: #fff;
-}
-
-#time-picker-popup h3,
-#spin-date-picker-popup h3 {
-    font-family: 'MozTT', Sans-serif;
-    font-weight: normal;
-    font-size: 1.6rem;
-    line-height: 1em;
-    color: #fff;
-    border-bottom: 0.1rem solid #686868;
-    margin: 0 0 1.5rem;
-    padding-bottom: 1.5rem;
-}
-
-.table-wrapper {
-  display: table;
-  width:  100%;
-  height: 100%;
-}
-
-.table-cell {
-  display: table-cell;
-  vertical-align: middle;
-  width:  100%;
-  height: 100%;
-}
-
-/* The following rules is to override the styles defined in building blocks of value selector */
-#value-selector li {
-  height: auto;
-  padding-bottom: 0px;
-  line-height: 3.9rem;
-}
-
-#value-selector li span {
-  padding: 1rem 1.5rem;
-  line-height: 4rem;
-  word-wrap: break-word;
-}
-
-#value-selector li input:checked + span,
-#value-selector li[aria-checked="true"] span {
-  padding-right: 2.6rem;
-  margin-right: 1.2rem;
-  background: transparent url("../bb/value_selector/images/icons/checked.png") no-repeat 100% 50%;
-}
-
-html[dir="rtl"] #value-selector li input:checked + span,
-html[dir="rtl"] #value-selector li[aria-checked="true"] span {
-  padding-left: 2.6rem;
-  margin-left: 1.2rem;
-}
-

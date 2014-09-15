@@ -1,16 +1,14 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  require('/shared/js/lazy_loader.js');
-  requireSupport('fake_page.js');
-  requireSupport('mock_view.js');
+requireSupport('fake_page.js');
+requireSupport('mock_view.js');
 
-  requireLib('provider/abstract.js');
-  requireLib('worker/manager.js');
-  requireLib('controllers/service.js');
-  requireLib('router.js');
-  requireLib('app.js');
-});
+requireLib('provider/abstract.js');
+requireLib('worker/manager.js');
+requireLib('controllers/service.js');
+requireLib('router.js');
+requireLib('app.js');
 
 suite('app', function() {
+  'use strict';
 
   // don't need a real db for this;
   var subject;
@@ -90,9 +88,7 @@ suite('app', function() {
       fmt = Calendar.App.dateFormat = navigator.mozL10n.DateTimeFormat();
       expected = [];
 
-      var formatXDate = new Date(2012, 1, 1);
       var formatCDate = new Date(2012, 1, 1, 7, 2, 9);
-
       addExpect(formatCDate, 'myl10nKey', '%x');
       addExpect(formatCDate, 'otherl10nKey', '%c');
 
@@ -218,14 +214,13 @@ suite('app', function() {
   suite('global events', function() {
     var calledWith;
     var realRestart;
-    var realTimeout;
+    var clock;
 
     setup(function() {
       calledWith = 0;
-      realTimeout = subject._mozTimeRefreshTimeout;
       realRestart = Calendar.App.forceRestart;
+      clock = sinon.useFakeTimers();
 
-      subject._mozTimeRefreshTimeout = 1;
       subject.forceRestart = function() {
         calledWith++;
       };
@@ -233,24 +228,20 @@ suite('app', function() {
 
     teardown(function() {
       subject.forceRestart = realRestart;
-      subject._mozTimeRefreshTimeout = realTimeout;
+      clock.restore();
     });
 
-    test('moztimechange', function(done) {
+    test('moztimechange', function() {
       // dispatch multiple times to ensure it only fires callback
       // once...
       window.dispatchEvent(new Event('moztimechange'));
       window.dispatchEvent(new Event('moztimechange'));
 
-      setTimeout(function() {
-        window.dispatchEvent(new Event('moztimechange'));
-      }, 0);
+      clock.tick(10);
+      window.dispatchEvent(new Event('moztimechange'));
 
-      setTimeout(function() {
-        done(function() {
-          assert.equal(calledWith, 1);
-        });
-      }, 100);
+      clock.tick(subject._mozTimeRefreshTimeout + 10);
+      assert.equal(calledWith, 1);
     });
   });
 
@@ -387,7 +378,6 @@ suite('app', function() {
   });
 
   test('#modifier', function() {
-    var uniq = function() {};
     subject.modifier('/foo', 'Mock');
 
     var route = page.routes[0];
@@ -402,8 +392,6 @@ suite('app', function() {
   suite('#route', function() {
 
     test('singleRoute', function() {
-      var mock = new Calendar.Views.Mock();
-
       subject.state('/single', 'Mock');
 
       var route = page.routes[0];
@@ -419,7 +407,6 @@ suite('app', function() {
     });
 
     test('twoRoutes', function() {
-      var uniq = function() {};
       subject.state('/foo', ['Mock', 'Mock']);
 
       var route = page.routes[0];
@@ -435,16 +422,13 @@ suite('app', function() {
     });
   });
 
-  suite('Delayed DOM Loading', function() {
-
+  suite('#_showTodayDate', function() {
     var container;
 
     suiteSetup(function() {
       container = document.createElement('div');
-      container.innerHTML = '<div class="delay"><!-- ' +
-          '<div class="lazynode first">i love</div>' +
-          '<div class="lazynode second">bacon</div>' +
-        ' --></div>';
+      container.innerHTML = '<a id="today" href="#today">' +
+        '<span class="icon-calendar-today"></span></a>';
       document.body.appendChild(container);
     });
 
@@ -452,44 +436,40 @@ suite('app', function() {
       container.parentNode.removeChild(container);
     });
 
-    test('make sure lazy nodes load', function() {
+    test('show current date on the .icon-calendar-today span', function() {
+      subject._showTodayDate();
       assert.equal(
-        document.querySelectorAll('.delay').length,
-        1,
-        'we have a single delayed container'
+        document.querySelector('#today .icon-calendar-today').innerHTML,
+        new Date().getDate()
       );
+    });
+  });
 
+  suite('#_syncTodayDate', function() {
+    var clock;
+    var container;
+
+    suiteSetup(function() {
+      var baseTimestamp = new Date(1991, 9, 7, 23, 59, 59).getTime();
+      clock = sinon.useFakeTimers(baseTimestamp);
+
+      container = document.createElement('div');
+      container.innerHTML = '<a id="today" href="#today">' +
+        '<span class="icon-calendar-today">7</span></a>';
+      document.body.appendChild(container);
+    });
+
+    suiteTeardown(function() {
+      container.parentNode.removeChild(container);
+      clock.restore();
+    });
+
+    test('Update the date on the today span after midnight', function() {
+      subject._syncTodayDate();
+      clock.tick(1500);
       assert.equal(
-        document.querySelectorAll('.lazynode').length,
-        0,
-        'we do not have delayed nodes yet'
-      );
-
-      // Load the delayed nodes
-      subject.loadDOM();
-
-      assert.equal(
-        document.querySelectorAll('.delay').length,
-        0,
-        'delayed containers are removed'
-      );
-
-      assert.equal(
-        document.querySelectorAll('.lazynode').length,
-        2,
-        'delayed nodes are loaded'
-      );
-
-      assert.equal(
-        document.querySelector('.lazynode').parentNode,
-        container,
-        'the node is inserted into the correct parent'
-      );
-
-      var nextEl = document.querySelector('.first').nextElementSibling;
-      assert.ok(
-        nextEl.classList.contains('second'),
-        'node order is preserved'
+        document.querySelector('#today .icon-calendar-today').innerHTML,
+        8
       );
     });
   });

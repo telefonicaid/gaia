@@ -1,12 +1,7 @@
 /* ROOT */
-/* Hidden elements */
-.hide, [data-template] {
-  display: none !important;
-}
-
 
 /* Global */
-html, body {
+html {
   width: 100%;
   height: 100%;
   margin: 0;
@@ -14,12 +9,13 @@ html, body {
   font-size: 62.5%;
   overflow: hidden;
   position: relative;
+  background-color: white;
 }
 
 body {
-  background: #000;
   color: #fff;
-  font: 1.6rem/2.2rem MozTT, Sans-serif;
+  font-size: 1.6rem;
+  line-height: 2.2rem;
   text-align: center;
   vertical-align: middle;
 }
@@ -68,17 +64,16 @@ abbr, acronym {
 }
 
 strong {
-  font-family: MozTT, Sans-serif;
   font-weight: bold;
 }
 
 b {
-  font-family: MozTT, Sans-serif;
   font-weight: 600;
 }
 
 small {
-  font: 1.1rem/1rem MozTT, Sans-serif;
+  font-size: 1.1rem;
+  line-height: 1rem;
   color: #999;
 }
 
@@ -102,11 +97,11 @@ a abbr {
 }
 
 /* Icons */
-span[role="button"] {
+span.icon {
   font-style: normal;
 }
 
-span[role="button"] + b, span[role="button"] + span {
+span.icon + b, span.icon + span {
   vertical-align: middle;
 }
 
@@ -147,15 +142,6 @@ textarea {
   height: 4.6rem;
 }
 
-input[type="text"], textarea {
-  font: 1.3rem/4rem MozTT, Sans-serif;
-  font-weight: 600;
-}
-
-input[type="text"]:focus, textarea:focus {
-  border-color: #7a7a7a;
-}
-
 [contenteditable] {
   outline: none;
   word-wrap: break-word;
@@ -193,7 +179,6 @@ menu, nav, section, video, audio, canvas, progress, meter, time {
   width: 100%;
   height: 100%;
   transform: translate(0, 0);
-  transition: transform 0.5s ease;
 }
 
 .view:not(.view-noscroll) {
@@ -209,81 +194,46 @@ menu, nav, section, video, audio, canvas, progress, meter, time {
   transform: translateY(100%);
 }
 
-
-/* BB Header redefinition
-    This avoids full repainting on scroll in the contacts lists
-    We must fill a bug with this issue
- */
-section[role="region"] > header:first-child {
-  background-color: #cd6623;
-}
-
 /* Rewritting from buttons.css */
-section[role="region"] > header:first-child button,
-section[role="region"] > header:first-child a[role="button"] {
+section[role="region"] > gaia-header button,
+section[role="region"] > gaia-header a {
   white-space: normal;
 }
 
 /* Buttons inside list redefinition */
-li button span,
-li a[role="button"] span {
+li button span {
   font-size: 0;
 }
 
-/* Extending BB list buttons (Activity ones) */
-li button.activity,
-li a[role="button"].activity {
-  background-color: #fff;
-  padding: 0 1rem 0 0;
-}
-
-li button.activity:active,
-li a[role="button"].activity:active {
-  background-color: #008AAA;
-}
-
-/* Icons at left side */
-li button.activity.icon,
-li a[role="button"].activity.icon {
-  padding-left: 3rem;
-}
-
-li button.activity.icon,
-li a[role="button"].activity.icon {
-  text-indent: 1rem;
-}
-
-li button.activity:before,
-li a[role="button"].activity:before {
-  right: auto;
-  left: 0.5rem;
-}
-
 /* Extending components */
-li button.activity > b em ,
-li a[role="button"].activity > b em{
+li button.activity > b em {
   color: #727272;
   font-style: normal;
 }
 
-/* Long strings (email) */
-li button.activity > b ,
-li a[role="button"].activity > b{
-  font-weight: normal;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;;
-  display: block;
-  position: absolute;
-  left: 3rem;
-  right: 0;
-  top: 0;
-  bottom: 0;
+[data-type="list"] li p {
+  margin-left: 1.5rem;
 }
 
 /* BB Lists extending */
-[data-type="list"] header {
-  margin-left: -1rem;
+#view-contacts-list [data-type="list"] {
+  padding: 2.5rem 2.5rem 0 0;
+}
+
+.active[data-type="list"] li:after, [data-type="list"] li > a:after {
+  left: 0;
+}
+
+[data-type="list"] gaia-header {
+  padding: 0 0 0 1.5rem;
+  position: sticky;
+  top: -1.5rem;
+  background: #FFF;
+  z-index: 2;
+}
+
+[data-type="list"].active li:after {
+  right: 0;
 }
 
 /* JS helper */
@@ -292,30 +242,34 @@ li a[role="button"].activity > b{
   pointer-events: none;
 }
 
-
+[data-type="list"] li aside.pack-end {
+  margin: 0 2rem 0 0;
+}
 
 /* Selection tag extended from shared/style/buttons.css */
 .view-select-tag .selection-list li button {
   background-color: #fff;
 }
 
-.view-select-tag .selection-list li button:active {
-  background-color: #008AAA;
-}
-
 .view-select-tag .selection-list li button.icon-selected:before {
-  background: transparent url(gphx/bitmap/default/lists/tick.png) no-repeat center center;
+  background: transparent url(gphx/bitmap/default/lists/tick.png) no-repeat center center / 2rem;
 }
 
-/* Input areas customization*/
-form p + p {
-  margin-top: 0.5rem;
+#custom-tag {
+  margin-bottom: 2rem;
 }
 
 /* Body */
 .view-body {
   position: relative;
   height: calc(100% - 5rem);
+}
+
+#view-screenshot.contact-list > #view-screenshot-body {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  background: -moz-element(#view-contacts-list);
 }
 
 .view-body-inner {
@@ -328,53 +282,15 @@ form p + p {
   z-index: 5;
   width: 100%;
   -moz-box-sizing: border-box;
-  padding: 1.4rem 2rem;
-  background: #f4f4f4;
+  background: #fff;
   color: #333;
   text-align: left;
+  will-change: scroll-position;
 }
 
 /* Removes scroll from the view body inner */
 .view-noscroll .view-body-inner {
-  width: -moz-calc(100% + 0.8rem);
-}
-
-
-/* LAYOUT */
-/* ITEM: The smallest complete structure; */
-.item {
-  display: block;
-  overflow: hidden;
-}
-
-.item-media {
-  float: left;
-  margin-right: 1rem;
-}
-
-.item-media.pull-right {
-  margin-left: 1rem;
-  margin-right: 0;
-}
-
-.item-body {
-  display: table;
-}
-
-.item-body-exp {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* PULLS: Float an element to the desired position; */
-.pull-right {
-  float: right;
-}
-
-.pull-left {
-  float: left;
+  width: -moz-calc(100% + 1.5rem);
 }
 
 /* STACK: inline block list items; */
@@ -391,73 +307,28 @@ form p + p {
 
 /* ICONS */
 
-span[role="button"] {
-  font: 0/0 a;
+span.icon {
+  font-size: 0;
   background: transparent no-repeat center center;
   background-size: 100% auto;
   display: inline-block;
 }
 
-span[role="button"].icon-finish {
-  background-color: rgba(0, 0, 0, 0.5);
-}
-
-/* selection list */
-span[role="button"].icon-selected {
-  background-color: rgba(0, 0, 0, 0.5);
-}
-
-/* tabs */
-span[role="button"].icon-profile {
-  background-color: rgba(255, 255, 255, 0.5)
-}
-
-/* navigation */
-span[role="button"].icon-log {
-  background-color: rgba(255, 255, 255, 0.5);
-}
-
-span[role="button"].icon-contacts {
-  background-color: rgba(255, 255, 255, 0.5);
-}
-
-span[role="button"].icon-messages {
-  background-color: rgba(255, 255, 255, 0.5);
-}
-
-span[role="button"].icon-grid {
-  background-color: rgba(255, 255, 255, 0.5);
-}
-
 /* GENERIC BUTTONS */
-span[role="button"].icon-delete {
+span.icon.icon-delete {
   background-image: url(/contacts/style/gphx/bitmap/default/forms/delete.png);
-  width: 2.2rem;
-  height: 2.2rem;
+  background-size: 3rem;
+  width: 3rem;
 }
 
-span[role="button"].icon-addimage {
+span.icon.icon-addimage {
   background-image: url(/contacts/style/gphx/bitmap/default/forms/add.png);
-  width: 2.8rem;
-  height: 2.8rem;
+  background-size: 3rem;
+  width: 3rem;
+  height: 2.9rem;
 }
 
-li button.icon-call:before {
-  background-image: url(/contacts/style/gphx/bitmap/default/buttons/call.png);
-}
-
-li button.icon-message:before {
-  background-image: url(/contacts/style/gphx/bitmap/default/buttons/sms.png);
-}
-
-li button.send-sms {
-  width: 0;
-}
-li button.icon-email:before {
-  background-image: url(/contacts/style/gphx/bitmap/default/buttons/mail.png);
-}
-
-span[role="button"].icon-address {
+span.icon.icon-address {
   background-image: url(/contacts/style/gphx/bitmap/default/buttons/location.png);
 }
 
@@ -480,35 +351,13 @@ li button.icon-fb-profile:before {
 }
 
 li button.icon-add:before {
-  background: url(/contacts/style/gphx/bitmap/default/buttons/plus_sign.png) no-repeat center center;
+  background-image: url(/contacts/style/images/Add_button.png);
+  left: 0.2rem
 }
 
-
-/* arrows */
-span[role="button"].icon-arrow {
-  border: solid 0.4rem transparent;
-  width: 0;
-  height: 0;
-}
-
-span[role="button"].icon-arrow.icon-arrow-top {
-  margin-top: -0.4rem;
-  border-bottom-color: #333;
-}
-
-span[role="button"].icon-arrow.icon-arrow-bottom {
-  margin-top: 0.4rem;
-  border-top-color: #333;
-}
-
-span[role="button"].icon-arrow.icon-arrow-left {
-  margin-right: 0.4rem;
-  border-right-color: #333;
-}
-
-span[role="button"].icon-arrow.icon-arrow-right {
-  margin-left: 0.4rem;
-  border-left-color: #333;
+li button.icon-find-and-merge:before {
+  background-image: url(/contacts/style/images/findandmerge.png);
+  background-size: 3rem;
 }
 
 /* Block type (long text) */
@@ -516,10 +365,6 @@ span[role="button"].icon-arrow.icon-arrow-right {
   height: auto;
   min-height: 4rem;
   word-wrap: normal;
-}
-.action-block span[role="button"] {
-  float: left;
-  display: inline;
 }
 .action-block b {
   display: block;
@@ -539,7 +384,6 @@ span[role="button"].icon-arrow.icon-arrow-right {
 
 /* ROW: horizontal separation for elements; */
 .fillflow-row {
-  margin: 0 0 0.5rem;
   position: relative;
 }
 
@@ -563,51 +407,60 @@ span[role="button"].icon-arrow.icon-arrow-right {
 /* ROW ACTION */
 .fillflow-row-action {
   position: absolute;
-  left: 100%;
-  top: 50%;
-  margin: -1rem 0 0 0.5rem;
-  background: none;
-  border: none;
+  right: 0;
+  top: 0;
   width: auto;
   height: auto;
+  padding-top: 0;
 }
 
-.fillflow-row-action span[role="button"] {
-  display: inline-block;
-  vertical-align: middle;
+.fillflow-row-action span.icon {
+  border: none;
   margin: 0;
+  height: 3.8rem;
 }
 
 /* MEDIA: specific ratio used in forms; */
 .fillflow-media {
-  border: solid 1px #c8c8c8;
-  margin: 0 0.5rem 0.5rem 0;
-  width: 8.8rem;
-  height: 8.3rem;
+  margin: 0 1rem 0.5rem 0;
+  width: 7rem;
+  height: 7rem;
   position: relative;
-  background-color: #fff;
   z-index: 0;
+  border: 1px solid #c7c7c7;
+  background-color: #fff;
+  border-radius: 7rem;
 }
+
+.fillflow-media:active {
+  color: #fff;
+  background: rgba(105,230,255,0.5);
+}
+
+.fillflow-media.with-photo:active {
+  background: none;
+}
+
 .fillflow-media p {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  margin:0;
+  padding:0;
+  left:0;
+  top: 2rem;
   text-align: center;
   z-index: -1;
 }
 
 .fillflow-media p em {
   display: block;
-  color: #777;
-  font-size: 1.3rem;
-  font-weight: bold;
-  font-style: normal;
-  margin-top: 1rem;
+  color: #858585;
+  font-size: 1.4rem;
+  font-weight: normal;
+  font-style: italic;
+  margin-top: 1.8rem;
 }
 
 .fillflow-media .edit-photo {
-  background: rgba(255, 255, 255, 0.4);
   top: 0;
   right: 5rem;
   z-index: 1;
@@ -617,15 +470,23 @@ span[role="button"].icon-arrow.icon-arrow-right {
 }
 
 .fillflow-media .edit-photo em {
-  color: #fff;
-  text-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
-  margin-top: 6rem;
+  color: #858585;
+  margin-top: 7rem;
 }
 
 .with-photo .edit-photo {
   display: block;
+  width: 7rem;
 }
 
+.fillflow-media #photo-button {
+  width: 100%;
+  height: 100%;
+  background: none;
+  margin: inherit;
+  line-height: inherit;
+  padding: 0;
+}
 
 .fillflow-media img {
   width: 100%;
@@ -634,19 +495,105 @@ span[role="button"].icon-arrow.icon-arrow-right {
   background-size: cover;
 }
 
+/* We don't need a delete button on the first section */
+.fillflow-media .img-delete-button {
+  display: none;
+}
+
 /* JUMPER */
 
 nav[data-type="scrollbar"] {
   z-index: 6;
 }
 
+nav[data-type="scrollbar"].selecting {
+  bottom: 4.2rem;
+}
+
 nav[data-type="scrollbar"] ol > li > * {
   pointer-events: none;
 }
 
-nav[data-type="scrollbar"] p img {
-  position: absolute;
-  top: 25%;
-  left: 25%;
-  width: auto;
+#groups-container.selecting {
+  height: -moz-calc(100% - 7rem);
+}
+
+.contact-checkbox {
+  left: 0 !important;
+  display: none !important;
+}
+
+.contact-checkbox-selecting {
+  display: block !important;
+}
+
+#groups-list.selecting .group-section li,
+#search-list.selecting li {
+  padding-left: 2rem;
+}
+
+form[role="dialog"].no-overlay {
+  background: none;
+  pointer-events: none;
+  position: fixed;
+}
+
+form[role="dialog"].no-overlay button {
+  pointer-events: auto;
+}
+
+#selectable-form {
+  background: none;
+}
+
+#groups-list[data-type="list"].active.selecting li:not(:active):after {
+  display:none !important;
+}
+
+html[dir="rtl"] .fillflow-row-action {
+  right: auto;
+  left: 0;
+}
+
+html[dir="rtl"] .view-body-inner,
+html[dir="rtl"] ::-moz-placeholder {
+  text-align: right;
+}
+
+#import-settings button {
+  margin: 1.5rem;
+  width: calc(100% - 3rem);
+}
+
+#contact-list-ice {
+  padding-left: 1rem
+}
+
+#contact-list-ice li {
+  display: flex;
+  align-items: baseline;
+}
+
+#contact-list-ice span {
+  width: 3rem;
+  height: 3rem;
+  background: url('/contacts/style/images/icon_ice.png') no-repeat 0 0 / 3rem auto transparent;
+}
+
+#groups-list.selecting #contact-list-ice {
+  display:none;
+}
+
+#ice-list {
+  min-height: 100%;
+  background: #FFF;
+  text-align: left;
+}
+
+.ice-contact {
+  font-size: 1.6rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 24rem;
 }

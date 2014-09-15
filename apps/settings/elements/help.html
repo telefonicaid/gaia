@@ -1,0 +1,32 @@
+<element name="help" extends="section">
+  <template>
+
+    <gaia-header action="back" data-href="#root">
+      <h1 data-l10n-id="help"></h1>
+    </gaia-header>
+
+    <div>
+      <ul>
+        <li class="support-info">
+          <span id="online-support-link" data-l10n-id="online-support"> Online Support:
+            <span id="help-online-support-text"></span>
+          </span>
+        </li>
+        <li class="support-info">
+          <span id="call-support-link" data-l10n-id="call-support"> Call Support:
+            <span id="help-call-support-numbers"></span>
+          </span>
+        </li>
+        <li>
+          <button id="user-guide" data-l10n-id="user-guide"> User Guide </button>
+        </li>
+        <li class="no-support-info description" data-l10n-id="default-support">
+          Please contact your local provider for support.
+        </li>
+      </ul>
+    </div>
+
+    <panel data-path="panels/help/panel"></panel>
+
+  </template>
+</element>

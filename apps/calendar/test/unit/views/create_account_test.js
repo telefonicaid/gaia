@@ -1,10 +1,5 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireApp('calendar/js/templates/account.js');
-  requireApp('calendar/js/presets.js');
-  requireApp('calendar/js/views/create_account.js');
-});
-
-suite('views/create_account', function() {
+suiteGroup('Views.CreateAccount', function() {
+  'use strict';
 
   var subject;
   var template;
@@ -15,12 +10,14 @@ suite('views/create_account', function() {
     el.parentNode.removeChild(el);
   });
 
-  setup(function() {
+  setup(function(done) {
     var div = document.createElement('div');
     div.id = 'test';
     div.innerHTML = [
       '<div id="create-account-view">',
-        '<button class="cancel">cancel</button>',
+        '<gaia-header id="create-account-header" action="back">',
+          '<h1>Add an account</h1>',
+        '</gaia-header>',
         '<ul id="create-account-presets"></ul>',
       '</div>'
     ].join('');
@@ -33,6 +30,19 @@ suite('views/create_account', function() {
     subject = new Calendar.Views.CreateAccount({
       app: app
     });
+
+    app.db.open(done);
+  });
+
+  teardown(function(done) {
+    testSupport.calendar.clearStore(
+      app.db,
+      ['accounts'],
+      function() {
+        app.db.close();
+        done();
+      }
+    );
   });
 
   test('#element', function() {
@@ -79,62 +89,70 @@ suite('views/create_account', function() {
   });
 
   suite('#render', function() {
-    var presets;
-
     setup(function() {
-      presets = Object.keys(Calendar.Presets);
       subject.accounts.innerHTML = '__MARKER__';
     });
 
-    test('preset marked for single use', function() {
+    suite('default calendar presets', function() {
+      var presets;
 
-      var store = app.store('Account');
-      subject.presets = {
-        'one': {
-          singleUse: true,
-          providerType: 'local'
-        },
-        'two': {
-          singleUse: true,
-          providerType: 'local'
-        }
-      };
+      setup(function(done) {
+        presets = Object.keys(Calendar.Presets);
+        subject.render();
+        subject.onrender = done;
+      });
 
-      store.presetActive = function(name) {
-        return name === 'local';
-      };
+      test('each preset is displayed', function() {
+        var html = subject.accounts.innerHTML;
 
-      subject.render();
+        assert.ok(html);
 
-      assert.ok(
-        subject.accounts.innerHTML.indexOf('__MARKER__') === -1
-      );
-
-      var html = subject.accounts.innerHTML;
-      assert.ok(html);
-      var hasLocal = (html.indexOf('local') !== -1);
-
-      assert.isFalse(
-        hasLocal,
-        'single use presets should not be displayed'
-      );
-
+        presets.forEach(function(val) {
+          assert.include(
+            html,
+            val
+          );
+        });
+      });
     });
 
-    test('dom update', function() {
-      subject.render();
+    suite('with preset marked for single use', function() {
+      setup(function(done) {
+        subject.presets = {
+          'one': {
+            singleUse: true,
+            providerType: 'local'
+          },
+          'two': {
+            singleUse: true,
+            providerType: 'local'
+          }
+        };
 
-      var html = subject.accounts.innerHTML;
+        var accountStore = app.store('Account');
 
-      assert.ok(html);
+        accountStore.persist({ preset: 'one' }, function() {
+          subject.render();
+          subject.onrender = done;
+        });
+      });
 
-      presets.forEach(function(val) {
-        assert.include(
-          html,
-          template.provider.render({ name: val })
+      test('hides used single use presets', function() {
+        assert.ok(
+          subject.accounts.innerHTML.indexOf('__MARKER__') === -1
+        );
+
+        var html = subject.accounts.innerHTML;
+        assert.ok(html);
+        var hasLocal = (html.indexOf('local') !== -1);
+
+        assert.isFalse(
+          hasLocal,
+          'single use presets should not be displayed'
         );
       });
     });
+
   });
 
 });

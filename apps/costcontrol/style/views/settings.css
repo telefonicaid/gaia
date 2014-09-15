@@ -5,28 +5,34 @@
 
 #settings-view .view-scroll {
   top: 5rem;
+  bottom: 1rem;
 }
 
 #settings-view.view {
   top: 0;
 }
-
-#settings-view .buttons-list button {
-  margin: 0;
+#settings-view label span {
+  padding-left: 0.5rem;
 }
 
-#mobile-data-usage span,
-#wifi-data-usage span {
-  font-size: 1.3rem;
-  font-weight: normal;
+
+/* low limit */
+.low-limit-container {
+  padding-top: 1rem;
+  width: 100%;
 }
 
-#mobile-data-usage span.usage,
-#wifi-data-usage span.usage {
-  font-size: 1.7rem;
-  font-weight: bold;
+.low-limit-container input {
+  text-align: right;
 }
 
-#close-settings {
-  width: 8.5rem;
+.low-limit-container span {
+  padding: 0 0 1rem 1rem
+}
+
+/* Settings view data usage */
+#wifi-data-usage {
+  line-height: 20px;
+  font-size: 18px;
+  color: #333;
 }

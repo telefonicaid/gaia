@@ -1,16 +1,17 @@
-
+/* global _, CostControl, ConfigManager, debug, Formatting, SimManager */
 /*
  * The telephony tab is in charge of show telephony and billing cycle
  * information.
  *
  * It has two areas of drawing: one for the counters and another for
  */
-
+'use strict';
 
 var TelephonyTab = (function() {
-  'use strict';
   var costcontrol, initialized = false;
   var view, smscount, calltime, time, resetDate;
+  var telephonyPeriod = { begin: null, end: null };
+
   function setupTab() {
     if (initialized) {
       return;
@@ -29,10 +30,16 @@ var TelephonyTab = (function() {
       window.addEventListener('localized', localize);
 
       // Configure updates
-      document.addEventListener('mozvisibilitychange', updateWhenVisible, true);
+      document.addEventListener('visibilitychange', updateWhenVisible, true);
       ConfigManager.observe('lastTelephonyActivity', updateCounters, true);
       ConfigManager.observe('lastTelephonyReset', updateUI, true);
       ConfigManager.observe('nextReset', updateNextReset, true);
+
+      // Timeformat
+      window.addEventListener('timeformatchange', function () {
+        updateTimePeriod(
+          telephonyPeriod.begin, null, null, telephonyPeriod.end);
+      });
 
       updateUI();
       initialized = true;
@@ -50,7 +57,7 @@ var TelephonyTab = (function() {
       return;
     }
 
-    document.removeEventListener('mozvisibilitychange', updateWhenVisible);
+    document.removeEventListener('visibilitychange', updateWhenVisible);
     ConfigManager.removeObserver('lastTelephonyActivity', updateCounters);
     ConfigManager.removeObserver('lastTelephonyReset', updateUI);
     ConfigManager.removeObserver('nextReset', updateNextReset);
@@ -59,37 +66,41 @@ var TelephonyTab = (function() {
   }
 
   function updateWhenVisible() {
-    if (!document.mozHidden && initialized) {
+    if (!document.hidden && initialized) {
       updateUI();
     }
   }
 
   function updateUI() {
     var requestObj = { type: 'telephony' };
-    ConfigManager.requestSettings(function _onSettings(settings) {
-      costcontrol.request(requestObj, function _afterRequest(result) {
-        var telephonyActivity = result.data;
-        debug('Last telephony activity:', telephonyActivity);
-        updateTimePeriod(settings.lastTelephonyReset, null, null, settings);
-        updateCounters(telephonyActivity);
-        updateNextReset(settings.nextReset, null, null, settings);
+    SimManager.requestDataSimIcc(function(dataSimIcc) {
+      ConfigManager.requestSettings(dataSimIcc.iccId,
+                                    function _onSettings(settings) {
+        costcontrol.request(requestObj, function _afterRequest(result) {
+          var telephonyActivity = result.data;
+          debug('Last telephony activity:', telephonyActivity);
+          updateTimePeriod(settings.lastTelephonyReset, null, null, settings);
+          updateCounters(telephonyActivity);
+          updateNextReset(settings.nextReset, null, null, settings);
+        });
       });
     });
   }
 
   function updateTimePeriod(lastReset, old, key, settings) {
-    time.innerHTML = formatTimeHTML(lastReset,
-                                    settings.lastTelephonyActivity.timestamp);
-
+    telephonyPeriod.begin = lastReset;
+    telephonyPeriod.end = settings.lastTelephonyActivity.timestamp;
+    time.innerHTML = '';
+    time.appendChild(Formatting.formatTimeHTML(lastReset, telephonyPeriod.end));
   }
 
   function updateCounters(activity) {
-    smscount.innerHTML = _('magnitude', {
+    smscount.textContent = _('magnitude', {
       value: activity.smscount,
       unit: 'SMS'
     });
-    calltime.innerHTML = _('magnitude', {
-      value: computeTelephonyMinutes(activity),
+    calltime.textContent = _('magnitude', {
+      value: Formatting.computeTelephonyMinutes(activity),
       unit: 'min.'
     });
   }
@@ -100,10 +111,9 @@ var TelephonyTab = (function() {
       billingCycle.setAttribute('aria-hidden', true);
     } else {
       billingCycle.setAttribute('aria-hidden', false);
-      var dateFormatter = new navigator.mozL10n.DateTimeFormat();
-      var content = dateFormatter.localeFormat(settings.nextReset,
-        _('short-date-format'));
-      resetDate.innerHTML = content;
+      var content = Formatting.getFormattedDate(settings.nextReset,
+                                                _('short-date-format'));
+      resetDate.textContent = content;
     }
   }
 

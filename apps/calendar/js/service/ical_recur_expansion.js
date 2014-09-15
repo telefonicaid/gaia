@@ -1,5 +1,7 @@
-Calendar.ns('Service').IcalRecurExpansion = {
+/* global ICAL */
+'use strict';
 
+Calendar.ns('Service').IcalRecurExpansion = {
   /**
    * Maximum iterations must be > 0 && < Infinity.
    * Lower values are probably better as we can show progress
@@ -82,8 +84,9 @@ Calendar.ns('Service').IcalRecurExpansion = {
     do {
       current = iterator.next();
 
-      if (!current)
+      if (!current) {
         break;
+      }
 
       if (!min || current.compare(min) > 0) {
         // sent should be inside the loop to guard against

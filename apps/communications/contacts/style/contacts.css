@@ -1,24 +1,19 @@
+@import url("root.css");
+
 /* Contact detail header */
 .contact-header {
   margin: -1.4rem -2rem 1rem;
 }
 
 /* Fav star in header */
-section[role="region"] > header:first-child sup {
-  background: url(/contacts/style/gphx/bitmap/default/vw-header/icons/fav-star.png) no-repeat center center;
-  background-size: 100% auto;
-  width: 1.2rem;
-  height: 3.2rem;
-  vertical-align: text-top;
-  text-indent: 100%;
-  overflow: hidden;
-  position: relative;
-  float: left;
-  top: 0;
+#contact-name-title.favorite {
+  background: url(/contacts/style/gphx/bitmap/default/vw-header/icons/fav-star.png) no-repeat right 1rem / 3rem;
+  padding-right: 3rem;
+  margin-right: -1rem;
 }
 
-section[role="region"] > header:first-child .icon.icon-edit-contact {
-  background: url(images/edit-contact.png) no-repeat center center;
+section[role="region"] > gaia-header .icon.icon-edit-contact {
+  background-image: url(images/edit-contact.png);
 }
 
 .contact-header img {
@@ -33,21 +28,21 @@ section[role="region"] > header:first-child .icon.icon-edit-contact {
 }
 
 .view-contacts-list .view-body-inner {
-  padding-left: 1.5rem;
-}
-
-#contact-name-title {
-  max-width: 22rem;
-  float: left;
+  padding-left: 0;
 }
 
 /* Contact detail main section */
 
 .view-contact-profile .view-body {
-  position: relative;
   overflow-x: hidden;
   overflow-y: auto;
-  background-color: #f5f5f5;
+  will-change: scroll-position;
+
+  background: #fff;
+}
+
+.view-contact-profile .view-body-inner {
+  will-change: transform;
 }
 
 .view-contact-profile #cover-img {
@@ -56,8 +51,13 @@ section[role="region"] > header:first-child .icon.icon-edit-contact {
   left: 0;
   width: 100%;
   height: 100%;
-  background: transparent no-repeat;
+  background: #fff no-repeat;
   background-size: 100% auto;
+  transform: translateY(0);
+  will-change: transform;
+}
+
+.view-contact-profile #cover-img.translated {
   transform: translateY(-7rem);
 }
 
@@ -83,11 +83,15 @@ section[role="region"] > header:first-child .icon.icon-edit-contact {
 .view-contact-profile .view-body-inner {
   position: relative;
   padding: 0 1.5rem;
-  background: #f5f5f5;
+  background: #fff;
   overflow: visible;
   width: 100%;
   min-height: calc(100% - 8rem);
   -moz-box-sizing: border-box;
+  transform: translateY(0);
+}
+
+.view-contact-profile .view-body-inner.translated {
   transform: translateY(8rem);
 }
 
@@ -100,7 +104,7 @@ section[role="region"] > header:first-child .icon.icon-edit-contact {
 }
 
 .view-contact-profile .view-body-inner:not(.no-photo):after {
-  background: url(images/shadow_1px.png) repeat-x;
+  background: url(images/shadow_1px.png) repeat-x bottom / auto 0.8rem;
   content: "";
   display: block;
   height: 0.8rem;
@@ -111,69 +115,90 @@ section[role="region"] > header:first-child .icon.icon-edit-contact {
 }
 
 .view-contact-profile .view-body-inner.no-photo {
-  transform: translateY(0);
   min-height: 100%;
 }
 
 .view-contact-profile .view-body-inner .comment-notes {
-  font-family: MozTT;
   font-weight: 600;
   font-size: 1.3rem;
   line-height: 1.3em;
   white-space: pre-wrap;
 }
 
+#contactsManagement li:first-child {
+  margin-top: 1rem;
+}
+
 #contact-detail h1 {
-  font: 1.4rem/1.5em MozTT, Sans-serif;
-  font-weight: 600;
-  border-bottom: solid 1px #dbd9d9;
-  margin-bottom: 1rem;
-  padding-bottom: 0.55rem;
+  font-size: 1.6rem;
+  line-height: 1.8em;
+  font-weight: 400;
+  margin: 0 1.5rem 1rem;
+  color: #333;
   word-wrap: break-word;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-#contact-detail li .item-body-exp {
-  padding-bottom: 1rem;
-}
-
-#contact-detail li button {
-  margin: 0;
-}
-
 #contact-detail .social-actions button {
   margin-bottom: 1rem;
 }
 
+.calls-disabled li[data-phone] button.call-action {
+  pointer-events: none;
+}
 
-#contact-detail h2 {
-  text-transform: uppercase;
-  font-size: 1.4rem;
+#contact-detail .duplicate-actions button {
+  margin-bottom: 1rem;
 }
 
 .block-item > * {
   pointer-events: none;
 }
 
+.view:not(.current) {
+  visibility: hidden;
+}
+
 /* Edit contact section */
+.view-edit-contact,
+.view-edit-contact form li {
+  background: transparent;
+}
+
+.view-edit-contact form li {
+  padding-right: 1rem;
+  padding-left: 1rem;
+}
+
+.view-edit-contact form li.closed {
+  height: 4.5rem;
+  background-color: transparent;
+  border: 0;
+}
+.view-edit-contact form li.closed > section {
+  display: none;
+}
+
+.item.first {
+  width: 30rem;
+  padding: 1rem 1rem 0 1rem;
+}
+
 .view-edit-contact .tail-actions {
-  padding-top: 0.7rem;
-  margin: 1rem 0 2rem;
-  border-top: solid 0.1rem #dbdbdb;
+  margin: 4rem 0 1rem 0;
+  width: 100%;
+  text-align: center;
 }
 
 .view-edit-contact form li > section {
   padding: 0;
   border: none;
 }
+
 .view-edit-contact form li > section.first {
   margin: 0;
-}
-
-.view-edit-contact form li {
-  margin-right: 3rem;
 }
 
 .view-edit-contact form li > section{
@@ -184,81 +209,58 @@ section[role="region"] > header:first-child .icon.icon-edit-contact {
   position: relative;
 }
 
-.view-edit-contact form li section + button {
-  margin-top: -0.7rem;
-  border-radius: 0 0 0.4rem 0.4rem;
+.view-edit-contact form li fieldset {
+  /* li already has a 0.5 padding */
+  margin-top: 1rem;
+  overflow: visible;
+  width: 25rem;
 }
 
-.view-edit-contact form li section + button:after {
-  display: none;
+.two_fields {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
 }
 
-#contact-detail-inner h1 {
-  padding-left: 0.5rem;
+.two_fields > :first-child {
+  margin-right: 1rem;
+  width: 12rem;
 }
 
-#contact-detail-inner h2 {
-  margin-left: 0.5rem;
+.two_fields > :nth-child(2) {
+  width: 12rem;
 }
 
 .view-edit-contact .fillflow-row-action {
-  width: 5rem;
-  height: 5rem;
-  margin: -2.5rem 0 0 0;
+  width: 4rem;
+  height: 4rem;
 }
 
-.view-edit-contact .fillflow-row-action:after {
-  display: none;
+.view-edit-contact .fillflow-row-action {
+  width: 4rem;
+  height: 4rem;
 }
 
-.view-edit-contact .fillflow-row-action:active {
-  background: none;
-}
-
-/* FB info (non-editable) */
-.view-edit-contact .facebook fieldset {
-  border-color: #255c95;
-  background: #cbd4df;
-  color: #969696;
-}
-
-.view-edit-contact .facebook fieldset legend,
-.view-edit-contact .facebook fieldset input {
-  color: #969696;
-}
-
-.view-edit-contact .facebook fieldset section {
-  border-left-color: #255c95;
-}
-
-.view-edit-contact .facebook fieldset section p {
-  border-bottom-color: #255c95;
+#contacts-form-notes .setbox {
+  width: calc(100% - 5rem);
 }
 
 hr {
   background-color: #BCBCBC;
   border: 0;
-  height: 1px;
+  height: 0.1rem;
 }
 
 /* Overriding Input areas BB */
 form p input + button[type="reset"].hide,
 form p textarea + button[type="reset"].hide {
-  display: block!important;
+  display: block !important;
   opacity: 0;
   pointer-events: none;
 }
 
-fieldset legend.action {
-  padding-right: 1.8rem;
-}
-
-fieldset legend.action:after {
-  right: 1rem;
-}
-
 /* Favorites handling */
-#group-favorites abbr, .fixed-title abbr {
+#group-favorites abbr {
   background: url(gphx/bitmap/default/lists/favorites.png);
   display: block;
   background-size: 100% auto;
@@ -303,42 +305,41 @@ fieldset legend.action:after {
   background-image: url(images/f_logo.png) !important;
 }
 
-.icon-social.icon-tw {
-  background-image: url(images/tw_logo2.png) !important;
-}
-
 .icon-social.notorg {
   margin-left: 0 !important;
 }
 
-#contact-detail p > strong {
-  font-size: 1.4rem;
+#contact-detail p > strong,
+.action-block b,
+.comment-notes {
+  font-size: 1.6rem;
+  font-weight: normal;
+  padding: 0 1.5rem 1.5rem;
+  display: block;
 }
 
-/* MARK AS REMOVED */
+/* MARK AS Facebook */
 
-.removed {
+.facebook {
   border-color: #c8c8c8;
   opacity: 0.85;
 }
 
-.removed fieldset, .removed legend, .removed input {
+.facebook fieldset {
+  margin-left: 4rem;
+}
+
+.facebook fieldset, .facebook legend, .facebook input {
   background-color: transparent;
   color: #ccc;
   pointer-events: none;
 }
 
-.removed legend.action:after {
+.facebook legend.action:after {
   border-top-color: #666;
 }
 
-.removed button span.icon-delete {
-  background-image: url("/contacts/style/gphx/bitmap/default/forms/undo.png");
-}
-
 .with-photo {
-  padding-right: 5rem;
-  border:1px solid #C8C8C8;
   background: none;
 }
 
@@ -351,38 +352,69 @@ fieldset legend.action:after {
 }
 
 .view-edit-contact .with-photo .fillflow-row-action {
-  margin-left: -5rem;
-}
-
-/* Contacts in comms application */
-@media screen and (max-height: 450px) and (min-height: 420px) {
- nav[data-type="scrollbar"] li {
-  font-size: 1.05rem;
-  line-height: 1.23rem;
- }
+  right: 0;
+  width: 5rem;
+  z-index: 10;
+  border-radius: 0;
+  background: none;
 }
 
 /* SETTINGS */
-section[role="region"] > header .icon.icon-settings
-     { background-image: url(/contacts/style/gphx/bitmap/default/vw-header/icons/settings.png); }
 
+#import-settings ul {
+  padding: 0;
+}
+
+/**
+ * 1. Hide label text. !important required
+ *    to override high specificity of scoped
+ *    stylesheets. When `::content` selector
+ *    lands, we won't need this any more.
+ */
+
+gaia-header [data-icon] {
+  font-size: 0 !important; /* 1 */
+}
+
+#view-settings {
+  z-index: 101;
+}
+
+#ice-settings .view-body-inner,
 #view-settings .view-body-inner {
   padding: 0;
 }
 
+#view-settings .view-body-inner,
+#import-settings .view-body-inner,
+#view-contact-form .view-body-inner {
+  background: #f4f4f4;
+}
+#view-contact-form #thumbnail-photo {
+  background-color: transparent;
+  border-radius: 7rem;
+}
+
 /* Order switch */
+#view-settings [data-type="list"] li#settingsOrder {
+  display: flex;
+  justify-content: space-between;
+}
 #view-settings [data-type="list"] li#settingsOrder aside {
   pointer-events: none;
+  align-self: flex-end;
 }
 
 /* Cutom FB item */
 #view-settings [data-type="list"] .fb-item {
   height: auto;
-  min-height: 6rem;
+  border-bottom: none;
+  display: flex;
+  flex-direction: column;
 }
 
 #view-settings [data-type="list"] .fb-item p {
-  padding-left: 3.3rem;
+  padding-left: 4.3rem;
 }
 
 #view-settings [data-type="list"] .fb-item p span {
@@ -391,13 +423,18 @@ section[role="region"] > header .icon.icon-settings
 }
 
 #view-settings [data-type="list"] .fb-item p:first-of-type {
-  background: url(/contacts/style/fb/profile_icon.png) no-repeat left calc(50% + 0.5rem);
+  background: url(/contacts/style/images/f_logo.png) no-repeat 0.5rem calc(50% + 0.5rem) / 3rem;
+  height: 3rem;
+  line-height: 3rem;
 }
 
 #view-settings [data-type="list"] .fb-item aside {
   width: 6.5rem;
   height: 6rem;
   pointer-events: none;
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 #view-settings [data-type="list"] .fb-item aside label {
@@ -417,25 +454,53 @@ section[role="region"] > header .icon.icon-settings
   opacity: 0.3;
 }
 
+#fb-update-option {
+  height: auto;
+  margin: 1rem 0;
+}
 
+/* We are going to update the panels with conditional css */
+#import-settings.export #import-options{
+  display: none;
+}
 
-/* Extending BB lists components*/
-#view-settings [data-type="list"] li aside {
+#import-settings.import #export-options{
+  display: none;
+}
+
+#import-settings [data-type="list"] li {
+  border-bottom: none;
+  height: auto;
+}
+
+#import-settings [data-type="list"] li .error-message {
+  display: none;
+}
+
+#import-settings [data-type="list"] li.error .error-message {
+  display: block;
+  line-height: 2rem;
+  margin-top: -1.5rem;
+  color: #5B5B5B;
+  font-size: 1.5rem;
+  height: auto;
+  white-space: normal;
+}
+
+/* Extending BB styles */
+
+#import-settings [data-type="list"] li aside {
   pointer-events: auto;
 }
 
-#view-settings [data-type="list"] li aside label {
+#import-settings [data-type="list"] li aside label {
   height: 100%;
   width: 6.5rem;
 }
 
 /* Extending BB buttons Icons at left side*/
-#view-settings [data-type="list"] li button {
-  margin: 1rem 0;
-}
-
 #view-settings [data-type="list"] li button.icon {
-  padding: 0 1rem 0 4rem;
+  padding: 1.2rem 1.3rem 1.2rem 4rem;
 }
 
 #view-settings [data-type="list"] li button.icon:before {
@@ -443,13 +508,111 @@ section[role="region"] > header .icon.icon-settings
   left: 0.5rem;
 }
 
-/* Extending icon types*/
-#view-settings [data-type="list"] li button.icon-sim:before {
-  background-image: url(/contacts/style/images/import_SIM.png);
-  background-size: 1.6rem;
+#view-settings [data-type="list"] li button.icon[disabled="disabled"]:before {
+  opacity: 0.2;
 }
 
+#import-settings [data-type="list"] li button.icon {
+  padding: 1rem 1.3rem 1rem 4rem;
+}
 
+#import-settings [data-type="list"] li button.icon:before {
+  right: auto;
+  left: 0.5rem;
+}
+
+#import-settings [data-type="list"] li button.icon[disabled="disabled"]:before {
+  opacity: 0.2;
+}
+
+/* Extending icon types for view settings & import-settings*/
+#view-settings [data-type="list"] li button.icon-import:before {
+  background-image: url(/contacts/style/images/import_contacts.png);
+}
+#view-settings [data-type="list"] li button.icon-export:before {
+  background-image: url(/contacts/style/images/export_contacts.png);
+}
+
+#import-settings [data-type="list"] li button.icon:before {
+  background-size: 3rem;
+}
+#import-settings [data-type="list"] li button.icon-sim:before {
+  background-image: url(/contacts/style/images/import_SIM.png);
+}
+#import-settings [data-type="list"] li button.icon-sd:before {
+  background-image: url(/contacts/style/images/import_sd.png);
+}
+
+#import-settings [data-type="list"] li button.icon-gmail:before {
+  background-image: url(/contacts/style/images/gmail_icon.png);
+}
+
+#import-settings [data-type="list"] li button.icon-live:before {
+  background-image: url(/contacts/style/images/outlook_icon.png);
+}
+
+#import-settings [data-type="list"] li button.icon-bluetooth:before {
+  background-image: url(/contacts/style/images/bluetooth_icon.png);
+}
+
+#ice-settings .ice-contacts-switch {
+  display: flex;
+  justify-content: space-between;
+}
+#ice-settings .ice-contacts-switch aside {
+  align-self: flex-end;
+}
+
+#ice-settings li button,
+#view-settings li button {
+  line-height: 1.9rem;
+}
+
+#view-settings button p {
+  display: block;
+  font-size: 1.3rem;
+  line-height: 1.9rem;
+  color: #858585;
+  padding: 0;
+}
+
+#ice-settings p.description {
+  font-size: 1.6rem;
+  padding: 1.5rem;
+}
+
+#view-settings button p span {
+  font-size: 1.3rem;
+}
+
+#view-settings button p time {
+  font-size: 1.3rem;
+  display: inline-block;
+  margin: 0 0 0 0.5rem;
+}
+
+#import-settings li button {
+  height: 5.5rem;
+  line-height: 1.9rem;
+}
+
+#import-settings button p {
+  display: block;
+  font-size: 1.3rem;
+  line-height: 1.9rem;
+  color: #858585;
+  padding: 0;
+}
+
+#import-settings button p span {
+  font-size: 1.3rem;
+}
+
+#import-settings button p time {
+  font-size: 1.3rem;
+  display: inline-block;
+  margin: 0 0 0 0.5rem;
+}
 /* Error message */
 #view-settings .view-body-inner .fb-error {
   color: #D1323F;
@@ -461,7 +624,7 @@ section[role="region"] > header .icon.icon-settings
 
 .result {
   display: block;
-  min-height: 0rem !important;
+  min-height: 0 !important;
   text-align: center;
   height: 5rem;
   line-height: 5rem;
@@ -470,45 +633,30 @@ section[role="region"] > header .icon.icon-settings
 /* No Contacts */
 
 #no-contacts {
-  background: url(/contacts/style/images/contact_big_icon.png) no-repeat center center #FFFFFF;
+  background: #FFF url(/contacts/style/images/contact_big_icon.png) no-repeat center center / 15.3rem;
   height: 100%;
   position: absolute;
   width: 100%;
   z-index: 11;
   color: #000;
-  text-align: left;
+  text-align: initial;
 }
 
 #no-contacts .info {
-  border-top: 1px solid rgba(96, 96, 96, 0.5);
+  border-top: 0.1rem solid rgba(96, 96, 96, 0.5);
   color: #606060;
   font-size: 2rem;
-  font-weight: lighter;
-  margin: 15rem 4rem 0;
+  font-weight: 300;
+  margin: 16rem 2rem 0;
+  padding: 1rem;
 }
 
-#no-contacts .info p {
-  margin-top: 1rem;
+#no-contacts p {
+  margin-bottom: 1rem;
 }
 
 #no-contacts p.small {
-  font-size: 1.35rem;
-  font-weight: lighter;
-  margin: 1.5rem 10rem 0 4rem;
-}
-
-#no-contacts .arrow {
-  position: absolute;
-}
-
-#no-contacts .small.arrow {
-  background: url("/contacts/style/images/arrow_small.png") no-repeat scroll 93% 0.5rem transparent;
-}
-
-#no-contacts .big.arrow {
-  background: url("/contacts/style/images/arrow_big.png") no-repeat scroll 93% 0.5rem transparent;
-  height: 5rem;
-  padding-top: 3.5rem;
+  font-size: 1.6rem;
 }
 
 #statusMsg {
@@ -523,26 +671,235 @@ section[role="region"] > header .icon.icon-settings
   z-index: 1001;
 }
 
-.remark {
-  color: #d20000;
+#sources {
+  margin-top: 1rem;
 }
 
-.valueselector {
-  position: fixed;
-  top: -100%;
-  left: -100%;
+#sources > li {
+  border-bottom: none;
+  height: auto;
+}
+
+#groups-container-box {
+  width: 100%;
+  overflow: hidden;
+}
+
+#groups-container {
+  height: 100%;
+  overflow: scroll;
+}
+
+/* Bug 967274 - Background doesn't scroll with the contacts causing
+ * expensive over-invalidation
+ */
+#groups-container-background {
+  background-color: #fff;
+}
+
+.group-section {
+  padding-left: 1.5rem;
+}
+
+.datetime {
+  /* pass the events from <span> to <input> */
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 1.5rem;
+  right: 2rem;
+  line-height: 4rem;
+  font-size: 1.6rem;
+  font-weight: normal;
+  color: #333;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.datetime + input[type="date"] {
+  font-size: 0;
+}
+
+.placeholder {
+  color: #858585;
+}
+
+
+.hidden-input {
+  /* visibility: hidden; will avoid events to reach the <input> */
   opacity: 0;
 }
 
-#no-sim {
-  color: #5B5B5B;
-  font-size: 1.5rem;
-  line-height: 2rem;
-  margin: -0.2rem 0 0.6rem;
-  padding: 0;
-  white-space: normal;
+form[role="dialog"][data-type="edit"] gaia-header {
+  transform: translateY(-5rem);
 }
 
-#settingsSIM {
-  height: auto;
+form[role="dialog"][data-type="edit"] > menu {
+  transform: translateY(110%);
+}
+
+form[role="dialog"][data-type="edit"].contacts-select.in-edit-mode gaia-header,
+form[role="dialog"][data-type="edit"].contacts-select.in-edit-mode > menu {
+  transition: 0s;
+}
+
+form[role="dialog"][data-type="edit"].contacts-select:not(.insearchmode) > menu {
+  transform: translateY(0);
+}
+
+form[role="dialog"][data-type="edit"].contacts-select:not(.insearchmode) gaia-header {
+  transform: translateY(0);
+}
+
+[data-type='list'] .contact-item > aside > span:before {
+  content: attr(data-group);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  color: #fff;
+  font-size: 2.2rem;
+  font-style: italic;
+  line-height: 5rem;
+  text-align: center;
+}
+
+[data-type="list"] .contact-item > aside > span {
+  position: relative;
+  display: none;
+}
+
+/* Photo by default redefines the background property */
+[data-type="list"] .contact-item > aside > span[data-group] {
+  background: url(images/Imagery.png) no-repeat 50% 50% / 7rem auto;
+}
+
+/* Photo by default is displayed when it is visited by image loader component */
+[data-type="list"] .contact-item[data-visited="true"] > aside > span {
+  display: block;
+}
+
+html[dir="rtl"] #no-contacts .icon {
+  padding-right: 3.5rem;
+  padding-left: 0;
+}
+
+html[dir="rtl"] #no-contacts .create.icon,
+html[dir="rtl"] #no-contacts .import.icon {
+  background-position: 100% 50%;
+}
+
+nav[data-type="scrollbar"] li .pack-icon-ice {
+  width: 1.2rem;
+  height: 1.2rem;
+  font-size: 0;
+  vertical-align: middle;
+  background: transparent no-repeat center center / 1.2rem;
+  background-image: url("/contacts/style/images/ice_small.png");
+}
+
+html[dir="rtl"] #no-contacts .icon {
+  padding-right: 3.5rem;
+  padding-left: 0;
+}
+
+html[dir="rtl"] #no-contacts .create.icon,
+html[dir="rtl"] #no-contacts .import.icon {
+  background-position: 100% 50%;
+}
+
+fieldset legend {
+  font-size: 1.6rem;
+  background-color: #f2f2f2;
+  border: 1px solid #c7c7c7;
+  color: #363636;
+}
+
+form[role="combobox"] span[data-field="type"] {
+  color: rgb(24,191,239);
+}
+
+.field-template {
+  display: flex;
+  border-radius: 15px 0 0;
+  background-color: #fff;
+  border: 1px solid #e7e7e7;
+}
+
+/* Add separation between templates */
+.field-template + .field-template {
+  margin-top: 1rem;
+}
+
+.img-delete-button {
+  padding: 0;
+  margin: 0.2rem 1rem 0 0.2rem;
+  width: 2.8rem;
+  color: #fff;
+  background: url('images/icon_remove.png') no-repeat scroll 0 0 / 3rem auto transparent;
+  border: 0;
+  -moz-user-select: none;
+}
+
+.img-delete-button:active {
+  background: url('images/icon_remove.png') no-repeat scroll 0 0 / 3rem auto transparent;
+}
+
+.view-edit-contact form li > section > div {
+  display: block;
+  width: 30rem;
+}
+
+.view-edit-contact form li > section > div.empty {
+  display: none;
+}
+
+.action-add {
+  background: transparent;
+  border: 0;
+  font-style: normal;
+  font-size: 1.8rem;
+  color: #5f5f5f;
+  height: 5rem;
+  vertical-align: middle;
+  padding-left: 4rem;
+  margin: 0;
+}
+
+.action-add[disabled] {
+  background: transparent;
+}
+
+.note-template dl {
+  margin-top: 1rem;
+}
+
+.note-template input {
+  height: 9rem;
+  border: 1px solid #c7c7c7;
+}
+
+.action-delete {
+  width: 29rem;
+  height: 4rem;
+  background-color: #e51e1e;
+  font-size: 1.6rem;
+  font-style: italic;
+  font-weight: unset;
+}
+
+#groups-list {
+  margin-top: 1rem;
+}
+
+#group-favorites {
+  padding-top: 2rem;
+}
+
+.tagItem,
+.textfield.tagItem {
+  margin: 1rem;
+  width: calc(100% - 2rem);
 }

@@ -2,21 +2,32 @@
   "name": "Music",
   "description": "Gaia Music",
   "type": "certified",
-  "launch_path": "/index.html",
+  "launch_path": "/index.html#mix",
   "developer": {
     "name": "The Gaia Team",
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
+    "storage":{},
     "device-storage:music":{ "access": "readwrite" },
     "settings":{ "access": "readonly" },
     "deprecated-hwvideo":{},
-    "audio-channel-content":{}
+    "bluetooth":{},
+    "audio-channel-content":{},
+    "nfc":{ "access": "readwrite" }
   },
   "activities": {
+    "pick": {
+      "filters": {
+        "type": ["audio/*", "audio/mpeg", "audio/ogg", "audio/mp4"]
+       },
+      "disposition": "inline",
+      "returnValue": true,
+      "href": "/index.html#pick"
+    },
     "open": {
       "filters": {
-        "type": ["audio/mpeg", "audio/ogg", "audio/mp4"]
+        "type": ["audio/mpeg", "audio/ogg", "audio/mp4", "audio/amr"]
        },
       "disposition": "inline",
       "returnValue": true,
@@ -43,8 +54,14 @@
   },
   "default_locale": "en-US",
   "icons": {
-    "120": "/style/icons/Music.png",
-    "60": "/style/icons/60/Music.png"
+    "84": "/style/icons/music_84.png",
+    "126": "/style/icons/music_126.png",
+    "142": "/style/icons/music_142.png",
+    "189": "/style/icons/music_189.png",
+    "284": "/style/icons/music_284.png"
   },
-  "orientation": "portrait-primary"
+  "orientation": "default",
+  "messages": [
+     { "media-button": "/index.html#mix" }
+  ]
 }

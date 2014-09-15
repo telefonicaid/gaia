@@ -3,6 +3,9 @@
 
 'use strict';
 
+/* global StatusBar */
+/* global KeyboardManager */
+
 // The modal dialog listen to mozbrowsershowmodalprompt event.
 // Blocking the current app and then show cutom modal dialog
 // (alert/confirm/prompt)
@@ -40,9 +43,20 @@ var ModalDialog = {
   },
 
   // Save the events returned by mozbrowsershowmodalprompt for later use.
-  // The events are stored according to webapp origin
-  // e.g., 'http://uitest.gaiamobile.org': evt
+  // The events are stored according to webapp origin and in some edge cases
+  // (in particular related to system messages) we have to handle multiple
+  // events for one origin, so we queue them.
+  // e.g., 'http://uitest.gaiamobile.org': [evt]
   currentEvents: {},
+
+  get eventForCurrentOrigin() {
+    var originEvents = this.currentEvents[this.currentOrigin];
+    if (originEvents && originEvents.length) {
+      return originEvents[0];
+    }
+
+    return null;
+  },
 
   init: function md_init() {
     // Get all elements initially.
@@ -50,8 +64,6 @@ var ModalDialog = {
     var elements = this.elements;
 
     // Bind events
-    window.addEventListener('mozbrowsershowmodalprompt', this);
-    window.addEventListener('appopen', this);
     window.addEventListener('appwillclose', this);
     window.addEventListener('appterminated', this);
     window.addEventListener('resize', this);
@@ -72,22 +84,6 @@ var ModalDialog = {
   handleEvent: function md_handleEvent(evt) {
     var elements = this.elements;
     switch (evt.type) {
-      case 'mozbrowsershowmodalprompt':
-        var frameType = evt.target.dataset.frameType;
-        if (frameType != 'window' && frameType != 'inline-activity')
-          return;
-
-        evt.preventDefault();
-        var origin = evt.target.dataset.frameOrigin;
-        this.currentEvents[origin] = evt;
-
-        // Show modal dialog only if
-        // the frame is currently displayed.
-        if (origin == WindowManager.getDisplayedApp() ||
-            frameType == 'inline-activity')
-          this.show(evt.target, origin);
-        break;
-
       case 'click':
         if (evt.currentTarget === elements.confirmCancel ||
           evt.currentTarget === elements.promptCancel ||
@@ -107,103 +103,122 @@ var ModalDialog = {
       case 'home':
       case 'holdhome':
         // Inline activity, which origin is different from foreground app
-        if (this.isVisible() &&
-            this.currentOrigin != WindowManager.getDisplayedApp())
+        if (this.isVisible()) {
           this.cancelHandler();
+        }
         break;
 
       case 'appwillclose':
         // Do nothing if the app is closed at background.
-        if (evt.detail.origin !== this.currentOrigin)
+        if (evt.detail.origin !== this.currentOrigin) {
           return;
+        }
 
         // Reset currentOrigin
         this.hide();
         break;
 
       case 'appterminated':
-        if (this.currentEvents[evt.detail.origin])
+        if (this.currentEvents[evt.detail.origin]) {
           delete this.currentEvents[evt.detail.origin];
+        }
 
         break;
 
       case 'resize':
       case 'keyboardhide':
-        if (!this.currentOrigin)
+        if (!this.currentOrigin) {
           return;
+        }
 
         this.setHeight(window.innerHeight - StatusBar.height);
         break;
 
       case 'keyboardchange':
-        this.setHeight(window.innerHeight -
-          evt.detail.height - StatusBar.height);
+        var keyboardHeight = KeyboardManager.getHeight();
+        this.setHeight(window.innerHeight - keyboardHeight - StatusBar.height);
         break;
     }
   },
 
+  processNextEvent: function md_processNextEvent() {
+    var originEvents = this.currentEvents[this.currentOrigin];
+
+    originEvents.splice(0, 1);
+
+    if (originEvents.length) {
+      this.show(null, this.currentOrigin);
+      return;
+    }
+
+    delete this.currentEvents[this.currentOrigin];
+  },
+
   setHeight: function md_setHeight(height) {
-    if (this.isVisible())
+    if (this.isVisible()) {
       this.overlay.style.height = height + 'px';
+    }
   },
 
   // Show relative dialog and set message/input value well
   show: function md_show(target, origin) {
-    if (!(origin in this.currentEvents))
+    if (!(origin in this.currentEvents)) {
       return;
+    }
 
-    var _ = navigator.mozL10n.get;
-    var evt = this.currentEvents[origin];
     this.currentOrigin = origin;
+    var evt = this.eventForCurrentOrigin;
 
     var message = evt.detail.message || '';
+    var title = evt.detail.title || '';
     var elements = this.elements;
     this.screen.classList.add('modal-dialog');
 
-    function escapeHTML(str) {
-      var stringHTML = str;
-      stringHTML = stringHTML.replace(/\</g, '&#60;');
-      stringHTML = stringHTML.replace(/(\r\n|\n|\r)/gm, '<br/>');
-      stringHTML = stringHTML.replace(/\s\s/g, ' &nbsp;');
-
-      return stringHTML.replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
-    }
-
     var type = evt.detail.promptType || evt.detail.type;
-    if (type !== 'selectone') {
-      message = escapeHTML(message);
+
+    // XXX: Bug 916658 - Remove unused l10n resources from b2g gecko
+    // If we have removed translations from Gecko, then we can remove this.
+    if (target && target.dataset.frameType === 'window') {
+      title = '';
     }
 
     switch (type) {
       case 'alert':
-        elements.alertMessage.innerHTML = message;
+        elements.alertMessage.setAttribute('data-l10n-id', message);
         elements.alert.classList.add('visible');
-        this.setTitle('alert', '');
-        elements.alertOk.textContent = evt.yesText ? evt.yesText : _('ok');
+        this.setTitle('alert', title);
+        elements.alertOk.setAttribute('data-l10n-id', evt.yesText ?
+                                                        evt.yesText : 'ok');
+        elements.alert.focus();
         break;
 
       case 'prompt':
         elements.prompt.classList.add('visible');
         elements.promptInput.value = evt.detail.initialValue;
-        elements.promptMessage.innerHTML = message;
-        this.setTitle('prompt', '');
-        elements.promptOk.textContent = evt.yesText ? evt.yesText : _('ok');
-        elements.promptCancel.textContent = evt.noText ?
-          evt.noText : _('cancel');
+        elements.promptMessage.setAttribute('data-l10n-id', message);
+        this.setTitle('prompt', title);
+        elements.promptOk.setAttribute('data-l10n-id', evt.yesText ?
+                                                        evt.yesText : 'ok');
+        elements.promptCancel.setAttribute('data-l10n-id', evt.noText ?
+                                                        evt.noText : 'cancel');
+        elements.prompt.focus();
         break;
 
       case 'confirm':
         elements.confirm.classList.add('visible');
-        elements.confirmMessage.innerHTML = message;
-        this.setTitle('confirm', '');
-        elements.confirmOk.textContent = evt.yesText ? evt.yesText : _('ok');
-        elements.confirmCancel.textContent = evt.noText ?
-          evt.noText : _('cancel');
+        elements.confirmMessage.setAttribute('data-l10n-id', message);
+        this.setTitle('confirm', title);
+        elements.confirmOk.setAttribute('data-l10n-id', evt.yesText ?
+                                                        evt.yesText : 'ok');
+        elements.confirmCancel.setAttribute('data-l10n-id', evt.noText ?
+                                                        evt.noText : 'cancel');
+        elements.confirm.focus();
         break;
 
       case 'selectone':
         this.buildSelectOneDialog(message);
         elements.selectOne.classList.add('visible');
+        elements.selectOne.focus();
         break;
     }
 
@@ -211,7 +226,7 @@ var ModalDialog = {
   },
 
   hide: function md_hide() {
-    var evt = this.currentEvents[this.currentOrigin];
+    var evt = this.eventForCurrentOrigin;
     var type = evt.detail.promptType;
     if (type == 'prompt') {
       this.elements.promptInput.blur();
@@ -222,7 +237,7 @@ var ModalDialog = {
   },
 
   setTitle: function md_setTitle(type, title) {
-    this.elements[type + 'Title'].textContent = title;
+    this.elements[type + 'Title'].setAttribute('data-l10n-id', title);
   },
 
   // When user clicks OK button on alert/confirm/prompt
@@ -230,7 +245,7 @@ var ModalDialog = {
     this.screen.classList.remove('modal-dialog');
     var elements = this.elements;
 
-    var evt = this.currentEvents[this.currentOrigin];
+    var evt = this.eventForCurrentOrigin;
 
     var type = evt.detail.promptType || evt.detail.type;
     switch (type) {
@@ -253,16 +268,17 @@ var ModalDialog = {
       evt.callback(evt.detail.returnValue);
     }
 
-    if (evt.detail.unblock)
+    if (evt.detail.unblock) {
       evt.detail.unblock();
+    }
 
-    delete this.currentEvents[this.currentOrigin];
+    this.processNextEvent();
   },
 
   // When user clicks cancel button on confirm/prompt or
   // when the user try to escape the dialog with the escape key
   cancelHandler: function md_cancelHandler() {
-    var evt = this.currentEvents[this.currentOrigin];
+    var evt = this.eventForCurrentOrigin;
     this.screen.classList.remove('modal-dialog');
     var elements = this.elements;
 
@@ -295,10 +311,11 @@ var ModalDialog = {
       evt.cancelCallback(evt.detail.returnValue);
     }
 
-    if (evt.detail.unblock)
+    if (evt.detail.unblock) {
       evt.detail.unblock();
+    }
 
-    delete this.currentEvents[this.currentOrigin];
+    this.processNextEvent();
   },
 
   // When user selects an option on selectone dialog
@@ -306,7 +323,7 @@ var ModalDialog = {
     this.screen.classList.remove('modal-dialog');
     var elements = this.elements;
 
-    var evt = this.currentEvents[this.currentOrigin];
+    var evt = this.eventForCurrentOrigin;
 
     evt.detail.returnValue = target.id;
     elements.selectOne.classList.remove('visible');
@@ -315,10 +332,11 @@ var ModalDialog = {
       evt.callback(evt.detail.returnValue);
     }
 
-    if (evt.detail.unblock)
+    if (evt.detail.unblock) {
       evt.detail.unblock();
+    }
 
-    delete this.currentEvents[this.currentOrigin];
+    this.processNextEvent();
   },
 
   buildSelectOneDialog: function md_buildSelectOneDialog(data) {
@@ -417,6 +435,7 @@ var ModalDialog = {
       }
     };
 
+    pseudoEvt.detail.title = config.title;
     pseudoEvt.detail.message = config.text;
     pseudoEvt.callback = config.callback;
     pseudoEvt.detail.promptType = config.type;
@@ -429,14 +448,15 @@ var ModalDialog = {
 
     // Create a virtual mapping in this.currentEvents,
     // since system-app uses the different way to call ModalDialog.
-    this.currentEvents['system'] = pseudoEvt;
+    if (!this.currentEvents.system) {
+      this.currentEvents.system = [];
+    }
+    this.currentEvents.system.push(pseudoEvt);
     this.show(null, 'system');
-    if (config.title)
-      this.setTitle(config.type, config.title);
   },
 
   isVisible: function md_isVisible() {
-    return this.screen.classList.contains('modal-dialog');
+    return this.screen ? this.screen.classList.contains('modal-dialog') : false;
   }
 };
 

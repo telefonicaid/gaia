@@ -1,19 +1,39 @@
 {
-  "name": "Keyboard",
-  "description": "Gaia Keyboard",
+  "name": "Built-in Keyboard",
+  "description": "Built-in Keyboard",
   "type": "certified",
+  "role": "input",
+  "launch_path": "/settings.html",
   "developer": {
     "name": "The Gaia Team",
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
-    "settings":{ "access": "readwrite" },
-    "keyboard":{}
+    "settings": { "access": "readwrite" },
+    "input": {}
+  },
+  "inputs": {
+    "number": {
+      "launch_path": "/index.html#numberLayout",
+      "name": "Number",
+      "description": "Numeric layout",
+      "types": ["number"],
+      "locales": {
+        "en-US": {
+          "name": "Number",
+          "description": "Numeric layout"
+        }
+      }
+    }
   },
   "locales": {
     "en-US": {
-      "name": "Keyboard",
-      "description": "Gaia Keyboard"
+      "name": "Built-in Keyboard",
+      "description": "Built-in Keyboard"
+    },
+    "zh-TW": {
+      "name": "預設鍵盤",
+      "description": "預設鍵盤"
     }
   },
   "default_locale": "en-US"

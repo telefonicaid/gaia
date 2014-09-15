@@ -8,13 +8,17 @@
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "messages": [
-     { "alarm": "/index.html" }
+     { "alarm": "/index.html" },
+     { "notification": "/index.html" }
   ],
   "permissions": {
     "systemXHR":{},
-    "settings":{ "access": "readonly" },
     "alarms":{},
-    "desktop-notification":{}
+    "browser": {},
+    "storage":{},
+    "settings":{ "access": "readonly" },
+    "desktop-notification":{},
+    "audio-channel-notification":{}
   },
   "locales": {
     "ar": {
@@ -36,8 +40,11 @@
   },
   "default_locale": "en-US",
   "icons": {
-    "120": "/style/icons/Calendar.png",
-    "60": "/style/icons/60/Calendar.png"
+    "84": "/style/icons/calendar_84.png",
+    "126": "/style/icons/calendar_126.png",
+    "142": "/style/icons/calendar_142.png",
+    "189": "/style/icons/calendar_189.png",
+    "284": "/style/icons/calendar_284.png"
   },
-  "orientation": "portrait-primary"
+  "orientation": "default"
 }

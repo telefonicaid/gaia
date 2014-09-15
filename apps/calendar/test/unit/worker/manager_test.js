@@ -1,12 +1,12 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('worker/manager.js');
-});
+requireLib('worker/manager.js');
 
 /**
  * This test should over the basics of
  * both the manager and the thread.
  */
 suite('worker/manager', function() {
+  'use strict';
+
   var subject;
 
   function MockWorker(handler) {
@@ -16,8 +16,11 @@ suite('worker/manager', function() {
       this.sent = [];
 
       this.addEventListener = function(type, func) {
-        if (type == 'error') this.onerror = func;
-        else if (type == 'message') this.onmessage = func;
+        if (type == 'error') {
+          this.onerror = func;
+        } else if (type == 'message') {
+          this.onmessage = func;
+        }
       };
 
       this.respond = function(message) {
@@ -68,6 +71,7 @@ suite('worker/manager', function() {
 
   suite('worker acceptance', function() {
     function mockHandler(message) {
+      /*jshint validthis:true */
       assert.equal(message[0], '_dispatch');
       var data = message[1], self = this;
       assert.equal(typeof data.id, 'number');
@@ -101,7 +105,6 @@ suite('worker/manager', function() {
     });
 
     test('#request', function(done) {
-      this.timeout(12000);
       subject.request('test', 'foobar', obj, function(data) {
         done(function() {
           assert.deepEqual(data, 'response');
@@ -110,7 +113,6 @@ suite('worker/manager', function() {
     });
 
     test('#request /w error object', function(done) {
-      this.timeout(12000);
       subject.request('test', 'explode', function(err) {
         done(function() {
           assert.instanceOf(err, Error);
@@ -120,7 +122,6 @@ suite('worker/manager', function() {
     });
 
     test('#stream', function(done) {
-      this.timeout(12000);
       var stream = subject.stream('test', 'stream');
       var dataReceived = [], errorReceived = null;
 
@@ -142,7 +143,6 @@ suite('worker/manager', function() {
     });
 
     test('#stream error', function(done) {
-      this.timeout(12000);
       var stream = subject.stream('test', 'stream/explode');
       var dataReceived = [], errorReceived = null;
 

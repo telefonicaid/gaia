@@ -9,11 +9,13 @@
   },
   "fullscreen": true,
   "permissions": {
+    "storage":{},
     "device-storage:pictures":{ "access": "readwrite" },
     "device-storage:videos":{ "access": "readwrite" },
     "deprecated-hwvideo":{},
     "audio-channel-content":{},
-    "settings":{ "access": "readonly" }
+    "nfc": { "access": "readwrite" },
+    "feature-detection": {}
   },
   "activities": {
     "browse": {
@@ -24,7 +26,7 @@
     },
     "pick": {
       "filters": {
-        "type": ["image/jpeg", "image/png"]
+        "type": ["image/*", "image/jpeg", "image/png"]
        },
       "disposition": "inline",
       "returnValue": true,
@@ -32,7 +34,7 @@
     },
     "open": {
       "filters": {
-        "type": ["image/jpeg", "image/png", "image/gif"]
+        "type": ["image/jpeg", "image/png", "image/gif", "image/bmp"]
        },
       "disposition": "inline",
       "returnValue": true,
@@ -59,7 +61,10 @@
   },
   "default_locale": "en-US",
   "icons": {
-    "120": "/style/icons/Gallery.png",
-    "60": "/style/icons/60/Gallery.png"
+    "84": "/style/icons/gallery_84.png",
+    "126": "/style/icons/gallery_126.png",
+    "142": "/style/icons/gallery_142.png",
+    "189": "/style/icons/gallery_189.png",
+    "284": "/style/icons/gallery_284.png"
   }
 }

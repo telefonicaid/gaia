@@ -18,6 +18,7 @@ function AppUpdatable(app) {
 
   var manifest = app.manifest ? app.manifest : app.updateManifest;
   this.name = new ManifestHelper(manifest).name;
+  this.nameL10nId = '';
 
   this.size = app.downloadSize;
   this.progress = null;
@@ -74,7 +75,8 @@ AppUpdatable.prototype.availableCallBack = function() {
 
 AppUpdatable.prototype.successCallBack = function() {
   var app = this.app;
-  if (WindowManager.getDisplayedApp() !== app.origin) {
+  if (AppWindowManager.getActiveApp() &&
+      AppWindowManager.getActiveApp().origin !== app.origin) {
     this.applyUpdate();
   } else {
     var self = this;
@@ -84,12 +86,13 @@ AppUpdatable.prototype.successCallBack = function() {
     });
   }
 
+  UpdateManager.downloaded(this);
   UpdateManager.removeFromDownloadsQueue(this);
   UpdateManager.removeFromUpdatesQueue(this);
 };
 
 AppUpdatable.prototype.applyUpdate = function() {
-  WindowManager.kill(this.app.origin);
+  AppWindowManager.kill(this.app.origin);
   this._mgmt.applyDownload(this.app);
 };
 
@@ -98,10 +101,14 @@ AppUpdatable.prototype.appliedCallBack = function() {
 };
 
 AppUpdatable.prototype.errorCallBack = function(e) {
-  var errorName = e.application.downloadError.name;
+  var app = e.application;
+  var errorName = app.downloadError.name;
   console.info('downloadError event, error code is', errorName);
   UpdateManager.requestErrorBanner();
   UpdateManager.removeFromDownloadsQueue(this);
+  if (!app.downloadAvailable) {
+    UpdateManager.removeFromUpdatesQueue(this);
+  }
   this.progress = null;
 };
 
@@ -124,8 +131,7 @@ AppUpdatable.prototype.progressCallBack = function() {
  *
  */
 function SystemUpdatable() {
-  var _ = navigator.mozL10n.get;
-  this.name = _('systemUpdate');
+  this.nameL10nId = 'systemUpdate';
   this.size = 0;
   this.downloading = false;
   this.paused = false;
@@ -192,6 +198,7 @@ SystemUpdatable.prototype.handleEvent = function(evt) {
       break;
     case 'update-downloaded':
       this.downloading = false;
+      UpdateManager.downloaded(this);
       this.showApplyPrompt();
       break;
     case 'update-prompt-apply':
@@ -207,32 +214,117 @@ SystemUpdatable.prototype.errorCallBack = function() {
 };
 
 SystemUpdatable.prototype.showApplyPrompt = function() {
+  var batteryLevel = window.navigator.battery.level * 100;
+  this.getBatteryPercentageThreshold().then(function(threshold) {
+    if (batteryLevel < threshold) {
+      this.showApplyPromptBatteryNok(threshold);
+    } else {
+      this.showApplyPromptBatteryOk();
+    }
+  }.bind(this));
+};
+
+SystemUpdatable.prototype.BATTERY_FALLBACK_THRESHOLD = 25;
+
+SystemUpdatable.prototype.getBatteryPercentageThreshold = function() {
+  var fallbackThreshold = this.BATTERY_FALLBACK_THRESHOLD;
+
+  var isCharging = window.navigator.battery.charging;
+  var batteryThresholdKey =
+    'app.update.battery-threshold.' + (isCharging ? 'plugged' : 'unplugged');
+
+  var settings = window.navigator.mozSettings;
+  var getRequest = settings.createLock().get(batteryThresholdKey);
+
+  return new Promise(function(resolve, reject) {
+    getRequest.onerror = function() {
+      resolve(fallbackThreshold);
+    };
+    getRequest.onsuccess = function() {
+      var threshold = getRequest.result[batteryThresholdKey];
+      if (typeof threshold !== 'number') {
+        threshold = fallbackThreshold;
+      }
+      if (threshold < 0 || threshold > 100) {
+        threshold = fallbackThreshold;
+      }
+      resolve(threshold);
+    };
+  });
+};
+
+SystemUpdatable.prototype.showApplyPromptBatteryNok = function(minBattery) {
+  var ok = {
+    title: 'ok',
+    callback: this.declineInstallBattery.bind(this)
+  };
+
+  var screen = document.getElementById('screen');
+
+  UtilityTray.hide();
+  CustomDialog.show(
+    'systemUpdateReady',
+    { id: 'systemUpdateLowBatteryThreshold', args: { threshold: minBattery } },
+    ok,
+    null,
+    screen
+  )
+  .setAttribute('data-z-index-level', 'system-dialog');
+};
+
+SystemUpdatable.prototype.showApplyPromptBatteryOk = function() {
   var _ = navigator.mozL10n.get;
 
   // Update will be completed after restart
   this.forgetKnownUpdate();
 
   var cancel = {
-    title: _('later'),
-    callback: this.declineInstall.bind(this)
+    title: 'later',
+    callback: this.declineInstallWait.bind(this)
   };
 
   var confirm = {
-    title: _('installNow'),
-    callback: this.acceptInstall.bind(this)
+    title: 'installNow',
+    callback: this.acceptInstall.bind(this),
+    recommend: true
   };
 
+  var screen = document.getElementById('screen');
+
   UtilityTray.hide();
-  CustomDialog.show(_('systemUpdateReady'), _('wantToInstall'),
-                    cancel, confirm);
+  CustomDialog.show(
+    'systemUpdateReady',
+    'wantToInstallNow',
+    cancel,
+    confirm,
+    screen
+  )
+  .setAttribute('data-z-index-level', 'system-dialog');
 };
 
-SystemUpdatable.prototype.declineInstall = function() {
+/**
+ * Decline install of update, forwarding `reason` to UpdatePrompt.jsm.
+ * `reason` is either 'wait' or 'low-battery'. 'wait' corresponds to the user
+ * deciding to delay the update, in which case the prompt will reappear after a
+ * few minutes of idle time. 'low-battery' means the battery is currently too
+ * low for an update to take place and the update prompt will not reappear.
+ * @param {String} reason
+ */
+SystemUpdatable.prototype.declineInstall = function(reason) {
   CustomDialog.hide();
-  this._dispatchEvent('update-prompt-apply-result', 'wait');
+  this._dispatchEvent('update-prompt-apply-result', reason);
 
   UpdateManager.removeFromDownloadsQueue(this);
 };
+
+SystemUpdatable.prototype.declineInstallBattery = function() {
+  this.declineInstall('low-battery');
+};
+
+SystemUpdatable.prototype.declineInstallWait = function() {
+  this.declineInstall('wait');
+};
+
 
 SystemUpdatable.prototype.acceptInstall = function() {
   CustomDialog.hide();

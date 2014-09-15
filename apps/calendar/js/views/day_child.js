@@ -1,10 +1,11 @@
 Calendar.ns('Views').DayChild = (function() {
+  'use strict';
 
   var template = Calendar.Templates.Day;
-  var OrderedMap = Calendar.Utils.OrderedMap;
+  var Parent = Calendar.Views.DayBased;
 
   function Day(options) {
-    Calendar.Views.DayBased.apply(this, arguments);
+    Parent.apply(this, arguments);
 
     this.controller = this.app.timeController;
     this.hourEventsSelector = template.hourEventsSelector;
@@ -12,10 +13,38 @@ Calendar.ns('Views').DayChild = (function() {
 
   Day.prototype = {
 
-    __proto__: Calendar.Views.DayBased.prototype,
+    __proto__: Parent.prototype,
+
+    create: function() {
+      Parent.prototype.create.apply(this, arguments);
+
+      var container = this.element
+        .querySelector('.day-events-wrapper > .day-events');
+      this._currentTime = new Calendar.Views.CurrentTime({
+        container: container,
+        timespan: this.timespan
+      });
+    },
+
+    activate: function() {
+      Parent.prototype.activate.apply(this, arguments);
+
+      this._currentTime.activate();
+    },
+
+    deactivate: function() {
+      Parent.prototype.deactivate.apply(this, arguments);
+
+      this._currentTime.deactivate();
+    },
+
+    destroy: function() {
+      Parent.prototype.destroy.apply(this, arguments);
+
+      this._currentTime.destroy();
+    },
 
     _renderEvent: function(busytime, event) {
-      var remote = event.remote;
       var attendees;
 
       if (event.remote.attendees) {
@@ -25,6 +54,7 @@ Calendar.ns('Views').DayChild = (function() {
       }
 
       return template.event.render({
+        hasAlarm: !!(event.remote.alarms && event.remote.alarms.length),
         busytimeId: busytime._id,
         calendarId: event.calendarId,
         title: event.remote.title,

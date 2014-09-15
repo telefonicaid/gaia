@@ -1,8 +1,7 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('timespan.js');
-});
+requireLib('timespan.js');
 
 suite('timespan', function() {
+  'use strict';
 
   var subject;
   var startDate;
@@ -233,7 +232,6 @@ suite('timespan', function() {
 
     test('overlaping times', function() {
       var key;
-      var prefix = '';
 
       for (key in dates) {
         if (dates.hasOwnProperty(key)) {
@@ -250,7 +248,6 @@ suite('timespan', function() {
 
     test('overlaping times as dates', function() {
       var key;
-      var prefix = '';
 
       for (key in dates) {
         if (dates.hasOwnProperty(key)) {

@@ -1,0 +1,78 @@
+<element name="about-moreInfo" extends="section">
+  <template>
+
+    <gaia-header action="back" data-href="#about">
+      <h1 data-l10n-id="more-info-header">More Information</h1>
+    </gaia-header>
+
+    <div>
+      <ul>
+        <li>
+          <span data-l10n-id="os-version">OS Version</span>
+          <small data-name="deviceinfo.os"></small>
+        </li>
+        <li>
+          <span data-l10n-id="firmware_revision">Firmware Revision</span>
+          <small data-name="deviceinfo.firmware_revision"></small>
+        </li>
+        <li>
+          <span data-l10n-id="hardware_revision">Hardware Revision</span>
+          <small data-name="deviceinfo.hardware"></small>
+        </li>
+        <li>
+          <span data-l10n-id="macAddress">MAC Address</span>
+          <small data-name="deviceinfo.mac"></small>
+        </li>
+        <li>
+          <span data-l10n-id="deviceInfo-IMEI">IMEI</span>
+          <small id="deviceInfo-imeis" class="multiline"></small>
+        </li>
+        <li>
+          <span data-l10n-id="deviceInfo-ICCID">ICCID</span>
+          <small id="deviceInfo-iccids" class="multiline"></small>
+        </li>
+        <li>
+          <span data-l10n-id="platform_version">Platform Version</span>
+          <small data-name="deviceinfo.platform_version"></small>
+        </li>
+        <li>
+          <span data-l10n-id="build-id">Build Identifier</span>
+          <small data-name="deviceinfo.platform_build_id"></small>
+        </li>
+        <li>
+          <span data-l10n-id="update-channel">Update Channel</span>
+          <small data-name="app.update.channel"></small>
+        </li>
+        <li>
+          <span data-l10n-id="bluetooth-address">Bluetooth Address</span>
+          <small data-name="deviceinfo.bt_address"></small>
+        </li>
+      </ul>
+
+      <header>
+        <h2 data-l10n-id="gitInfo">Git Commit Info</h2>
+      </header>
+      <ul>
+        <li>
+          <span id="gaia-commit-date"></span>
+          <small id="gaia-commit-hash"></small>
+        </li>
+      </ul>
+
+      <header>
+        <h2 data-l10n-id="devSettings">Developer Settings</h2>
+      </header>
+      <ul>
+        <li>
+          <label class="pack-switch">
+            <input type="checkbox" name="developer.menu.enabled">
+            <span data-l10n-id="developer-menu">Developer Menu</span>
+          </label>
+        </li>
+      </ul>
+    </div>
+
+    <script src="js/about_more_info.js"></script>
+
+  </template>
+</element>

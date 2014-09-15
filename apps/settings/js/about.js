@@ -6,55 +6,8 @@
 var About = {
   init: function about_init() {
     document.getElementById('check-update-now').onclick = this.checkForUpdates;
-    document.getElementById('ftuLauncher').onclick = this.launchFTU;
     this.loadHardwareInfo();
-    this.loadGaiaCommit();
     this.loadLastUpdated();
-  },
-
-  loadGaiaCommit: function about_loadGaiaCommit() {
-    var GAIA_COMMIT = 'resources/gaia_commit.txt';
-
-    var dispDate = document.getElementById('gaia-commit-date');
-    var dispHash = document.getElementById('gaia-commit-hash');
-    if (dispHash.textContent)
-      return; // `gaia-commit.txt' has already been loaded
-
-    function dateToUTC(d) {
-      var arr = [];
-      [
-        d.getUTCFullYear(), (d.getUTCMonth() + 1), d.getUTCDate(),
-        d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()
-      ].forEach(function(n) {
-        arr.push((n >= 10) ? n : '0' + n);
-      });
-      return arr.splice(0, 3).join('-') + ' ' + arr.join(':');
-    }
-
-    var req = new XMLHttpRequest();
-    req.onreadystatechange = (function(e) {
-      if (req.readyState === 4) {
-        if (req.status === 0 || req.status === 200) {
-          var data = req.responseText.split('\n');
-
-          /**
-           * XXX it would be great to pop a link to the github page showing the
-           * commit, but there doesn't seem to be any way to tell the browser
-           * to do it.
-           */
-
-          var d = new Date(parseInt(data[1] + '000', 10));
-          dispDate.textContent = dateToUTC(d);
-          dispHash.textContent = data[0];
-        } else {
-          console.error('Failed to fetch gaia commit: ', req.statusText);
-        }
-      }
-    }).bind(this);
-
-    req.open('GET', GAIA_COMMIT, true); // async
-    req.responseType = 'text';
-    req.send();
   },
 
   loadLastUpdated: function about_loadLastUpdated() {
@@ -66,6 +19,7 @@ var About = {
     var lock = settings.createLock();
     var key = 'deviceinfo.last_updated';
     var request = lock.get(key);
+
     request.onsuccess = function() {
       var lastUpdated = request.result[key];
       if (!lastUpdated) {
@@ -80,28 +34,103 @@ var About = {
   },
 
   loadHardwareInfo: function about_loadHardwareInfo() {
-    var mobileConnection = getMobileConnection();
-    if (!mobileConnection)
+    var deviceInfoPhoneNum = document.getElementById('deviceinfo-phone-num');
+    var deviceInfoMsisdns = document.getElementById('deviceInfo-msisdns');
+    var conns = navigator.mozMobileConnections;
+
+    if (!conns) {
+      deviceInfoPhoneNum.hidden = true;
       return;
+    }
 
-    var info = mobileConnection.iccInfo;
-    document.getElementById('deviceInfo-iccid').textContent = info.iccid;
-    document.getElementById('deviceInfo-msisdn').textContent = info.msisdn;
+    var multiSim = conns.length > 1;
+    // Only show the list item when there are valid iccinfos.
+    var showListItem = false;
 
-    var req = mobileConnection.sendMMI('*#06#');
-    req.onsuccess = function getIMEI() {
-      document.getElementById('deviceInfo-imei').textContent = req.result;
-    };
+    // update msisdns
+    while (deviceInfoMsisdns.hasChildNodes()) {
+      deviceInfoMsisdns.removeChild(deviceInfoMsisdns.lastChild);
+    }
+
+    Array.prototype.forEach.call(conns, function(conn, index) {
+      var iccId = conn.iccId;
+      if (!iccId) {
+        return;
+      }
+      var iccObj = navigator.mozIccManager.getIccById(iccId);
+      if (!iccObj) {
+        return;
+      }
+      var iccInfo = iccObj.iccInfo;
+      if (!iccInfo) {
+        return;
+      }
+
+      showListItem = true;
+      // If the icc card is gsm card, the phone number is in msisdn.
+      // Otherwise, the phone number is in mdn.
+      var span = document.createElement('span');
+      var msisdn = iccInfo.msisdn || iccInfo.mdn;
+      if (msisdn) {
+        span.textContent = multiSim ?
+          'SIM ' + (index + 1) + ': ' + msisdn : msisdn;
+      } else {
+        if (multiSim) {
+          navigator.mozL10n.setAttributes(span,
+            'unknown-phoneNumber-sim', { index: index + 1 });
+        } else {
+          navigator.mozL10n.setAttributes(span, 'unknown-phoneNumber');
+        }
+      }
+      deviceInfoMsisdns.appendChild(span);
+    });
+
+    deviceInfoPhoneNum.hidden = !showListItem;
   },
 
   checkForUpdates: function about_checkForUpdates() {
     var settings = Settings.mozSettings;
-    if (!settings)
-      return;
-
     var _ = navigator.mozL10n.get;
-    var updateStatus = document.getElementById('update-status'),
-        systemStatus = updateStatus.querySelector('.system-update-status');
+
+    if (!settings) {
+      return;
+    }
+
+    if (!navigator.onLine) {
+      alert(_('no-network-when-update'));
+      return;
+    }
+
+    var updateStatus = document.getElementById('update-status');
+    var systemStatus = updateStatus.querySelector('.system-update-status');
+
+    var checkStatus = {
+      'gecko.updateStatus': {},
+      'apps.updateStatus': {}
+    };
+
+    updateStatus.classList.add('checking', 'visible');
+
+    function checkIfStatusComplete() {
+      var hasAllCheckComplete =
+        Object.keys(checkStatus).every(function(setting) {
+          return checkStatus[setting].value === 'check-complete';
+        });
+
+      var hasAllResponses =
+        Object.keys(checkStatus).every(function(setting) {
+          return !!checkStatus[setting].value;
+        });
+
+      if (hasAllCheckComplete) {
+        updateStatus.classList.remove('visible');
+        systemStatus.textContent = '';
+      }
+
+      if (hasAllResponses) {
+        updateStatus.classList.remove('checking');
+      }
+    }
 
     function onUpdateStatus(setting, event) {
       var value = event.settingValue;
@@ -126,9 +155,15 @@ var About = {
        * to check if this is still current
        */
 
+      var l10nValues = [
+        'no-updates', 'already-latest-version', 'retry-when-online'];
+
       if (value !== 'check-complete') {
-        systemStatus.textContent = _(value, null, _('check-error'));
-        console.error('Error checking for system update:', value);
+        var id = l10nValues.indexOf(value) !== -1 ? value : 'check-error';
+        systemStatus.setAttribute('data-l10n-id', id);
+        if (id == 'check-error') {
+          console.error('Error checking for system update:', value);
+        }
       }
 
       checkIfStatusComplete();
@@ -137,39 +172,8 @@ var About = {
       checkStatus[setting].cb = null;
     }
 
-    function checkIfStatusComplete() {
-      var hasAllCheckComplete =
-        Object.keys(checkStatus).every(function(setting) {
-          return checkStatus[setting].value === 'check-complete';
-        });
-
-      var hasAllResponses =
-        Object.keys(checkStatus).every(function(setting) {
-          return !!checkStatus[setting].value;
-        });
-
-      if (hasAllCheckComplete) {
-        updateStatus.classList.remove('visible');
-        systemStatus.textContent = '';
-      }
-
-      if (hasAllResponses) {
-        updateStatus.classList.remove('checking');
-      }
-    }
-
-    /* Firefox currently doesn't implement adding 2 classes in one call */
-    /* see Bug 814014 */
-    updateStatus.classList.add('checking');
-    updateStatus.classList.add('visible');
-
     /* remove whatever was there before */
     systemStatus.textContent = '';
-
-    var checkStatus = {
-      'gecko.updateStatus': {},
-      'apps.updateStatus': {}
-    };
 
     for (var setting in checkStatus) {
       checkStatus[setting].cb = onUpdateStatus.bind(null, setting);
@@ -180,46 +184,9 @@ var About = {
     lock.set({
       'gaia.system.checkForUpdates': true
     });
-  },
-
-  launchFTU: function about_launchFTU() {
-    var settings = Settings.mozSettings;
-    if (!settings)
-      return;
-
-    var key = 'ftu.manifestURL';
-    var req = settings.createLock().get(key);
-    req.onsuccess = function ftuManifest() {
-      var ftuManifestURL = req.result[key];
-
-      // fallback if no settings present
-      if (!ftuManifestURL) {
-        ftuManifestURL = document.location.protocol +
-          '//communications.gaiamobile.org' +
-          (location.port ? (':' + location.port) : '') +
-          '/manifest.webapp';
-      }
-
-      var ftuApp = null;
-      navigator.mozApps.mgmt.getAll().onsuccess = function gotApps(evt) {
-        var apps = evt.target.result;
-        for (var i = 0; i < apps.length && ftuApp == null; i++) {
-          var app = apps[i];
-          if (app.manifestURL == ftuManifestURL) {
-            ftuApp = app;
-          }
-        }
-
-        if (ftuApp) {
-          ftuApp.launch('ftu');
-        } else {
-          alert(navigator.mozL10n.get('no-ftu'));
-        }
-      }
-    }
   }
 };
 
 // startup
-navigator.mozL10n.ready(About.init.bind(About));
+navigator.mozL10n.once(About.init.bind(About));
 

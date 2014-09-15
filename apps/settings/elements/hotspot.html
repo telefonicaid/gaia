@@ -1,0 +1,63 @@
+<element name="hotspot" extends="section">
+  <template>
+
+    <gaia-header action="back" data-href="#root">
+      <h1 data-l10n-id="internetSharing-header"> Internet Sharing </h1>
+    </gaia-header>
+
+    <div>
+      <header>
+        <h2 data-l10n-id="internetSharing-wifi"> Wi-Fi </h2>
+      </header>
+      <ul>
+        <li>
+          <label class="pack-switch">
+            <input type="checkbox" id="tethering-wifi-enabled" class="uninit">
+            <span data-l10n-id="wifi-hotspot">Wi-Fi Hotspot</span>
+          </label>
+        </li>
+        <li class="description">
+          <p data-l10n-id="internetSharing-wifi-desc">
+            Allow other devices to share my phone’s Internet connection by connecting via Wi-Fi.
+          </p>
+        </li>
+        <li>
+          <a>
+            <span data-l10n-id="wifi-name">Name</span>
+            <span data-name="tethering.wifi.ssid"></span>
+          </a>
+        </li>
+        <li>
+          <a>
+            <span data-l10n-id="wifi-security">Security</span>
+            <span id="wifi-security-type"></span>
+          </a>
+        </li>
+        <li id="hotspot-settings-section">
+          <button class="icon icon-view"
+            data-l10n-id="hotspotSettings">Hotspot Settings</button>
+        </li>
+      </ul>
+
+      <header>
+        <h2 data-l10n-id="internetSharing-usb"> USB </h2>
+      </header>
+      <ul>
+        <li>
+          <label class="pack-switch">
+            <input type="checkbox" id="tethering-usb-enabled" class="uninit">
+            <span data-l10n-id="usb-tethering">USB Tethering</span>
+          </label>
+        </li>
+        <li class="description">
+          <p data-l10n-id="internetSharing-usb-desc">
+            Share my phone’s Internet connection with a USB-connected device.
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <script src="js/hotspot.js"></script>
+
+  </template>
+</element>

@@ -1,17 +1,15 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('ext/uuid.js');
-  requireLib('timespan.js');
-  requireLib('event_mutations.js');
-  requireLib('provider/abstract.js');
-  requireLib('provider/local.js');
-});
+/*global Factory */
 
-suite('provider/local', function() {
+requireLib('timespan.js');
+
+suiteGroup('Provider.Local', function() {
+  'use strict';
 
   var subject;
   var app;
   var db;
   var controller;
+  var shouldDisplay;
 
   setup(function(done) {
     app = testSupport.calendar.app();
@@ -20,6 +18,10 @@ suite('provider/local', function() {
     });
 
     controller = app.timeController;
+    shouldDisplay = controller._shouldDisplayBusytime;
+    controller._shouldDisplayBusytime = function() {
+      return true;
+    };
 
     db = app.db;
     db.open(function(err) {
@@ -29,6 +31,7 @@ suite('provider/local', function() {
   });
 
   teardown(function(done) {
+    controller._shouldDisplayBusytime = shouldDisplay;
     testSupport.calendar.clearStore(
       db,
       ['accounts', 'calendars', 'events', 'busytimes'],
@@ -136,7 +139,6 @@ suite('provider/local', function() {
           find(event._id, function(busytime, event) {
             done(function() {
               assert.deepEqual(event, event);
-              assert.deepEqual(busytimes.factory(event), busytime);
               assert.hasProperties(addTime, busytime);
             });
           });
@@ -193,7 +195,10 @@ suite('provider/local', function() {
         });
 
         test('busytime', function(done) {
-          assert.hasProperties(busytime, busytimes.factory(event));
+          assert.hasProperties(busytime, {
+            eventId: event._id, calendarId: event.calendarId
+          });
+
           busytimes.count(function(err, count) {
             done(function() {
               assert.equal(count, 1);

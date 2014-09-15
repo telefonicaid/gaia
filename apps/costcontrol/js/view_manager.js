@@ -1,9 +1,11 @@
+/* global AccessibilityHelper */
+/* exported ViewManager */
 /* -*- Mode: js; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- /
 /* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
 
 'use strict';
 
-var ViewManager = (function () {
+var ViewManager = (function() {
 
   // The ViewManager is in charge of simply manage the different views of the
   // applications. ViewManager.changeViewTo() valid values are listed above
@@ -14,7 +16,7 @@ var ViewManager = (function () {
     this._tabs = {};
     tabs.forEach(function _registerTab(tabItem) {
       if (typeof tabItem !== 'object') {
-        tabItem = { id:tabItem };
+        tabItem = { id: tabItem };
       }
       this._tabs[tabItem.id] = tabItem.tab || 'left';
     }, this);
@@ -22,7 +24,7 @@ var ViewManager = (function () {
     this._currentView = null;
     this._currentTab = null;
 
-  };
+  }
 
   // Return true if the passed view is a tab
   ViewManager.prototype._isTab = function _isTab(view) {
@@ -46,12 +48,12 @@ var ViewManager = (function () {
     var previousViewId, currentViewId;
     previousViewId = currentViewId = this._currentView ?
                                      this._currentView.id : null;
-    
+
     var view = document.getElementById(viewId);
-    
+
     // lazy load HTML of the panel
     this.loadPanel(view);
-                                     
+
     // Tabs are treated in a different way than overlay views
     var isTab = this._isTab(viewId);
     if (isTab) {
@@ -63,21 +65,22 @@ var ViewManager = (function () {
       }
       if (disposingTab) {
         disposingTab.dataset.viewport = this._tabs[disposingTab.id];
-        document.getElementById(disposingTab.id + '-filter')
-          .setAttribute('aria-selected', 'false');
+        document.getElementById(disposingTab.id + '-filter').classList.remove(
+          '.selected');
       }
-
       // Showing the new one
       view.dataset.viewport = '';
-      document.getElementById(view.id + '-filter')
-        .setAttribute('aria-selected', 'true');
+      document.getElementById(view.id + '-filter').classList.add('.selected');
+      AccessibilityHelper.setAriaSelected(
+        document.getElementById(view.id + '-control'),
+        document.querySelectorAll('[role="tab"]'));
 
       this._currentTab = viewId;
 
     // Overlay view
     } else {
       this.closeCurrentView();
-      var previousViewId = this._currentView ? this._currentView.id : '';
+      previousViewId = this._currentView ? this._currentView.id : '';
       this._currentView = {
         id: viewId,
         defaultViewport: view.dataset.viewport
@@ -90,15 +93,27 @@ var ViewManager = (function () {
     if (callback) {
       callback(isTab, viewId, isTab ? currentViewId : previousViewId);
     }
+    notifyViewChange(isTab, viewId);
   };
 
+  function notifyViewChange(isTab, current) {
+    var type = isTab ? 'tabchanged' : 'viewchanged';
+    var event = new CustomEvent(type, { detail: current });
+    window.dispatchEvent(event);
+  }
+
   ViewManager.prototype.loadPanel = function _loadPanel(panel) {
-    if (!panel || panel.hidden === false) return;
+    if (!panel || panel.hidden === false) {
+      return;
+    }
 
     // apply the HTML markup stored in the first comment node
-    for (var i = 0; i < panel.childNodes.length; i++) {
-      if (panel.childNodes[i].nodeType == document.COMMENT_NODE) {
-        panel.innerHTML = panel.childNodes[i].nodeValue;
+    for (var idx = 0; idx < panel.childNodes.length; idx++) {
+      if (panel.childNodes[idx].nodeType == document.COMMENT_NODE) {
+        // XXX: Note we use innerHTML precisely because we need to parse the
+        // content and we want to avoid overhead introduced by DOM
+        // manipulations.
+        panel.innerHTML = panel.childNodes[idx].nodeValue;
         break;
       }
     }
@@ -122,8 +137,8 @@ var ViewManager = (function () {
 
     // activate all scripts
     var scripts = panel.querySelectorAll('script');
-    for (var i = 0; i < scripts.length; i++) {
-      var src = scripts[i].getAttribute('src');
+    for (var j = 0; j < scripts.length; j++) {
+      var src = scripts[j].getAttribute('src');
       if (!document.getElementById(src)) {
         var script = document.createElement('script');
         script.type = 'application/javascript';
@@ -133,16 +148,16 @@ var ViewManager = (function () {
     }
 
     //add listeners
-    var closeButtons = panel.querySelectorAll('.close-dialog');
-    [].forEach.call(closeButtons, function(closeButton) {
-      closeButton.addEventListener('click', function() {
+    var headers = panel.querySelectorAll('gaia-header[action="close"]');
+    [].forEach.call(headers, function(headerWithClose) {
+      headerWithClose.addEventListener('action', function() {
         window.parent.location.hash = '#';
       });
     });
 
     panel.hidden = false;
   };
-  
+
   // Close the current view returning to the previous one
   ViewManager.prototype.closeCurrentView = function _closeCurrentView() {
     if (!this._currentView) {

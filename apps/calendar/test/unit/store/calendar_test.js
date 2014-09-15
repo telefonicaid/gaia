@@ -1,50 +1,44 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('responder.js');
-  requireLib('db.js');
+/*global Factory */
 
-  requireLib('provider/local.js');
-  requireLib('provider/caldav.js');
+requireLib('responder.js');
+requireLib('db.js');
 
-  requireLib('models/calendar.js');
-  requireLib('models/account.js');
+requireLib('models/calendar.js');
+requireLib('models/account.js');
 
-  requireLib('store/abstract.js');
-  requireLib('store/calendar.js');
-});
+requireLib('store/abstract.js');
+requireLib('store/calendar.js');
 
 suite('store/calendar', function() {
+  'use strict';
 
   var subject;
   var db;
   var model;
-  var account;
   var app;
 
   setup(function(done) {
-    this.timeout(5000);
-
-    db = testSupport.calendar.db();
     app = testSupport.calendar.app();
-
-    var accountStore = db.getStore('Account');
+    db = app.db;
 
     subject = db.getStore('Calendar');
 
-    account = accountStore.cached.acc1 = {
-      _id: 'acc1',
-      providerType: 'Local'
-    };
-
-    model = {
+    model = Factory('calendar', {
       _id: 1,
       remote: { id: 'uuid' },
       accountId: 'acc1'
-    };
+    });
 
     db.open(function(err) {
       done();
     });
   });
+
+  testSupport.calendar.accountEnvironment();
+  testSupport.calendar.loadObjects(
+    'Provider.Local',
+    'Provider.Caldav'
+  );
 
   teardown(function(done) {
     testSupport.calendar.clearStore(
@@ -62,8 +56,6 @@ suite('store/calendar', function() {
     assert.instanceOf(subject, Calendar.Store.Abstract);
     assert.equal(subject._store, 'calendars');
     assert.equal(subject.db, db);
-
-    assert.ok(subject._remoteByAccount);
   });
 
   suite('cache handling', function() {
@@ -73,25 +65,53 @@ suite('store/calendar', function() {
 
     test('#_addToCache', function() {
       assert.equal(subject._cached[1], model);
-      assert.equal(
-        subject._remoteByAccount['acc1']['uuid'],
-        model
-      );
     });
 
     test('#_removeFromCache', function() {
       subject._removeFromCache(1);
       assert.ok(!subject._cached[1]);
-      assert.ok(!subject._remoteByAccount['acc1']['uuid']);
+    });
+  });
+
+  suite('#markWithError', function() {
+    var calendar;
+
+    setup(function(done) {
+      calendar = Factory('calendar');
+      subject.persist(calendar, done);
     });
 
+    test('success', function(done) {
+      var err = new Calendar.Error.Authentication();
+      subject.markWithError(calendar, err, function(markErr) {
+        assert.ok(!markErr);
+        subject.get(calendar._id, function(getErr, result) {
+          done(function() {
+            assert.ok(result.error, 'has error');
+            assert.equal(result.error.name, err.name, 'set error');
+          });
+        });
+      });
+    });
   });
 
   suite('#persist', function() {
+    var stubUpdateColor;
+
+    setup(function() {
+      stubUpdateColor = sinon.stub(subject, '_updateCalendarColor');
+    });
+
+    teardown(function() {
+      stubUpdateColor.restore();
+    });
+
     test('error case', function(done) {
       var sample = Factory.create('calendar');
 
       subject.persist(sample, function(err, data) {
+        sinon.assert.calledOnce(stubUpdateColor);
+        sinon.assert.calledWith(stubUpdateColor, sample);
         done();
       });
     });
@@ -120,15 +140,64 @@ suite('store/calendar', function() {
     });
   });
 
-  test('#remotesByAccount', function() {
-    subject._addToCache(model);
+  suite('#remotesByAccount', function() {
+    var expected;
+    var models = testSupport.calendar.dbFixtures('calendar', 'Calendar', {
+      one: { accountId: 1, remote: { id: 'one' } },
+      two: { accountId: 1, remote: { id: 'two' } },
+      three: { accountId: 2, remote: { id: 'three' } }
+    });
 
-    var result = subject.remotesByAccount(
-      model.accountId
-    );
+    setup(function(done) {
+      subject.persist(model, done);
+    });
 
-    assert.deepEqual(result, {
-      'uuid': model
+    function verify(accountId, done) {
+      subject.remotesByAccount(accountId, function(err, list) {
+        if (err) {
+          done(err);
+        }
+
+        done(function() {
+          var expectedIds = Object.keys(expected).sort();
+          assert.deepEqual(
+            Object.keys(list).sort(),
+            expectedIds,
+            'has same keys'
+          );
+
+          expectedIds.forEach(function(id) {
+            assert.hasProperties(
+              expected[id],
+              list[id],
+              id
+            );
+          });
+        });
+      });
+    }
+
+    test('one calendar', function(done) {
+      expected = {
+        three: models.three
+      };
+
+      verify(2, done);
+    });
+
+    test('no calendars', function(done) {
+      expected = {};
+
+      verify(3, done);
+    });
+
+    test('multiple calendars', function(done) {
+      expected = {
+        one: models.one,
+        two: models.two
+      };
+
+      verify(1, done);
     });
   });
 
@@ -167,6 +236,7 @@ suite('store/calendar', function() {
 
   suite('#remove', function() {
     var eventStore;
+    var stubRemoveColor;
 
     var model;
     var events;
@@ -202,10 +272,20 @@ suite('store/calendar', function() {
       });
     });
 
+    setup(function() {
+      stubRemoveColor = sinon.stub(subject, '_removeCalendarColorFromCache');
+    });
+
+    teardown(function() {
+      stubRemoveColor.restore();
+    });
+
     setup(function(done) {
       subject.remove(model._id, function() {
         eventStore.count(function(err, count) {
           assert.equal(count, 1);
+          sinon.assert.calledOnce(stubRemoveColor);
+          sinon.assert.calledWith(stubRemoveColor, model._id);
           done();
         });
       });
@@ -220,66 +300,168 @@ suite('store/calendar', function() {
     });
   });
 
-  test('#providerFor', function() {
-    account.providerType = 'Local';
-    assert.equal(
-      subject.providerFor(model),
-      app.provider('Local')
-    );
+  suite('#ownersOf', function() {
+
+    test('given an id', function(done) {
+      var id = this.calendar._id;
+      subject.ownersOf(id, function(err, owners) {
+        done(function() {
+          assert.instanceOf(owners.calendar, Calendar.Models.Calendar);
+          assert.instanceOf(owners.account, Calendar.Models.Account);
+
+          assert.equal(owners.calendar._id, this.calendar._id, 'calendar id');
+          assert.equal(owners.account._id, this.account._id, 'account id');
+        }.bind(this));
+      }.bind(this));
+    });
+
   });
 
-  suite('#findWithCapability', function() {
-    var abstractAccount;
-    var localAccount;
 
-    var localCal;
-    var absCal;
+  test('#providerFor', function(done) {
+    subject.providerFor(this.calendar, function(err, provider) {
+      done(function() {
+        assert.equal(provider, app.provider('Mock'));
+      });
+    });
+  });
 
-    setup(function(done) {
-      var trans = subject.db.transaction(
-        ['accounts', 'calendars'],
-        'readwrite'
+  suite('#_updateCalendarColor', function(done) {
+    var palette = Calendar.Store.Calendar.REMOTE_COLORS;
+
+    function resetUsedColors() {
+      subject._usedColors.length = 0;
+    }
+
+    setup(resetUsedColors);
+    teardown(resetUsedColors);
+
+    test('> local calendar', function() {
+      var calendar = Factory('calendar', {
+        color: '#BADA55',
+        _id: Calendar.Provider.Local.calendarId
+      });
+      subject._updateCalendarColor(calendar);
+      assert.equal(
+        calendar.color,
+        Calendar.Store.Calendar.LOCAL_COLOR,
+        'should use local calendar color'
       );
-
-      trans.addEventListener('complete', function() {
-        done();
-      });
-
-      abstractAccount = Factory('account', {
-        _id: 'abstract',
-        providerType: 'Abstract'
-      });
-
-      localAccount = Factory('account', {
-        _id: 'local',
-        providerType: 'Local'
-      });
-
-      localCal = Factory('calendar', {
-        accountId: localAccount._id
-      });
-
-      absCal = Factory('calendar', {
-        accountId: abstractAccount._id
-      });
-
-      var account = db.getStore('Account');
-
-      account.persist(abstractAccount, trans);
-      account.persist(localAccount, trans);
-      subject.persist(localCal, trans);
-      subject.persist(absCal, trans);
     });
 
-    var caps = ['createEvent', 'deleteEvent', 'updateEvent'];
+    suite('> remote calendars', function() {
+      suite('> add', function() {
+        test('return first unused color from palette', function() {
+          assert.ok(palette.length, 'palette');
 
-    caps.forEach(function(name) {
-      test('find: ' + name, function() {
-        var result = subject.findWithCapability(name);
-        assert.equal(result[0], localCal);
+          palette.forEach(function(color) {
+            assert.ok(
+              subject._usedColors.indexOf(color) === -1,
+              'should not repeat color ' + color
+            );
+
+            // it will ignore color from the remote and use color from palette
+            // instead
+            var calendar = { color: '#00FFCC' };
+            subject._updateCalendarColor(calendar);
+            assert.equal(
+              calendar.color,
+              color,
+              'color should match'
+            );
+
+            assert.ok(
+              subject._usedColors.indexOf(color) !== -1,
+              'should update the used colors ' + color
+            );
+          });
+        });
+      });
+
+      suite('> many calendars', function() {
+        setup(function() {
+          subject._usedColors = palette.slice(0, palette.length - 1);
+        });
+
+        test('loop colors if too many calendars', function() {
+          var calendar;
+
+          calendar = {};
+          subject._updateCalendarColor(calendar);
+          assert.equal(
+            calendar.color,
+            palette[palette.length - 1],
+            'last color'
+          );
+
+          calendar = {};
+          subject._updateCalendarColor(calendar);
+          assert.equal(
+            calendar.color,
+            palette[0],
+            'first color'
+          );
+
+          calendar = {};
+          subject._updateCalendarColor(calendar);
+          assert.equal(
+            calendar.color,
+            palette[1],
+            'second color'
+          );
+        });
+      });
+
+      suite('> update', function() {
+        var foo, bar;
+
+        setup(function() {
+          foo = { color: palette[3], _id: 'foo' };
+          bar = { color: '#F00', _id: 'bar' };
+          subject._cached.foo = foo;
+          subject._cached.bar = bar;
+          subject._usedColors = [foo.color, bar.color];
+        });
+
+        teardown(function() {
+          delete subject._cached.foo;
+          delete subject._cached.bar;
+        });
+
+        teardown(resetUsedColors);
+
+        test('keep previous color if from palette', function() {
+          subject._updateCalendarColor(foo);
+          assert.equal(
+            foo.color,
+            palette[3],
+            'should keep same color'
+          );
+
+          assert.deepEqual(
+            subject._usedColors,
+            [bar.color, foo.color],
+            'should keep _usedColors in sync'
+          );
+        });
+
+        test('override color if not from palette', function() {
+          // this test simulates an update on the color scheme and/or old
+          // calendars (stored in the DB before the 2.0 visual refresh)
+          subject._updateCalendarColor(bar);
+          assert.equal(
+            bar.color,
+            palette[0],
+            'should use first color from palette'
+          );
+
+          assert.deepEqual(
+            subject._usedColors,
+            [foo.color, bar.color],
+            'should keep _usedColors in sync'
+          );
+        });
       });
     });
-
   });
-
 });

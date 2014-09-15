@@ -9,11 +9,14 @@
   },
   "permissions": {
     "sms":{},
-    "contacts":{ "access": "readonly" },
+    "storage":{},
     "mobileconnection":{},
-    "settings":{ "access": "readonly" },
+    "alarms":{},
+    "contacts":{ "access": "readonly" },
+    "settings":{ "access": "readwrite" },
     "audio-channel-notification":{},
-    "desktop-notification":{}
+    "desktop-notification":{},
+    "phonenumberservice": {}
   },
   "locales": {
     "ar": {
@@ -34,22 +37,56 @@
     }
   },
   "default_locale": "en-US",
-  "background_page": "/background.html#0",
   "icons": {
-    "120": "/style/icons/Sms.png",
-    "60": "/style/icons/60/Sms.png"
+    "84": "/style/icons/sms_84.png",
+    "126": "/style/icons/sms_126.png",
+    "142": "/style/icons/sms_142.png",
+    "189": "/style/icons/sms_189.png",
+    "284": "/style/icons/sms_284.png"
   },
-  "orientation": "portrait-primary",
+  "orientation": "default",
   "activities": {
     "new": {
+      "href": "/index.html#activity-new",
       "filters": {
-        "type": "websms/sms"
+        "type": "websms/sms",
+        "number": {
+          "pattern":"[\\w\\s+#*().-]{0,50}"
+        }
        },
-      "disposition": "window"
+      "disposition": "inline",
+      "returnValue": true
+    },
+    "share": {
+      "href": "/index.html#activity-share",
+      "filters": {
+        "type": ["image/*", "audio/*", "video/*", "url"],
+        "number": {
+          "max": 5
+        }
+       },
+      "disposition": "inline",
+      "returnValue": true
     }
   },
   "messages": [
+     { "alarm": "/index.html" },
      { "sms-received": "/index.html" },
      { "notification": "/index.html" }
-  ]
+  ],
+  "connections": {
+    "costcontrolSmsQuery": {
+      "description": "Communicate between Usage and Sms",
+      "rules": {
+        "manifestURLs": [
+          "app://costcontrol.gaiamobile.org/manifest.webapp"
+        ]
+      }
+    }
+  },
+  "datastores-access": {
+    "Gaia_Facebook_Friends": {
+      "description": "Facebook Friends"
+    }
+  }
 }

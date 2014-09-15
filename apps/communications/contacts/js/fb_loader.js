@@ -1,23 +1,27 @@
+'use strict';
+/* global LazyLoader */
+/* exported fbLoader */
 
 var fbLoader = (function() {
 
   var loaded = false;
-  scriptsLoaded = 0;
 
   var loadFb = function loadFb() {
-    if (loaded)
+    if (loaded) {
       return;
+    }
 
     loaded = true;
     var iframesFragment = document.createDocumentFragment();
 
     var curtain = document.createElement('iframe');
     curtain.id = 'fb-curtain';
-    curtain.src = '/facebook/curtain.html';
+    curtain.src = '/shared/pages/import/curtain.html';
     iframesFragment.appendChild(curtain);
 
     var oauth = document.createElement('iframe');
     oauth.id = 'fb-oauth';
+    oauth.hidden = true;
     iframesFragment.appendChild(oauth);
 
     var extensions = document.createElement('iframe');
@@ -27,38 +31,23 @@ var fbLoader = (function() {
     document.body.appendChild(iframesFragment);
 
     var scripts = [
-      '/contacts/js/fb_extensions.js',
-      '/contacts/oauth2/js/parameters.js',
-      '/contacts/js/fb/fb_utils.js',
-      '/contacts/js/fb/fb_query.js',
-      '/contacts/js/fb/fb_contact_utils.js',
-      '/contacts/js/fb/fb_contact.js',
+      '/contacts/js/service_extensions.js',
+      '/shared/pages/import/js/parameters.js',
+      '/shared/js/fb/fb_request.js',
+      '/shared/js/contacts/import/facebook/fb_data.js',
+      '/shared/js/contacts/import/facebook/fb_utils.js',
+      '/shared/js/contacts/import/facebook/fb_query.js',
+      '/shared/js/fb/fb_reader_utils.js',
+      '/shared/js/contacts/import/facebook/fb_contact_utils.js',
+      '/shared/js/contacts/import/facebook/fb_contact.js',
       '/contacts/js/fb/fb_link.js',
-      '/contacts/js/fb/fb_messaging.js',
-      '/contacts/js/value_selector.js',
-      '/contacts/js/fb/fb_data.js'
+      '/contacts/js/fb/fb_messaging.js'
     ];
 
-    var fragment = document.createDocumentFragment();
-
-    var onScriptLoaded = function onScriptLoaded() {
-      scriptsLoaded++;
-      if (scriptsLoaded === scripts.length) {
-        var event = new CustomEvent('facebookLoaded');
-        window.dispatchEvent(event);
-      }
-    };
-
-    for (var i = 0; i < scripts.length; i++) {
-      var script = scripts[i];
-      var elem = document.createElement('script');
-      elem.setAttribute('type', 'text/javascript');
-      elem.src = script;
-      elem.addEventListener('load', onScriptLoaded);
-      fragment.appendChild(elem);
-    }
-
-    document.head.appendChild(fragment);
+    LazyLoader.load(scripts, function() {
+      var event = new CustomEvent('facebookLoaded');
+      window.dispatchEvent(event);
+    });
   };
 
   return {

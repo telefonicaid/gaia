@@ -1,31 +1,15 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  require('/shared/js/gesture_detector.js');
-  requireLib('timespan.js');
-  requireLib('utils/ordered_map.js');
-  requireLib('views/time_parent.js');
-});
+require('/shared/js/gesture_detector.js');
+requireLib('timespan.js');
 
-suite('views/time_parent', function() {
+suiteGroup('Views.TimeParent', function() {
+  'use strict';
 
   var testEl;
-  var viewDate = new Date(2012, 1, 15);
   var app;
   var subject;
   var id;
   var controller;
-
   var TimeParent;
-
-  function mapKeys(map) {
-    return map.items.map(function(item) {
-      return item[0];
-    });
-  }
-
-  function viewActive(id) {
-    var view = subject.frames.get(id);
-    return view.active;
-  }
 
   function ChildView(options) {
     this.date = options.date;
@@ -54,6 +38,14 @@ suite('views/time_parent', function() {
       el.id = this.id;
       this.element = el;
       return el;
+    },
+
+    getScrollTop: function() {
+      return this.scrollTop;
+    },
+
+    setScrollTop: function(scrollTop) {
+      this.scrollTop = scrollTop;
     }
   };
 
@@ -259,6 +251,16 @@ suite('views/time_parent', function() {
       // verify other children where removed
       assert.length(subject.frameContainer.children, 3);
     });
+
+    test('the same scrollTop between day ane week views', function() {
+      subject.currentFrame.setScrollTop(100);
+
+      var next = subject._nextTime(date);
+      subject.changeDate(next);
+      var scrollTop = subject.currentFrame.getScrollTop();
+
+      assert.equal(scrollTop, 100, 'same scrollTop');
+    });
   });
 
   suite('#handleEvent', function() {
@@ -294,6 +296,7 @@ suite('views/time_parent', function() {
       items = Object.create(null);
 
       function destroy() {
+        /*jshint validthis:true */
         this.destroyed = true;
       }
 
@@ -379,5 +382,4 @@ suite('views/time_parent', function() {
     });
 
   });
-
 });

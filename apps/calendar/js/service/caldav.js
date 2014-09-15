@@ -1,11 +1,16 @@
+/* global Caldav, ICAL, uuid */
 Calendar.ns('Service').Caldav = (function() {
+  'use strict';
 
   var debug = Calendar.debug('caldav service');
 
   /* TODO: ugly hack to enable system XHR fix upstream in Caldav lib */
   var xhrOpts = {
+    /** system is required for cross domain XHR  */
     mozSystem: true,
+    /** mozAnon is required to avoid system level popups on 401 status */
     mozAnon: true,
+    /** enables use of mozilla only streaming api's when available */
     useMozChunkedText: true
   };
 
@@ -16,7 +21,7 @@ Calendar.ns('Service').Caldav = (function() {
 
     this.service = service;
     this._initEvents();
-  };
+  }
 
   Service.prototype = {
 
@@ -53,6 +58,38 @@ Calendar.ns('Service').Caldav = (function() {
 
     handleEvent: function(e) {
       this[e.type].apply(this, e.data);
+    },
+
+    /**
+     * Builds an Caldav connection from an account model object.
+     */
+    _createConnection: function(account) {
+      var params = Calendar.extend({}, account);
+      var preset = Calendar.Presets[account.preset];
+
+      if (
+          preset &&
+          preset.authenticationType &&
+          preset.apiCredentials
+      ) {
+        switch (preset.authenticationType) {
+          case 'oauth2':
+            params.httpHandler = 'oauth2';
+
+            // shallow copy the apiCredentials on the preset
+            params.apiCredentials =
+              Calendar.extend({}, preset.apiCredentials);
+
+            // the url in this case will always be tokenUrl
+            params.apiCredentials.url =
+              preset.apiCredentials.tokenUrl;
+
+            break;
+        }
+      }
+
+      var connection = new Caldav.Connection(params);
+      return connection;
     },
 
     _requestHome: function(connection, url) {
@@ -111,18 +148,35 @@ Calendar.ns('Service').Caldav = (function() {
 
     getAccount: function(account, callback) {
       var url = account.entrypoint;
-      var connection = new Caldav.Connection(account);
+      debug('Fetching account from:', url);
+
+      var connection = this._createConnection(account);
+      debug('Creating connection:', connection);
 
       var request = this._requestHome(connection, url);
+      debug('Will issue calendar home request.');
       return request.send(function(err, data) {
         if (err) {
-          callback(err);
-          return;
+          debug('Error sending home request:', err);
+          return callback(err);
         }
 
-        callback(null, {
-          calendarHome: data.url
-        });
+        debug('Received data:', data);
+        var result = {};
+
+        if (data.url) {
+          result.calendarHome = data.url;
+        }
+
+        if (connection.oauth) {
+          result.oauth = connection.oauth;
+        }
+
+        if (connection.user) {
+          result.user = connection.user;
+        }
+
+        callback(null, result);
       });
     },
 
@@ -143,9 +197,7 @@ Calendar.ns('Service').Caldav = (function() {
     findCalendars: function(account, callback) {
       var self = this;
       var url = account.calendarHome;
-      var connection = new Caldav.Connection(
-        account
-      );
+      var connection = this._createConnection(account);
 
       var request = this._requestCalendars(
         connection,
@@ -162,7 +214,6 @@ Calendar.ns('Service').Caldav = (function() {
         var results = {};
         var key;
         var item;
-        var resource;
 
         for (key in calendars) {
           if (calendars.hasOwnProperty(key)) {
@@ -188,6 +239,28 @@ Calendar.ns('Service').Caldav = (function() {
     },
 
     /**
+     * Formats an alarm trigger
+     * Returns the relative time for that trigger
+     *
+     * @param {ICAL.Property} trigger property.
+     * @param {ICAL.Date} start date.
+     */
+    _formatTrigger: function(trigger, startDate) {
+      var alarmTrigger;
+      if (trigger.type == 'duration') {
+        alarmTrigger = trigger.getFirstValue().toSeconds();
+      } else {
+        // Type is date-time
+        alarmTrigger = trigger
+          .getFirstValue()
+          .subtractDate(startDate)
+          .toSeconds();
+      }
+
+      return alarmTrigger;
+    },
+
+    /**
      * Formats an already parsed ICAL.Event instance.
      * Expects event to already contain exceptions, etc..
      *
@@ -197,6 +270,7 @@ Calendar.ns('Service').Caldav = (function() {
      * @param {ICAL.Event} event ical event.
      */
     _formatEvent: function(etag, url, ical, event) {
+      var self = this;
       var exceptions = null;
       var key;
 
@@ -222,7 +296,29 @@ Calendar.ns('Service').Caldav = (function() {
         rid = this.formatICALTime(rid);
       }
 
+      var resultAlarms = [];
+      var alarms = event.component.getAllSubcomponents('valarm');
+      alarms.forEach(function(instance) {
+        var action = instance.getFirstPropertyValue('action');
+        if (action && action === 'DISPLAY') {
+          var triggers = instance.getAllProperties('trigger');
+          var i = 0;
+          var len = triggers.length;
+
+          for (; i < len; i++) {
+
+            var trigger = triggers[i];
+
+            resultAlarms.push({
+              action: action,
+              trigger: self._formatTrigger(trigger, event.startDate)
+            });
+          }
+        }
+      });
+
       var result = {
+        alarms: resultAlarms,
         syncToken: etag,
         url: url,
         id: event.uid,
@@ -250,26 +346,20 @@ Calendar.ns('Service').Caldav = (function() {
       var alarms = comp.getAllSubcomponents('valarm');
       var result = [];
 
-      var start = details.startDate;
       var self = this;
-
       alarms.forEach(function(instance) {
         var action = instance.getFirstPropertyValue('action');
-        if (action) {
-          if (action === 'DISPLAY') {
-            // lets just assume we might have multiple triggers
-            var triggers = instance.getAllProperties('trigger');
-            var i = 0;
-            var len = triggers.length;
+        if (action && action === 'DISPLAY') {
+          // lets just assume we might have multiple triggers
+          var triggers = instance.getAllProperties('trigger');
+          var i = 0;
+          var len = triggers.length;
 
-            for (; i < len; i++) {
-              var time = start.clone();
-              time.addDuration(triggers[i].getFirstValue());
-
-              result.push({
-                startDate: self.formatICALTime(time)
-              });
-            }
+          for (; i < len; i++) {
+            result.push({
+              action: action,
+              trigger: self._formatTrigger(triggers[i], event.startDate)
+            });
           }
         }
       });
@@ -310,13 +400,19 @@ Calendar.ns('Service').Caldav = (function() {
 
       utc += offset;
 
-      return {
+      var result = {
         tzid: zone.tzid,
         // from seconds to ms
         offset: offset,
         // from seconds to ms
         utc: utc
       };
+
+      if (time.isDate) {
+        result.isDate = true;
+      }
+
+      return result;
     },
 
     /**
@@ -331,8 +427,9 @@ Calendar.ns('Service').Caldav = (function() {
      *                                    or output of formatICALTime.
      */
     formatInputTime: function(time) {
-      if (time instanceof ICAL.Time)
+      if (time instanceof ICAL.Time) {
         return time;
+      }
 
       var utc = time.utc;
       var tzid = time.tzid;
@@ -347,6 +444,10 @@ Calendar.ns('Service').Caldav = (function() {
         result = new ICAL.Time();
         result.fromUnixTime((utc - offset) / 1000);
         result.zone = ICAL.Timezone.utcTimezone;
+      }
+
+      if (time.isDate) {
+        result.isDate = true;
       }
 
       return result;
@@ -506,20 +607,21 @@ Calendar.ns('Service').Caldav = (function() {
      */
     expandRecurringEvent: function(component, options, stream, callback) {
       var self = this;
-      var startDate = options.startDate;
-
       var maxDate;
       var minDate = null;
       var now;
 
-      if (options.minDate)
+      if (options.minDate) {
         minDate = this.formatInputTime(options.minDate);
+      }
 
-      if (options.maxDate)
+      if (options.maxDate) {
         maxDate = this.formatInputTime(options.maxDate);
+      }
 
-      if (!('now' in options))
+      if (!('now' in options)) {
         options.now = ICAL.Time.now();
+      }
 
       now = options.now;
 
@@ -540,17 +642,14 @@ Calendar.ns('Service').Caldav = (function() {
 
         function occuranceHandler(next) {
           var details = event.getOccurrenceDetails(next);
-          var lastStart = details.startDate;
           var inFuture = details.endDate.compare(now);
 
-          if (Calendar.DEBUG) {
-            debug('alarm time',
-                  event.summary,
-                  'will add ' + String(inFuture),
-                  'start:', details.startDate.toJSDate().toString(),
-                  'end:', details.endDate.toJSDate().toString(),
-                  'now:', now.toJSDate().toString());
-          }
+          debug('alarm time',
+                event.summary,
+                'will add ' + String(inFuture),
+                'start:', details.startDate.toJSDate().toString(),
+                'end:', details.endDate.toJSDate().toString(),
+                'now:', now.toJSDate().toString());
 
           var occurrence = {
             start: self.formatICALTime(details.startDate),
@@ -608,7 +707,7 @@ Calendar.ns('Service').Caldav = (function() {
      */
     _handleCaldavEvent: function(url, response, stream, callback) {
       var self = this;
-      var etag = response['getetag'];
+      var etag = response.getetag;
       var event = response['calendar-data'];
 
       if (event.status != 200) {
@@ -664,9 +763,7 @@ Calendar.ns('Service').Caldav = (function() {
     streamEvents: function(account, calendar, options, stream, callback) {
       var self = this;
       var hasCompleted = false;
-      var connection = new Caldav.Connection(
-        account
-      );
+      var connection = this._createConnection(account);
 
       var cache = options.cached;
 
@@ -721,6 +818,11 @@ Calendar.ns('Service').Caldav = (function() {
           'DAV:/response', handleResponse
         );
 
+        if (err) {
+          callback(err);
+          return;
+        }
+
         if (!pending) {
           var missing = [];
 
@@ -732,7 +834,7 @@ Calendar.ns('Service').Caldav = (function() {
           stream.emit('missingEvents', missing);
 
           // notify the requester that we have completed.
-          callback(err);
+          callback();
         }
       });
     },
@@ -742,19 +844,82 @@ Calendar.ns('Service').Caldav = (function() {
     },
 
     deleteEvent: function(account, calendar, event, callback) {
-      var connection = new Caldav.Connection(
-        account
-      );
+      var connection = this._createConnection(account);
 
       var req = this._assetRequest(connection, event.url);
 
-      req.delete({}, function(err, data, xhr) {
+      req.delete({}, function(err) {
         callback(err);
       });
     },
 
+    addAlarms: function(component, alarms, account) {
+      alarms = alarms || [];
+
+      for (var i = 0; i < alarms.length; i++) {
+
+        var valarm = new ICAL.Component('valarm');
+
+        // valarm details
+        valarm.addPropertyWithValue('action', alarms[i].action);
+        valarm.addPropertyWithValue('description', 'This is an event reminder');
+        var trigger = valarm.addPropertyWithValue('trigger',
+          ICAL.Duration.fromSeconds(
+            alarms[i].trigger
+          )
+        );
+        trigger.setParameter('relative', 'START');
+        component.addSubcomponent(valarm);
+
+        // Check if we need to mirror the VALARM onto email
+        if (this.mirrorAlarms(account)) {
+          valarm = new ICAL.Component('valarm');
+          valarm.addPropertyWithValue('action', 'EMAIL');
+          valarm.addPropertyWithValue('description',
+            'This is an event reminder');
+          valarm.addPropertyWithValue('ATTENDEE', account.user);
+          trigger = valarm.addPropertyWithValue('trigger',
+            ICAL.Duration.fromSeconds(
+              alarms[i].trigger
+            )
+          );
+          trigger.setParameter('relative', 'START');
+          component.addSubcomponent(valarm);
+        }
+      }
+    },
+
+    /**
+     * Update absolute alarm times when the startDate changes.
+     *
+     * @param {ICAL.Time} originalDate of the event.
+     * @param {ICAL.Event} event to update.
+     */
+    adjustAbsoluteAlarms: function(originalDate, event) {
+      var alarms = event.component.getAllSubcomponents('valarm');
+
+      alarms.forEach(function(alarm) {
+        var trigger = alarm.getFirstProperty('trigger');
+        var value = trigger.getValues()[0].clone();
+
+        // absolute time
+        if (value instanceof ICAL.Time) {
+          // find absolute time difference
+          var diff = value.subtractDateTz(originalDate);
+          trigger.setValue(diff);
+        }
+      });
+    },
+
+    /**
+     * Yahoo needs us to mirror all alarms as EMAIL alarms
+     */
+    mirrorAlarms: function(account) {
+      return account && account.domain === 'https://caldav.calendar.yahoo.com';
+    },
+
     createEvent: function(account, calendar, event, callback) {
-      var connection = new Caldav.Connection(account);
+      var connection = this._createConnection(account);
       var vcalendar = new ICAL.Component('vcalendar');
       var icalEvent = new ICAL.Event();
 
@@ -773,6 +938,9 @@ Calendar.ns('Service').Caldav = (function() {
       icalEvent.startDate = this.formatInputTime(event.start);
       icalEvent.endDate = this.formatInputTime(event.end);
 
+      // alarms
+      this.addAlarms(icalEvent.component, event.alarms, account);
+
       vcalendar.addSubcomponent(icalEvent.component);
 
       var url = calendar.url + icalEvent.uid + '.ics';
@@ -783,6 +951,11 @@ Calendar.ns('Service').Caldav = (function() {
       event.icalComponent = vcalendar.toString();
 
       req.put({}, event.icalComponent, function(err, data, xhr) {
+        if (err) {
+          callback(err);
+          return;
+        }
+
         var token = xhr.getResponseHeader('Etag');
         event.syncToken = token;
         // TODO: error handling
@@ -801,16 +974,13 @@ Calendar.ns('Service').Caldav = (function() {
      *  unmodified parsed ical component. (VCALENDAR).
      */
     updateEvent: function(account, calendar, eventDetails, callback) {
-      var connection = new Caldav.Connection(
-        account
-      );
+      var connection = this._createConnection(account);
 
       var icalComponent = eventDetails.icalComponent;
       var event = eventDetails.event;
 
       var self = this;
       var req = this._assetRequest(connection, event.url);
-      var etag = event.syncToken;
 
       // parse event
       this.parseEvent(icalComponent, function(err, icalEvent) {
@@ -821,6 +991,7 @@ Calendar.ns('Service').Caldav = (function() {
 
         var target = icalEvent;
         var vcalendar = icalEvent.component.parent;
+        var originalStartDate = target.startDate;
 
         // find correct event
         if (event.recurrenceId) {
@@ -854,10 +1025,31 @@ Calendar.ns('Service').Caldav = (function() {
           event.end
         );
 
+        // adjust absolute alarm time ( we do this before adding/changing our
+        // new alarm times )
+        self.adjustAbsoluteAlarms(originalStartDate, target);
+
+        // We generally want to remove all 'DISPLAY' alarms
+        // UNLESS we are dealing with a YAHOO account
+        // Then we overwrite all alarms
+        var alarms = target.component.getAllSubcomponents('valarm');
+        alarms.forEach(function(alarm) {
+          var action = alarm.getFirstPropertyValue('action');
+          if (action === 'DISPLAY' || self.mirrorAlarms(account)) {
+            target.component.removeSubcomponent(alarm);
+          }
+        });
+        self.addAlarms(target.component, event.alarms, account);
+
         var vcal = target.component.parent.toString();
         event.icalComponent = vcal;
 
         req.put({}, vcal, function(err, data, xhr) {
+          if (err) {
+            callback(err);
+            return;
+          }
+
           var token = xhr.getResponseHeader('Etag');
           event.syncToken = token;
           // TODO: error handling

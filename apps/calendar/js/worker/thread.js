@@ -1,7 +1,11 @@
-((typeof(Calendar) === 'undefined') ? Calendar = {} : '');
+'use strict';
 
-// expose window globally in this
-// context if not available.
+if (typeof(Calendar) === 'undefined') {
+  /*global Calendar:true */
+  Calendar = {};
+}
+
+/*jshint -W040 */
 if (typeof(window) === 'undefined') {
   this.window = this;
 }
@@ -53,8 +57,6 @@ Calendar.Thread.prototype = {
         self, data.id
       );
 
-      var payload = data.payload;
-
       if (data.role) {
         if (data.role in self.roles) {
           if (data.type && data.type === 'stream') {
@@ -88,7 +90,11 @@ Calendar.Thread.prototype = {
     errorObject.type = err.type || 'Error';
     errorObject.constructorName = err.constructor.name || 'Error';
 
-    if ('code' in err) {
+    if (err.name) {
+      errorObject.name = err.name;
+    }
+
+    if (err.code) {
       errorObject.code = err.code;
     }
 

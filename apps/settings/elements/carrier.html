@@ -1,0 +1,57 @@
+<element name="carrier" extends="section">
+  <template>
+
+    <gaia-header action="back" data-href="#root">
+      <h1 data-l10n-id="cellularAndData-header"> Cellular &amp; Data </h1>
+    </gaia-header>
+
+    <div>
+      <ul>
+        <li>
+          <span data-l10n-id="dataNetwork">Carrier</span>
+          <small id="dataNetwork-desc"></small>
+        </li>
+      </ul>
+
+      <header>
+        <h2 data-l10n-id="dataConnectivity"> Data Connectivity </h2>
+      </header>
+      <ul>
+        <li id="menuItem-enableDataCall" aria-disabled="true">
+          <label class="pack-switch">
+            <input type="checkbox" name="ril.data.enabled" class="uninit">
+            <span data-l10n-id="dataConnection">Data Connection</span>
+            <small id="dataConnection-desc"></small>
+          </label>
+        </li>
+        <li id="dataConnection-expl" class="explanation" data-l10n-id="dataConnection-warning-message" hidden></li>
+        <li id="menuItem-enableDataRoaming">
+          <label class="pack-switch">
+            <input type="checkbox" class="uninit">
+            <span data-l10n-id="dataRoaming">Data Roaming</span>
+          </label>
+        </li>
+        <li id="dataRoaming-expl" class="explanation" data-l10n-id="dataRoaming-warning-message" hidden></li>
+      </ul>
+
+      <header>
+        <h2 data-l10n-id="advancedSettings"> Advanced Settings </h2>
+      </header>
+      <ul>
+        <li>
+          <button class="icon icon-view" data-href="#carrier-operatorSettings"
+            data-l10n-id="networkOperator"> Network Operator </button>
+        </li>
+        <li>
+          <button class="icon icon-view" data-href="#apn-settings"
+            data-l10n-id="apnSettings">APN Settings</button>
+        </li>
+      </ul>
+    </div>
+
+    <script src="shared/js/apn_helper.js"></script>
+    <script src="shared/js/settings_helper.js"></script>
+    <script src="js/carrier.js"></script>
+
+  </template>
+</element>

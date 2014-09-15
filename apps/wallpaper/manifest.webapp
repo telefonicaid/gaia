@@ -2,6 +2,8 @@
   "name": "Wallpaper",
   "description": "Gaia Wallpaper Picker",
   "type": "certified",
+  "role": "system",
+  "orientation": "default",
   "developer": {
     "name": "The Gaia Team",
     "url": "https://github.com/mozilla-b2g/gaia"
@@ -12,9 +14,7 @@
   "activities": {
     "pick": {
       "filters": {
-        "type": ["image/jpeg", "image/png"],
-        "width": 320,
-        "height": 480
+        "type": "wallpaper"
        },
       "disposition": "inline",
       "returnValue": true,
@@ -28,10 +28,23 @@
       "disposition": "inline",
       "returnValue": true,
       "href": "/share.html"
+    },
+    "setwallpaper": {
+      "filters": {
+        "type": "image/*",
+        "number": 1
+       },
+      "disposition": "inline",
+      "returnValue": true,
+      "href": "/share.html"
     }
   },
   "icons": {
-    "64": "/style/icons/64/Wallpaper.png"
+    "84": "/style/icons/wallpaper_84.png",
+    "126": "/style/icons/wallpaper_126.png",
+    "142": "/style/icons/wallpaper_142.png",
+    "189": "/style/icons/wallpaper_189.png",
+    "284": "/style/icons/wallpaper_284.png"
   },
   "locales": {
     "en-US": {

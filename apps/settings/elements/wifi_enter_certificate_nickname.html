@@ -1,0 +1,27 @@
+<element name="wifi-enterCertificateNickname" extends="section">
+  <template>
+
+    <gaia-header>
+      <button type="reset" data-icon="back"><span data-l10n-id="back">Back</span></button>
+      <h1 data-l10n-id="enterCertificateNickname"> Enter certificate nick name </h1>
+      <button type="submit"><span data-l10n-id="done">Done</span></button>
+    </gaia-header>
+
+    <div>
+      <ul>
+        <li class="nickname">
+          <p data-l10n-id="nickname">Nick name</p>
+          <input class="certificate-file-nickname" type="text" data-ignore name="nickname" dir="auto" />
+        </li>
+        <li class="description">
+          <p data-l10n-id="enter-certificate-name-msg">
+            You can change the nick name or keep the default name.
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <panel data-path="panels/wifi_enter_certificate_nickname/panel"></panel>
+
+  </template>
+</element>

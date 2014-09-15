@@ -1,10 +1,36 @@
 (function(window) {
+  'use strict';
 
   function Store() {
     Calendar.Store.Abstract.apply(this, arguments);
+    this._usedColors = [];
 
-    this._remoteByAccount = Object.create(null);
+    Calendar.Promise.denodeifyAll(this, [
+      'markWithError',
+      'remotesByAccount',
+      'sync',
+      'providerFor',
+      'ownersOf'
+    ]);
   }
+
+  /**
+   * Remote calendar colors
+   */
+  Store.REMOTE_COLORS = [
+    '#00aacc', // light blue
+    '#bad600', // light green
+    '#df4784', // pink
+    '#f9bc17', // yellow
+    '#0766b7', // dark blue
+    '#76a408', // dark green
+    '#33a185'  // teal
+  ];
+
+  /**
+   * Local calendar color (orange)
+   */
+  Store.LOCAL_COLOR = '#f97c17',
 
   /**
    * List of possible calendar capabilities.
@@ -25,29 +51,7 @@
       'alarms', 'icalComponents'
     ],
 
-    _parseId: function(id) {
-      return id;
-    },
-
-    _addToCache: function(object) {
-      var remote = object.remote.id;
-
-      this._cached[object._id] = object;
-
-      if (!(object.accountId in this._remoteByAccount)) {
-        this._remoteByAccount[object.accountId] = {};
-      }
-      this._remoteByAccount[object.accountId][remote] = object;
-    },
-
-    _removeFromCache: function(id) {
-      if (id in this.cached) {
-        var object = this.cached[id];
-        var remote = object.remote.id;
-        delete this.cached[id];
-        delete this._remoteByAccount[object.accountId][remote];
-      }
-    },
+    _parseId: Calendar.probablyParseInt,
 
     _createModel: function(obj, id) {
       if (!(obj instanceof Calendar.Models.Calendar)) {
@@ -66,19 +70,185 @@
       store.removeByIndex('calendarId', id, trans);
     },
 
-    remotesByAccount: function(accountId) {
-      if (accountId in this._remoteByAccount) {
-        return this._remoteByAccount[accountId];
+    /**
+     * Marks a given calendar with an error.
+     *
+     * Emits a 'error' event immediately.. This method is typically
+     * triggered by an account wide error.
+     *
+     *
+     * @param {Object} calendar model.
+     * @param {Calendar.Error} error for given calendar.
+     * @param {IDBTransaction} transaction optional.
+     * @param {Function} callback fired when model is saved [err, id, model].
+     */
+    markWithError: function(calendar, error, trans, callback) {
+      if (typeof(trans) === 'function') {
+        callback = trans;
+        trans = null;
       }
-      return Object.create(null);
+
+      if (!calendar._id) {
+        throw new Error('given calendar must be persisted.');
+      }
+
+      calendar.error = {
+        name: error.name,
+        date: new Date()
+      };
+
+      this.persist(calendar, trans, callback);
+    },
+
+    persist: function(calendar, trans, callback) {
+      if (typeof(trans) === 'function') {
+        callback = trans;
+        trans = undefined;
+      }
+
+      this._updateCalendarColor(calendar);
+
+      var cb = callback;
+      var cached = this._cached[calendar._id];
+
+      if (cached && cached.localDisplayed !== calendar.localDisplayed) {
+        cb = function(err, id, model) {
+          this.emit('calendarVisibilityChange', id, model);
+          callback(err, id, model);
+        }.bind(this);
+      }
+
+      Calendar.Store.Abstract.prototype.persist.call(
+        this, calendar, trans, cb
+      );
+    },
+
+    remove: function(id, trans, callback) {
+      this._removeCalendarColorFromCache(id);
+      Calendar.Store.Abstract.prototype.remove.apply(this, arguments);
+    },
+
+    _updateCalendarColor: function(calendar) {
+      // we avoid storing multiple colors for same calendar in case of an
+      // "update" operation
+      this._removeCalendarColorFromCache(calendar._id);
+      this._setCalendarColor(calendar);
+      // cache is built asynchronously, we need to store the color as soon as
+      // possible to avoid adding same color multiple times in a row (eg.
+      // account with multiple calendars will call persist multiple times)
+      this._usedColors.push(calendar.color);
+    },
+
+    _removeCalendarColorFromCache: function(id) {
+      // we need to remove the color from index as soon as possible to avoid
+      // race conditions (remove is async)
+      var color = this._getCachedColorByCalendarId(id);
+      var index = this._usedColors.indexOf(color);
+      if (index !== -1) {
+        this._usedColors.splice(index, 1);
+      }
+    },
+
+    _getCachedColorByCalendarId: function(id) {
+      return this._cached[id] && this._cached[id].color;
+    },
+
+    _setCalendarColor: function(calendar) {
+      // local calendar should always use the same color
+      if (calendar._id === Calendar.Provider.Local.calendarId) {
+        calendar.color = Store.LOCAL_COLOR;
+        return;
+      }
+
+      // restore previous color only if it is part of the palette, otherwise we
+      // get the next available color (or least used)
+      var prevColor = this._getCachedColorByCalendarId(calendar._id);
+      if (prevColor && Store.REMOTE_COLORS.indexOf(prevColor) !== -1) {
+        calendar.color = prevColor;
+      } else {
+        calendar.color = this._getNextColor();
+      }
+    },
+
+    _getNextColor: function() {
+      var available = Store.REMOTE_COLORS.filter(function(color) {
+        return this._usedColors.indexOf(color) === -1;
+      }, this);
+
+      return available.length ? available[0] : this._getLeastUsedColor();
+    },
+
+    _getLeastUsedColor: function() {
+      var counter = {};
+      this._usedColors.forEach(function(color) {
+        counter[color] = (counter[color] || 0) + 1;
+      });
+
+      var leastUsedColor;
+      var leastUsedCount = Infinity;
+      for (var color in counter) {
+        if (counter[color] < leastUsedCount) {
+          leastUsedCount = counter[color];
+          leastUsedColor = color;
+        }
+      }
+
+      return leastUsedColor;
+    },
+
+    shouldDisplayCalendar: function(calendarId) {
+      var calendar = this._cached[calendarId];
+      return calendar && calendar.localDisplayed;
+    },
+
+    /**
+     * Find calendars in a specific account.
+     * Results will be returned in an object where
+     * the key is the remote.id and the value is the calendar.
+     *
+     * @param {String|Numeric} accountId id of account.
+     * @param {Function} callback [err, object] see above.
+     */
+    remotesByAccount: function(accountId, trans, callback) {
+      if (typeof(trans) === 'function') {
+        callback = trans;
+        trans = null;
+      }
+
+      if (!trans) {
+        trans = this.db.transaction(this._store);
+      }
+
+      var store = trans.objectStore(this._store);
+
+      var reqKey = IDBKeyRange.only(accountId);
+      var req = store.index('accountId').mozGetAll(reqKey);
+
+      req.onerror = function remotesError(e) {
+        callback(e.target.error);
+      };
+
+      var self = this;
+      req.onsuccess = function remotesSuccess(e) {
+        var result = Object.create(null);
+        e.target.result.forEach(function(calendar) {
+          result[calendar.remote.id] = self._createModel(
+            calendar,
+            calendar._id
+          );
+        });
+
+        callback(null, result);
+      };
     },
 
     /**
      * Sync remote and local events for a calendar.
+     *
+     * TODO: Deprecate use of this function in favor of a sync methods
+     *       inside of providers.
      */
     sync: function(account, calendar, callback) {
-      var self = this;
-      var store = this.db.getStore('Event');
       var provider = Calendar.App.provider(
         account.providerType
       );
@@ -89,68 +259,70 @@
      * Shortcut to find provider for calendar.
      *
      * @param {Calendar.Models.Calendar} calendar input calendar.
-     * @return {Calendar.Provider.Abstract} provider.
+     * @param {Function} callback [err, provider].
      */
-    providerFor: function(calendar) {
-      var acc = this.accountFor(calendar);
-      return Calendar.App.provider(acc.providerType);
-    },
-
-    /**
-     * Finds account for calendar
-     *
-     * @param {Calendar.Models.Calendar} calendar input calendar.
-     * @return {Calendar.Models.Account} cached account.
-     */
-    accountFor: function(calendar) {
-      return this.db.getStore('Account').cached[calendar.accountId];
-    },
-
-    /**
-     * Find calendar(s) with a specific capability:
-     * NOTE: this method only searches through cached calendars.
-     *
-     * Possible Capabilities:
-     *
-     *  - createEvent
-     *  - deleteEvent
-     *  - editEvent
-     *
-     * @param {String} type name of capability.
-     * @return {Array[Calendar.Model.Calendar]} list of calendar models.
-     */
-    findWithCapability: function(type) {
-      var accounts = this.db.getStore('Account');
-      var propName;
-
-      if (!(type in Store.capabilities)) {
-        throw new Error('invalid capability: "' + type + '"');
-      }
-
-      propName = Store.capabilities[type];
-
-      var list = this.cached;
-      var result = [];
-      var cal;
-      var id;
-      var account;
-      var provider;
-
-      for (id in list) {
-        cal = list[id];
-        account = accounts.cached[cal.accountId];
-        if (account) {
-          provider = Calendar.App.provider(account.providerType);
-          var caps = provider.calendarCapabilities(cal);
-          if (caps[propName]) {
-            result.push(cal);
-          }
+    providerFor: function(calendar, callback) {
+      this.ownersOf(calendar, function(err, owners) {
+        if (err) {
+          return callback(err);
         }
+
+        callback(
+          null,
+          Calendar.App.provider(owners.account.providerType)
+        );
+      });
+    },
+
+    /**
+     * Finds calendar/account for a given event.
+     *
+     * TODO: think about moving this function into its
+     * own file as a mixin.
+     *
+     * @param {Object|String|Numeric} objectOrId must contain .calendarId.
+     * @param {Function} callback [err, { ... }].
+     */
+    ownersOf: function(objectOrId, callback) {
+      var result = {};
+
+      var accountStore = this.db.getStore('Account');
+
+      // case 1. given a calendar
+      if (objectOrId instanceof Calendar.Models.Calendar) {
+        result.calendar = objectOrId;
+        accountStore.get(objectOrId.accountId, fetchAccount);
+        return;
       }
 
-      return result;
-    }
+      // case 2 given a calendar id or object
 
+      if (typeof(objectOrId) === 'object') {
+        objectOrId = objectOrId.calendarId;
+      }
+
+      // why??? because we use this method in event store too..
+      var calendarStore = this.db.getStore('Calendar');
+      calendarStore.get(objectOrId, fetchCalendar);
+
+      function fetchCalendar(err, calendar) {
+        if (err) {
+          return callback(err);
+        }
+
+        result.calendar = calendar;
+        accountStore.get(calendar.accountId, fetchAccount);
+      }
+
+      function fetchAccount(err, account) {
+        if (err) {
+          return callback(err);
+        }
+
+        result.account = account;
+        callback(null, result);
+      }
+    }
   };
 
   Calendar.ns('Store').Calendar = Store;

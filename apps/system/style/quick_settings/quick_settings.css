@@ -1,129 +1,86 @@
-html, body {
-  font-family: 'MozTT', sans-serif;
-  font-size: 10px;
-}
-
 #quick-settings {
-  display: block;
-  width: 100%;
-  height: 60px;
-  padding: 0;
-
-  background-image: url(images/background.png);
-  background-size: 100% 60px;
-
-  border-top:1px black solid;
+  height: 6rem;
+  pointer-events: none;
 }
 
-#quick-settings > a {
-  display: block;
+#quick-settings > li {
+  padding: 0 1.5rem;
+  margin: 0;
+  list-style: none;
+}
+
+#quick-settings ul {
   float: left;
-  width: -moz-calc(20% - 2px);
-  height: 30px;
-  margin: 15px 0;
+  width: 20%;
   padding: 0;
-  color: #fff;
+  margin: 0;
+}
+
+#quick-settings.non-mobile ul {
+  width: 25%;
+}
+
+#quick-settings a {
+  display: block;
+  height: 5rem;
+  width: 100%;
+  padding: 1.5rem 0;
+  margin: 0;
+  color: #e7e7e7;
   text-align: center;
   text-decoration: none;
   outline: none;
-  font-size: 1.4rem;
-  line-height: 1.8rem;
+  background: none;
+
+  pointer-events: auto;
 }
 
-#quick-settings > .separator {
-  border-right: 1px black solid;
-  border-left: 1px gray solid;
-  margin: 15px 0;
-  height: 30px;
-  float: left;
+#quick-settings a:before {
+  line-height: 4rem;
 }
 
-#quick-settings > a:first-child {
-  width: -moz-calc(20% - 1px);
-  border-left: 0;
-}
-
-#quick-settings > a:last-child {
-  width: -moz-calc(20% - 1px);
-  border-right: 0;
-}
-
-#quick-settings > a {
-  background-position: center;
-  background-repeat: no-repeat;
-}
 #quick-settings > *[data-initializing] {
   opacity: 0.5;
 }
-#quick-settings-wifi {
-  background-image: url(images/wifi-off.png);
-}
+
 #quick-settings-wifi[data-enabled] {
-  background-image: url(images/wifi-on.png);
+  color: #008eab;
 }
-#quick-settings-data {
-  background-image: url(images/data-off.png);
+
+.non-mobile #quick-settings-data {
+  display: none;
 }
-#quick-settings-data[data-network="2G"]  {
-  background-image: url(images/data-2g-off.png);
+
+#quick-settings-data[data-enabled] {
+  color: #008eab;
 }
-#quick-settings-data[data-enabled][data-network="2G"] {
-  background-image: url(images/data-2g-on.png);
-}
-#quick-settings-data[data-network="3G"] {
-  background-image: url(images/data-3g-off.png);
-}
-#quick-settings-data[data-enabled][data-network="3G"] {
-  background-image: url(images/data-3g-on.png);
-}
-#quick-settings-data[data-network="4G"] {
-  background-image: url(images/data-4g-off.png);
-}
-#quick-settings-data[data-enabled][data-network="4G"] {
-  background-image: url(images/data-4g-on.png);
-}
-#quick-settings-data[data-network="E"] {
-  background-image: url(images/data-e-off.png);
-}
-#quick-settings-data[data-enabled][data-network="E"] {
-  background-image: url(images/data-e-on.png);
-}
-#quick-settings-data[data-network="H"] {
-  background-image: url(images/data-h-off.png);
-}
-#quick-settings-data[data-enabled][data-network="H"] {
-  background-image: url(images/data-h-on.png);
-}
-#quick-settings-data[data-network="H+"] {
-  background-image: url(images/data-h+-off.png);
-}
-#quick-settings-data[data-enabled][data-network="H+"] {
-  background-image: url(images/data-h+-on.png);
-}
-#quick-settings-data[data-network="O"] {
-  background-image: url(images/data-o-off.png);
-}
-#quick-settings-data[data-enabled][data-network="O"] {
-  background-image: url(images/data-o-on.png);
-}
-#quick-settings-bluetooth {
-  background-image: url(images/bluetooth-off.png);
-}
+
 #quick-settings-bluetooth[data-enabled] {
-  background-image: url(images/bluetooth-on.png);
+  color: #008eab;
 }
-#quick-settings-airplane-mode {
-  background-image: url(images/airplane-mode-off.png);
-}
+
 #quick-settings-airplane-mode[data-enabled] {
-  background-image: url(images/airplane-mode-on.png);
+  color: #008eab;
 }
-#quick-settings-full-app {
-  background-image: url(images/settings-off.png);
+
+#quick-settings-airplane-mode[data-enabling] {
+  color: #008eab;
+  opacity: 0.5;
 }
-#quick-settings-full-app:active {
-  background-image: url(images/settings-on.png);
+
+#quick-settings-full-app:active:before {
+  color: #008eab;
 }
+
 .quick-settings-airplane-mode {
   opacity: 0.5;
+}
+#quick-setting-data-enabled-dialog {
+  /* Increasing padding size form 1.5 to 3.5rem for confirm dialogs with statusbar active */
+  padding-top: 3.5rem;
+  display: none;
+}
+#quick-setting-data-enabled-dialog.visible {
+  display: inline-block;
+  pointer-events: auto;
 }

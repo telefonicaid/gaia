@@ -1,9 +1,9 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('format.js');
-  requireLib('template.js');
-});
+requireLib('format.js');
+requireLib('template.js');
 
 suite('calendar/template', function() {
+  'use strict';
+
   var Template, subject,
       tplStr = '%s foo %h',
       support;
@@ -84,7 +84,8 @@ suite('calendar/template', function() {
     });
 
     test('when input is not an object', function() {
-      var tpl = new Template(function() { return 'foo ' + this.h('value') + '!'; });
+      var tpl = new Template(function() {
+          return 'foo ' + this.h('value') + '!'; });
       var result = tpl.render(1);
 
       assert.equal(result, 'foo 1!');
@@ -141,6 +142,27 @@ suite('calendar/template', function() {
       assert.equal(tpl.render('bar'), '\nfoo bar');
     });
 
+    test('with numeric, null and objects', function() {
+      var tpl = new Template(function() {
+        return 'foo ' + this.h('nullish') + this.h('undefinedish') +
+          this.h('zeroish') +' '+ this.h('falseish') + ' ' +
+          this.h('objectish');
+      });
+      // null, undefined and zero caused problems previously
+      assert.equal(tpl.render({
+        nullish: null,
+        undefinededish: undefined,
+        zeroish: 0,
+        falseish: false,
+        objectish: {
+          toString: function() {
+            // this should be escaped!!!
+            return '<a>complex</a>';
+          }
+        }
+      }), 'foo 0 false &lt;a&gt;complex&lt;/a&gt;');
+    });
+
     test('no html escape', function() {
       var tpl, input, output;
 
@@ -158,7 +180,7 @@ suite('calendar/template', function() {
     });
 
     test('bool handler', function() {
-      var tpl, input, output;
+      var tpl, output;
       tpl = new Template(function() { return this.bool('one', 'selected'); });
       output = tpl.render({ one: true });
       assert.equal(output, 'selected');
@@ -219,7 +241,7 @@ suite('calendar/template', function() {
   });
 
   suite('benchmarks', function() {
-
+    /*jshint -W027 */
     test('tpl vs format', function() {
       // XXX: Minor performance regression
       // come back later and inline
@@ -229,8 +251,6 @@ suite('calendar/template', function() {
 
       var tpl = 'My name is {first} {last}, Thats Mr {last}';
       var template;
-
-      var expected = 'My name is Sahaja Lal, Thats Mr Lal';
 
       var results = support.vs(5000, {
         compiled: function() {
@@ -261,9 +281,9 @@ suite('calendar/template', function() {
 
       div.appendChild(span);
 
-      var results = support.vs(5000, {
+      support.vs(5000, {
         html: function() {
-          var myDiv = div.cloneNode(),
+          var myDiv = div.cloneNode(true),
               mySpan = myDiv.querySelector('span');
 
           myDiv.className = 'dynamic';
@@ -277,7 +297,8 @@ suite('calendar/template', function() {
         template: function() {
           tpl = tpl || new Template(function() {
             return '<div class="' + this.h('divClass') + '">' +
-              '<span class="' + this.h('spanClass') + '">' + this.h('content') + '</span>' +
+              '<span class="' + this.h('spanClass') + '">' +
+                this.h('content') + '</span>' +
             '</div>';
           });
           container.innerHTML = '';

@@ -3,10 +3,15 @@
 
 'use strict';
 
-// The modal dialog listen to mozbrowsershowmodalprompt event.
-// Blocking the current app and then show custom modal dialog
-// (alert/confirm/prompt)
+/* exported ModalDialog */
 
+/**
+ * The modal dialog listen to mozbrowsershowmodalprompt event.
+ * Blocking the current app and then show custom modal dialog
+ * (alert/confirm/prompt)
+ *
+ * @namespace ModalDialog
+ */
 var ModalDialog = {
   // Used for element id access.
   // e.g., 'modal-dialog-alert-ok'
@@ -15,7 +20,7 @@ var ModalDialog = {
   // DOM
   elements: {},
 
-  // Get all elements when inited.
+  /** Get all elements when inited. */
   getAllElements: function md_getAllElements() {
     var elementsID = ['alert', 'alert-ok', 'alert-message',
       'prompt', 'prompt-ok', 'prompt-cancel', 'prompt-input', 'prompt-message',
@@ -37,15 +42,16 @@ var ModalDialog = {
   },
 
   // Save the events returned by mozbrowsershowmodalprompt for later use.
-  // The events are stored according to webapp origin
-  // e.g., 'http://uitest.gaiamobile.org': evt
+  // The events are stored according to webapp origin and in the order in
+  // which they are received,
+  // e.g., 'http://uitest.gaiamobile.org': [evt1, evt2]
   currentEvents: {},
 
+  /** Initialization. Get DOM elements and add listeners. */
   init: function md_init() {
     // Get all elements initially.
     this.getAllElements();
     var elements = this.elements;
-
     for (var id in elements) {
       if (elements[id].tagName.toLowerCase() == 'button') {
         elements[id].addEventListener('click', this);
@@ -54,15 +60,24 @@ var ModalDialog = {
     elements.customPromptButtons.addEventListener('click', this);
   },
 
-  // Default event handler
+  /**
+   * Default event handler for mozbrowser event and click event.
+   * @param {Event} evt
+   * @param {String} origin Tab ID
+   */
   handleEvent: function md_handleEvent(evt, origin) {
     var elements = this.elements;
     switch (evt.type) {
       case 'mozbrowsershowmodalprompt':
-        if (this.boundToWindow && evt.target.dataset.frameType != 'window')
+        if (this.boundToWindow && evt.target.dataset.frameType != 'window') {
           return;
+        }
         evt.preventDefault();
-        this.currentEvents[origin] = evt;
+        if (this.originHasEvent(origin)) {
+          this.currentEvents[origin].push(evt);
+          break;
+        }
+        this.currentEvents[origin] = [evt];
 
         // Show modal dialog only if
         // the frame is currently displayed.
@@ -84,13 +99,17 @@ var ModalDialog = {
     }
   },
 
-  // Show relative dialog and set message/input value well
+  /**
+   * Show relative dialog and set message/input value well.
+   * @param {String} origin Tab ID
+   */
   show: function md_show(origin) {
     this.currentOrigin = origin;
-    var evt = this.currentEvents[origin];
+    var evt = this.currentEvents[origin][0];
 
     var message = evt.detail.message;
     var elements = this.elements;
+    document.body.classList.add('modal-active');
 
     function escapeHTML(str) {
       var span = document.createElement('span');
@@ -107,22 +126,26 @@ var ModalDialog = {
     switch (type) {
       case 'alert':
         elements.alertMessage.innerHTML = message;
-        elements.alert.hidden = false;
+        elements.alert.classList.add('visible');
+        elements.alert.focus();
         break;
 
       case 'prompt':
-        elements.prompt.hidden = false;
+        elements.prompt.classList.add('visible');
         elements.promptInput.value = evt.detail.initialValue;
         elements.promptMessage.innerHTML = message;
+        elements.prompt.focus();
         break;
 
       case 'custom-prompt':
         var prompt = evt.detail;
-        elements.customPrompt.hidden = false;
-        elements.customPromptMessage.innerHTML = prompt.message;
+        elements.customPrompt.classList.add('visible');
+        elements.customPromptMessage.innerHTML = escapeHTML(prompt.message);
 
         // Display custom list of buttons
         elements.customPromptButtons.innerHTML = '';
+        elements.customPromptButtons.setAttribute('data-items',
+                                                  prompt.buttons.length);
         for (var i = 0, l = prompt.buttons.length; i < l; i++) {
           var button = prompt.buttons[i];
           var domElement = document.createElement('button');
@@ -130,7 +153,7 @@ var ModalDialog = {
           if (button.messageType === 'builtin') {
             // List of potential `message` values are defined here:
             // http://hg.mozilla.org/mozilla-central/annotate/5ce71981e005/dom/browser-element/BrowserElementPromptService.jsm#l157
-            domElement.textContent = navigator.mozL10n.get(button.message);
+            domElement.setAttribute('data-l10n-id', button.message);
           } else if (button.messageType === 'custom') {
             // For custom button, we assume that the text is already translated
             domElement.textContent = button.message;
@@ -153,99 +176,144 @@ var ModalDialog = {
           // We assume that checkbox custom message is already translated
           checkbox.nextElementSibling.textContent = prompt.checkboxMessage;
         }
+
+        elements.customPrompt.focus();
         break;
 
       case 'confirm':
-        elements.confirm.hidden = false;
+        elements.confirm.classList.add('visible');
         elements.confirmMessage.innerHTML = message;
+        elements.confirm.focus();
         break;
     }
   },
 
+  /**
+   * Hide dialog.
+   */
   hide: function md_hide() {
-    var evt = this.currentEvents[this.currentOrigin];
-    if (!evt)
+    document.body.classList.remove('modal-active');
+    var evt = this.currentEvents[this.currentOrigin][0];
+    if (!evt) {
       return;
-    var type = evt.detail.promptType;
+    }
+
     this.currentOrigin = null;
   },
 
-  // When user clicks OK button on alert/confirm/prompt
+  /**
+   * When user clicks OK button on alert/confirm/prompt,
+   * hide the dialog and return a value accordingly.
+   * Show the next dialog if any.
+   * @param {iframe} target
+   */
   confirmHandler: function md_confirmHandler(target) {
+    document.body.classList.remove('modal-active');
     var elements = this.elements;
 
-    var evt = this.currentEvents[this.currentOrigin];
+    var evt = this.currentEvents[this.currentOrigin][0];
     var type = evt.detail.promptType;
 
     switch (type) {
       case 'alert':
-        elements.alert.hidden = true;
+        elements.alert.classList.remove('visible');
         break;
 
       case 'prompt':
         evt.detail.returnValue = elements.promptInput.value;
-        elements.prompt.hidden = true;
+        elements.prompt.classList.remove('visible');
         break;
 
       case 'custom-prompt':
         var returnValue = {
           selectedButton: target.dataset.buttonIndex
         };
-        if (evt.detail.showCheckbox)
+        if (evt.detail.showCheckbox) {
           returnValue.checked = elements.customPromptCheckbox.checked;
+        }
         evt.detail.returnValue = returnValue;
-        elements.customPrompt.hidden = true;
+        elements.customPrompt.classList.remove('visible');
         break;
 
       case 'confirm':
         evt.detail.returnValue = true;
-        elements.confirm.hidden = true;
+        elements.confirm.classList.remove('visible');
         break;
     }
 
-    if (evt.detail.unblock)
+    if (evt.detail.unblock) {
       evt.detail.unblock();
+    }
 
-    delete this.currentEvents[this.currentOrigin];
+    this.remove(this.currentOrigin);
   },
 
-  // When user clicks cancel button on confirm/prompt or
-  // when the user try to escape the dialog with the escape key
+  /**
+   * When user clicks cancel button on confirm/prompt or
+   * when the user try to escape the dialog with the escape key,
+   * hide the dialog and show the next dialog if any.
+   */
   cancelHandler: function md_cancelHandler() {
-    var evt = this.currentEvents[this.currentOrigin];
+    var evt = this.currentEvents[this.currentOrigin][0];
     var elements = this.elements;
     var type = evt.detail.promptType;
 
     switch (type) {
       case 'alert':
-        elements.alert.hidden = true;
+        elements.alert.classList.remove('visible');
         break;
 
       case 'prompt':
         /* return null when click cancel */
         evt.detail.returnValue = null;
-        elements.prompt.hidden = true;
+        elements.prompt.classList.remove('visible');
         break;
 
       case 'confirm':
         /* return false when click cancel */
         evt.detail.returnValue = false;
-        elements.confirm.hidden = true;
+        elements.confirm.classList.remove('visible');
         break;
     }
 
-    if (evt.detail.unblock)
+    if (evt.detail.unblock) {
       evt.detail.unblock();
+    }
 
-    delete this.currentEvents[this.currentOrigin];
+    this.remove(this.currentOrigin);
   },
 
+  /**
+   * Check if the specified tab currently has any event.
+   * @param {String} origin Tab ID
+   */
   originHasEvent: function(origin) {
     return origin in this.currentEvents;
   },
 
+  /**
+   * Clear events of the specified tab ID.
+   * @param {String} origin Tab ID
+   */
   clear: function ad_clear(origin) {
-    if (this.currentEvents[origin])
+    if (this.currentEvents[origin]) {
       delete this.currentEvents[origin];
+    }
+  },
+
+  /**
+   * Remove the event of the specified tab from queue,
+   * show the next dialog if any.
+   * @param {String} origin Tab ID
+   */
+  remove: function(origin) {
+    if (this.currentEvents[origin]) {
+      this.currentEvents[origin].shift();
+      if (this.currentEvents[origin].length !== 0) {
+        this.show(origin);
+        return;
+      }
+      delete this.currentEvents[origin];
+    }
   }
 };

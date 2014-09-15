@@ -8,7 +8,9 @@ function startup(data, reason) {
   const Cc = Components.classes;
   const Ci = Components.interfaces;
   const Cu = Components.utils;
+  const Cm = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
 
+  Cu.import('resource://gre/modules/XPCOMUtils.jsm');
   Cu.import('resource://gre/modules/Services.jsm');
   try {
     // Gecko < 21
@@ -20,12 +22,21 @@ function startup(data, reason) {
 
   // Make sure all applications are considered launchable
   Cu.import('resource://gre/modules/Webapps.jsm');
+  const env = Cc['@mozilla.org/process/environment;1'].
+              getService(Ci.nsIEnvironment);
   DOMApplicationRegistry.allAppsLaunchable = true;
 
+  const LANG_EN = 'en-US';
   const GAIA_DOMAIN = Services.prefs.getCharPref("extensions.gaia.domain");
-  const GAIA_APP_SRCDIRS = Services.prefs.getCharPref("extensions.gaia.app_src_dirs");
+  const GAIA_APPDIRS = Services.prefs.getCharPref("extensions.gaia.appdirs");
+  const GAIA_ALLAPPDIRS = Services.prefs.getCharPref("extensions.gaia.allappdirs");
   const GAIA_DIR = Services.prefs.getCharPref("extensions.gaia.dir");
   const GAIA_PORT = Services.prefs.getIntPref("extensions.gaia.port");
+  const GAIA_OFFICIAL = Services.prefs.getBoolPref("extensions.gaia.official");
+  const LOCALES_FILE =
+    Services.prefs.getCharPref("extensions.gaia.locales_file");
+  const LOCALE_BASEDIR =
+    Services.prefs.getCharPref("extensions.gaia.locale_basedir");
 
   const LocalFile = CC('@mozilla.org/file/local;1',
                        'nsILocalFile',
@@ -36,15 +47,22 @@ function startup(data, reason) {
                                    'init');
 
   let DEBUG = false;
+  let l10nManager, utils;
   function debug(data) {
     if (!DEBUG)
       return;
     dump(data + '\n');
   }
 
+  function isl10nFile(fname) {
+    var matched;
+    return fname.contains('.ini') || fname.contains('manifest.webapp');
+  }
+
   function startupHttpd(baseDir, port) {
     const httpdURL = 'chrome://httpd.js/content/httpd.js';
     let httpd = {};
+    env.set('GAIA_DIR', GAIA_DIR);
     Services.scriptloader.loadSubScript(httpdURL, httpd);
     let server = new httpd.nsHttpServer();
     server.registerDirectory('/', new LocalFile(baseDir));
@@ -58,7 +76,7 @@ function startup(data, reason) {
     let host = GAIA_DOMAIN;
     identity.add(scheme, host, port);
 
-    let directories = getDirectories(baseDir);
+    let directories = getDirectories(GAIA_ALLAPPDIRS.split(' '));
     directories.forEach(function appendDir(name) {
       // Some app names can cause a raise here, preventing other apps
       // from being added.
@@ -69,28 +87,76 @@ function startup(data, reason) {
       }
     });
 
+    let commonjs = {
+      GAIA_BUILD_DIR: 'file://' + GAIA_DIR.replace(/\\/g, '/') + '/build/'
+    };
+    // Loading |require| then we can use build scripts of gaia.
+    Services.scriptloader.loadSubScript(commonjs.GAIA_BUILD_DIR +
+      '/xpcshell-commonjs.js', commonjs);
+    utils = commonjs.require('./utils');
+
+    if (LOCALE_BASEDIR) {
+      let appDirs = GAIA_APPDIRS.split(' ');
+      let multilocale = commonjs.require('./multilocale');
+      let sharedDir = utils.getFile(GAIA_DIR, 'shared');
+      l10nManager = new multilocale.L10nManager(GAIA_DIR,
+        LOCALES_FILE, LOCALE_BASEDIR);
+      let filesInShared = utils.ls(sharedDir, true);
+      let localesFile = utils.resolve(LOCALES_FILE, GAIA_DIR);
+
+      // Finding out which file we need to handle.
+      appDirs.forEach(function(appDir) {
+        let appDirFile = utils.getFile(appDir);
+        let filesInApp = utils.ls(appDirFile, true);
+
+        [...filesInApp, ...filesInShared].forEach(function(file) {
+          let fname = file.leafName;
+          let relativePath = file.path.substr(GAIA_DIR.length);
+          // localized ini and manifest files will be generated in runtime
+          // so we need handle path if client request those files.
+          // and we use "LocalizationHandler" to handle them.
+          if (isl10nFile(fname)) {
+            server.registerPathHandler(relativePath, LocalizationHandler);
+          }
+        });
+      });
+
+      // languages.json
+      server.registerFile('/shared/resources/languages.json', localesFile);
+      server.registerDirectory('/locales/',
+        new LocalFile(l10nManager.localeBasedir));
+    }
+
+    let testAgentBoilerplateDir = utils.getFile(GAIA_DIR, 'dev_apps',
+      'test-agent', 'common', 'test', 'boilerplate');
+    let proxyFile = testAgentBoilerplateDir.clone();
+    let sandboxFile = testAgentBoilerplateDir.clone();
+    proxyFile.append('_proxy.html');
+    sandboxFile.append('_sandbox.html');
+    server.registerFile('/test/unit/_proxy.html', proxyFile);
+    server.registerFile('/test/unit/_sandbox.html', sandboxFile);
+
     server.registerPathHandler('/marionette', MarionetteHandler);
+
+    server.registerDirectory(
+      '/common/', new LocalFile(baseDir + '/dev_apps/test-agent/common')
+    );
+    server.registerDirectory('/shared/', new LocalFile(baseDir + '/shared'));
+
+    let brandingLocalFile = new LocalFile(
+      baseDir + '/shared/resources/branding/' + (GAIA_OFFICIAL ? 'official' : 'unofficial')
+    );
+
+    server.registerDirectory('/shared/resources/branding/', brandingLocalFile);
   }
 
-  function getDirectories(dir) {
-    let dirs = [];
-    let appSrcDirs = GAIA_APP_SRCDIRS.split(' ');
-
-    appSrcDirs.forEach(function addDirectory(name) {
+  function getDirectories(appDirs) {
+    return appDirs.map(function (path) {
       let appsDir = Cc['@mozilla.org/file/local;1']
                       .createInstance(Ci.nsILocalFile);
-      appsDir.initWithPath(dir);
-      appsDir.append(name);
-
-      let files = appsDir.directoryEntries;
-      while (files.hasMoreElements()) {
-        let file = files.getNext().QueryInterface(Ci.nsILocalFile);
-        if (file.isDirectory()) {
-          dirs.push(file.leafName);
-        }
-      }
+      appsDir.initWithPath(path);
+      return appsDir.leafName;
     });
-    return dirs;
   }
 
   function LongPoll(connid, transport) {
@@ -171,6 +237,43 @@ function startup(data, reason) {
       return this._connections[uid] || null;
     }
   };
+
+  var LocalizationHandler = {
+    // we only handle GET method because we always use GET method to get those
+    // files.
+    handle: function lh_handle(request, response) {
+      if (request.method === 'GET' && l10nManager) {
+        let locales = JSON.parse(JSON.stringify(l10nManager.locales));
+        // no need to handle en-US.
+        var enIndex = locales.indexOf('en-US');
+        if (enIndex !== -1) {
+          locales.splice(enIndex, 1);
+        }
+        let {getFile, getFileContent} = utils;
+        let {modifyLocaleIni, serializeIni} = l10nManager;
+
+        let file = getFile(GAIA_DIR, request.path);
+        if (file.leafName.contains('.ini')) {
+          response.setHeader('Content-Type', 'text/plain');
+          let iniOriginal = getFileContent(file);
+          let modifiedIni = serializeIni(modifyLocaleIni(iniOriginal, locales));
+          response.write(modifiedIni);
+        } else if (file.leafName.contains('manifest.webapp')) {
+          let buildDirectoryFile = getFile(GAIA_DIR, 'build_stage',
+            file.parent.leafName);
+          response.setHeader('Content-Type', 'application/json');
+          let webapp = {
+            manifestFile: file,
+            sourceDirectoryFile: file.parent,
+            sourceDirectoryName: file.parent.leafName,
+            buildDirectoryFile: buildDirectoryFile
+          };
+          let manifest = l10nManager.localizeManifest(webapp);
+          response.write(JSON.stringify(manifest));
+        }
+      }
+    }
+  }
 
   var MarionetteHandler = {
 
@@ -354,6 +457,55 @@ function startup(data, reason) {
     }
   };
 
+  function registerAppProtocol() {
+    let classID = Components.ID('{e3bace70-f074-11e3-ac10-0800200c9a66}');
+    let contract = '@mozilla.org/network/protocol;1?name=app';
+    let instance = null;
+
+    function AppProtocol() {}
+
+    AppProtocol.prototype = {
+      scheme: 'app',
+      classID: classID,
+      QueryInterface: XPCOMUtils.generateQI([Ci.nsIProtocolHandler]),
+      newURI: function(aSpec, aOriginCharset, aBaseURI) {
+        let uri = Cc["@mozilla.org/network/standard-url;1"]
+                  .createInstance(Ci.nsIStandardURL);
+        uri.init(Ci.nsIStandardURL.URLTYPE_STANDARD, -1, aSpec, aOriginCharset,
+                 aBaseURI);
+        return uri.QueryInterface(Ci.nsIURI);
+      },
+      newChannel: function(aURI) {
+        let url = aURI.QueryInterface(Ci.nsIURL);
+        let appId = aURI.host;
+        let fileSpec = url.filePath;
+        let uri;
+        uri = 'http://' + appId + ':' + GAIA_PORT + fileSpec;
+        let channel = Services.io.newChannel(uri, null, null);
+        channel.QueryInterface(Ci.nsIChannel).originalURI = aURI;
+        return channel;
+      },
+    };
+
+    let newFactory = {
+      createInstance: function(outer, iid) {
+        if (outer) {
+          throw Components.results.NS_ERROR_NO_AGGREGATION;
+        }
+        if (instance === null) {
+          instance = new AppProtocol();
+        }
+        return instance;
+      },
+      lockFactory: function(aLock) {
+         throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+      },
+      QueryInterface: XPCOMUtils.generateQI([Ci.nsIFactory])
+    };
+    Cm.registerFactory(classID, '', contract, newFactory);
+  }
+
+  registerAppProtocol();
   startupHttpd(GAIA_DIR, GAIA_PORT);
 }
 

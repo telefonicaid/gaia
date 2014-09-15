@@ -1,6 +1,6 @@
 Calendar.ns('Views').Month = (function() {
+  'use strict';
 
-  var template = Calendar.Templates.Month;
   var Calc = Calendar.Calc;
   var Parent = Calendar.Views.TimeParent;
 
@@ -9,6 +9,8 @@ Calendar.ns('Views').Month = (function() {
    */
   function Month(options) {
     Parent.apply(this, arguments);
+    // default to today
+    this._selectedDay = new Date();
   }
 
   Month.prototype = {
@@ -24,6 +26,15 @@ Calendar.ns('Views').Month = (function() {
     childClass: Calendar.Views.MonthChild,
 
     SELECTED: 'selected',
+
+    _onswipe: function() {
+      var didSwipe = Parent.prototype._onswipe.apply(this, arguments);
+
+      // If we changed months, set the selected day to the 1st
+      if (didSwipe) {
+        this.controller.selectedDay = this.date;
+      }
+    },
 
     _clearSelectedDay: function() {
       var day = this.element.querySelector(
@@ -46,13 +57,12 @@ Calendar.ns('Views').Month = (function() {
 
       if (el) {
         el.classList.add(this.SELECTED);
+        this._selectedDay = date;
       }
     },
 
     _initEvents: function() {
-      var self = this;
       this.controller = this.app.timeController;
-
 
       Parent.prototype._initEvents.apply(this, arguments);
 
@@ -76,7 +86,6 @@ Calendar.ns('Views').Month = (function() {
         case 'selectedDayChange':
           this._selectDay(e.data[0]);
           break;
-
         case 'monthChange':
           this._clearSelectedDay();
           this.changeDate(e.data[0]);

@@ -3,182 +3,152 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 40px;
+  right: 0;
+  height: 4rem;
   -moz-transition: opacity 0.5s ease;
   pointer-events: none;
   display: none;
   background-image: url("images/header_bg.png");
 }
 
-#volume > * {
-  line-height: 40px;
-  height: 40px;
-  display: inline-block;
+#volume.visible {
+  display: block;
+}
+
+#volume > span {
+  height: 4rem;
   float: left;
   background-repeat: no-repeat, no-repeat;
   background-position: center, center;
 }
 
-#volume span {
-  display: inline-block;
-  width: 25px;
+#volume section {
+  overflow: hidden;
+  margin: 1.5rem 1rem 0 0;
+  height: 1rem;
+}
+
+/* Default shows 15 sound pieces */
+#volume section div {
+  width: 6.6%!important;
+  height: 100%;
   float: left;
+  background: #666;
+  -moz-box-sizing: border-box;
+  border-left: solid 0.2rem #3e3e3e;
 }
 
-#volume span.vibration {
-  visibility: hidden;
-  margin-left: 5px;
-  background-image: url('images/vibration_disabled_icon.png');
+#volume section div:first-child {
+  border-radius: 0.6rem 0 0 0.6rem;
+  border: none;
+  margin-left: 1%;
 }
 
-#volume.vibration span.vibration {
-  background-image: url('images/vibration_enabled_icon.png');
+#volume section div:nth-last-child(2) {
+  border-radius: 0 0.6rem 0.6rem 0;
+  /* Last visible bar */
 }
 
-#volume.mute span.mute-state {
-  background-image: url('images/speaker_mute_icon.png');
-}
-
-#volume span.mute-state {
-  background-image: url('images/speaker_regular_icon.png');
-}
-
-#volume span.volume {
-  margin-left: 5px;
-  background-image: url('images/speaker_loud_icon.png');
-}
-
-#volume.visible {
-  display: block;
-}
-
-#volume[data-channel="notification"] span.vibration {
-  visibility: visible;
-}
-
-#volume[data-channel="bt_sco"] div:nth-child(n+4),
-#volume[data-channel="content"] div:nth-child(n+4),
-#volume[data-channel="alarm"] div:nth-child(n+4),
-#volume[data-channel="notification"] div:nth-child(n+4) {
-  width: 12px;
-  margin-left: 2px;
-  background-image: url('images/volume_center_disabled.png');
-}
-
-#volume[data-channel="telephony"] div:nth-child(n+4) {
-  width: 42px;
-  margin-left: 2px;
-  background-image: url('images/volume_center_disabled.png');
-}
-
-#volume[data-channel="bt_sco"] div.active:nth-child(n+4),
-#volume[data-channel="content"] div.active:nth-child(n+4),
-#volume[data-channel="alarm"] div.active:nth-child(n+4),
-#volume[data-channel="notification"] div.active:nth-child(n+4),
-#volume[data-channel="telephony"] div.active:nth-child(n+4) {
-  background-image: url('images/volume_center_active.png');
-}
-
-#volume div:nth-child(3) {
-  background-image: url('images/volume_left_disabled.png');
-}
-
-#volume div.active:nth-child(3) {
-  background-image: url('images/volume_left_active.png');
-}
-
-#volume[data-channel="bt_sco"] div:nth-child(17),
-#volume[data-channel="alarm"] div:nth-child(17),
-#volume[data-channel="notification"] div:nth-child(17),
-#volume[data-channel="content"] div:nth-child(17),
-#volume[data-channel="telephony"] div:nth-child(7) {
-  background-image: url('images/volume_right_disabled.png');
-}
-
-#volume[data-channel="bt_sco"] div.active:nth-child(17),
-#volume[data-channel="alarm"] div.active:nth-child(17),
-#volume[data-channel="notification"] div.active:nth-child(17),
-#volume[data-channel="content"] div.active:nth-child(17),
-#volume[data-channel="telephony"] div.active:nth-child(7) {
-  background-image: url('images/volume_right_active.png');
-}
-
-#volume[data-channel="telephony"] div:nth-child(n+8) {
+#volume section div:last-child {
   display: none;
 }
 
-#volume[data-channel="notification"] > div:nth-child(n+3),
-#volume[data-channel="alarm"] > div:nth-child(n+3),
-#volume[data-channel="bt_sco"] > div:nth-child(n+3),
-#volume[data-channel="content"] > div:nth-child(n+3) {
-  width: 12px;
-  background-size: 12px 10px;
+#volume section div.active {
+  background: #00abcc;
 }
 
-#volume[data-channel="telephony"] > div:nth-child(n+3) {
-  width: 42px;
-  background-size: 42px 10px;
+#volume.mute section div {
+  background: #666;
 }
 
-@media (orientation: landscape) and (width: 480px) {
-  #volume[data-channel="bt_sco"] div:nth-child(n+4),
-  #volume[data-channel="content"] div:nth-child(n+4),
-  #volume[data-channel="alarm"] div:nth-child(n+4),
-  #volume[data-channel="notification"] div:nth-child(n+4),
-  #volume[data-channel="telephony"] div:nth-child(n+4) {
-    width: 36px;
-    margin-left: 2px;
-    background-size: 36px 10px;
-    background-image: url('images/VolumeOverlay_Landscape_SegmentOff.png');
-  }
+#volume span {
+  display: inline-block;
+  width: 3rem;
+  margin-left: 0.8rem;
+  float: left;
+}
 
-  #volume[data-channel="telephony"] div:nth-child(n+8) {
-    display: none;
-  }
+/* Icon states */
+#volume span.channel-type {
+  background-size: 3rem auto;
+}
 
-  #volume[data-channel="bt_sco"] div.active:nth-child(n+4),
-  #volume[data-channel="content"] div.active:nth-child(n+4),
-  #volume[data-channel="alarm"] div.active:nth-child(n+4),
-  #volume[data-channel="notification"] div.active:nth-child(n+4),
-  #volume[data-channel="telephony"] div.active:nth-child(n+4) {
-    background-image: url('images/VolumeOverlay_Landscape_SegmentOn.png');
-  }
+/* Telephony channel, just shows 6 progress pieces */
+#volume[data-channel="telephony"] section div {
+  width: 16.5%!important;
+}
 
-  #volume div:nth-child(3) {
-    background-image: url('images/VolumeOverlay_Landscape_SegmentOff_left.png');
-  }
+/* First always keep active */
+#volume[data-channel="telephony"] section div:first-child {
+  background: #00abcc;
+}
 
-  #volume div.active:nth-child(3) {
-    background-image: url('images/VolumeOverlay_Landscape_SegmentOn_left.png');
-  }
+#volume[data-channel="telephony"] section div:nth-child(n+6) {
+  border-radius: 0 0.6rem 0.6rem 0;
+  /* Last visible bar */
+}
 
-  #volume[data-channel="bt_sco"] div:nth-child(17),
-  #volume[data-channel="content"] div:nth-child(17),
-  #volume[data-channel="alarm"] div:nth-child(17),
-  #volume[data-channel="notification"] div:nth-child(17),
-  #volume[data-channel="telephony"] div:nth-child(7) {
-    background-image: url('images/VolumeOverlay_Landscape_SegmentOff_right.png');
-  }
+#volume[data-channel="telephony"] section div:nth-child(n+7) {
+  display: none;
+}
 
-  #volume[data-channel="bt_sco"] div.active:nth-child(17),
-  #volume[data-channel="content"] div.active:nth-child(17),
-  #volume[data-channel="alarm"] div.active:nth-child(17),
-  #volume[data-channel="notification"] div.active:nth-child(17),
-  #volume[data-channel="telephony"] div.active:nth-child(7) {
-    background-image: url('images/VolumeOverlay_Landscape_SegmentOn_right.png');
-  }
+#volume[data-channel="telephony"] span.channel-type {
+  background-image: url('images/telephony_normal.png');
+}
 
-  #volume[data-channel="notification"] > div:nth-child(n+3),
-  #volume[data-channel="alarm"] > div:nth-child(n+3),
-  #volume[data-channel="bt_sco"] > div:nth-child(n+3),
-  #volume[data-channel="content"] > div:nth-child(n+3) {
-    width: 22px;
-    background-size: 22px 10px;
-  }
+/* bt_sco channel, shows 16 (all of them) progress pieces */
+#volume[data-channel="bt_sco"] section div {
+  width: 6.25%!important;
+}
 
-  #volume[data-channel="telephony"] > div:nth-child(n+3) {
-    width: 74px;
-    background-size: 74px 10px;
-  }
+/* First always keep active */
+#volume[data-channel="bt_sco"] section div:first-child {
+  margin-left: 0;
+  background: #00abcc;
+}
+
+#volume[data-channel="bt_sco"] section div:nth-last-child(2) {
+  border-radius: 0;
+}
+
+#volume[data-channel="bt_sco"] section div:last-child {
+  border-radius: 0 0.6rem 0.6rem 0;
+  display: block;
+  /* Last visible bar */
+}
+
+#volume[data-channel="bt_sco"] span.channel-type {
+  background-image: url('images/telephony_normal.png');
+}
+
+/* Notification channel */
+#volume[data-channel="notification"] span.channel-type {
+  background-image: url('images/ringer-notifications_normal.png');
+}
+
+#volume[data-channel="notification"].mute span.channel-type {
+  /* Use the same image as the content channel to sync with the status bar */
+  background-image: url('images/media_silent.png');
+}
+
+#volume[data-channel="notification"].mute.vibration span.channel-type {
+  background-image: url('images/ringer-notifications_vibrate.png');
+}
+
+/* Alarm channel */
+#volume[data-channel="alarm"] span.channel-type {
+  background-image: url('images/alarm_normal.png');
+}
+
+#volume[data-channel="alarm"].mute span.channel-type {
+  background-image: url('images/alarm_silent.png');
+}
+
+/* Content channel */
+#volume[data-channel="content"] span.channel-type {
+  background-image: url('images/media_normal.png');
+}
+
+#volume[data-channel="content"].mute span.channel-type {
+  background-image: url('images/media_silent.png');
 }

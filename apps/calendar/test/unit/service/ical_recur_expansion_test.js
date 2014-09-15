@@ -1,3 +1,5 @@
+'use strict';
+
 requireApp('calendar/test/unit/helper.js', function() {
   requireLib('ext/ical.js');
   requireLib('ext/caldav.js');
@@ -28,7 +30,6 @@ suite('service/ical_recur_expansion', function() {
 
   // setup fixtures...
   suiteSetup(function(done) {
-    this.timeout(10000);
     fixtures = new ServiceSupport.Fixtures('ical');
     fixtures.load('recurring_event');
     fixtures.onready = done;
@@ -59,18 +60,20 @@ suite('service/ical_recur_expansion', function() {
       parseEvent(fixtures.recurringEvent, function(err, event) {
         var iter = event.iterator();
         var num = 15;
-        var max = num;
 
         while (--num) {
           var last = iter.next();
-          if (num === 1)
+          if (num === 1) {
             maxDate = last;
+          }
 
-          if (num === 10)
+          if (num === 10) {
             minDate = last;
+          }
 
-          if (num <= 10)
+          if (num <= 10) {
             inclusiveDates.push(last.toJSDate());
+          }
         }
 
         minDate.second -= 1;
@@ -84,7 +87,7 @@ suite('service/ical_recur_expansion', function() {
 
       function each(item) {
         sent.push(item.toJSDate());
-      };
+      }
 
       function verifyMinMax() {
         test('min & max', function() {
@@ -134,7 +137,7 @@ suite('service/ical_recur_expansion', function() {
         test('min', function() {
           sent.length = 0;
 
-          var iter = subject.forEach(
+          subject.forEach(
             event,
             iterator,
             each,
@@ -154,7 +157,7 @@ suite('service/ical_recur_expansion', function() {
           var exclusiveMin = minDate.clone();
           exclusiveMin.second += 1;
 
-          var iter = subject.forEach(
+          subject.forEach(
             event,
             iterator,
             each,
@@ -212,7 +215,7 @@ suite('service/ical_recur_expansion', function() {
 
         var sent = [];
 
-        var iter = subject.forEach(event, {}, function(item) {
+        subject.forEach(event, {}, function(item) {
           sent.push(item.toJSDate());
         }, minDate, maxDate);
 

@@ -1,23 +1,19 @@
+'use strict';
+
 requireCommon('test/synthetic_gestures.js');
 
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('models/calendar.js');
-  requireLib('templates/calendar.js');
-  requireLib('views/time_header.js');
-});
-
-suite('views/time_header', function() {
+suiteGroup('Views.TimeHeader', function() {
 
   var subject;
   var app;
-  var store;
   var controller;
   var date = new Date(2012, 0, 1);
-  var fmt;
+  var localeFormat;
   var monthTitle;
 
   suiteSetup(function() {
-    fmt = navigator.mozL10n.DateTimeFormat();
+    var fmt = navigator.mozL10n.DateTimeFormat();
+    localeFormat = fmt.localeFormat;
   });
 
   teardown(function() {
@@ -30,10 +26,9 @@ suite('views/time_header', function() {
     div.id = 'test';
     div.innerHTML = [
       '<div id="wrapper"></div>',
-      '<header id="time-header">',
-        '<button class="settings"></button>',
+      '<gaia-header id="time-header" action="menu">',
         '<h1></h1>',
-      '</div>'
+      '</gaia-header>'
     ].join('');
 
     document.body.appendChild(div);
@@ -46,9 +41,9 @@ suite('views/time_header', function() {
     });
 
     controller.move(date);
-    monthTitle = fmt.localeFormat(
+    monthTitle = localeFormat(
       date,
-      '%B %Y'
+      '%b %Y'
     );
   });
 
@@ -59,10 +54,6 @@ suite('views/time_header', function() {
     assert.equal(
       subject.element, document.querySelector('#time-header')
     );
-  });
-
-  test('#settings', function() {
-    assert.ok(subject.settings);
   });
 
   test('#title', function() {
@@ -77,23 +68,46 @@ suite('views/time_header', function() {
     );
   });
 
-  // When week starts in one month
-  // and ends in another we need
-  // 'Month1 Month2 Year' like header.
-  test('#getScale for week', function() {
+  test('#getScale for day', function() {
     controller.move(new Date(2012, 0, 30));
-    var firstMonth = fmt.localeFormat(
-      new Date(2012, 0, 30),
-      '%B'
-    );
+    var compare = localeFormat(new Date(2012, 0, 30), '%b %e, %A');
+    var out = subject.getScale('day');
+    assert.equal(out, compare);
+    // 20 chars seems to be the maximum with current layout (see bug 951423)
+    assert.operator(out.length, '<', 21,
+      'header should not have too many chars');
+  });
 
-    var secondMonth = fmt.localeFormat(
-      new Date(2012, 1, 1),
-      '%B %Y'
-    );
+  test('#getScale for week', function() {
+    controller.move(new Date(2012, 0, 15));
     var out = subject.getScale('week');
-    assert.include(out, firstMonth);
-    assert.include(out, secondMonth);
+    var compare = localeFormat(new Date(2012, 0, 30), '%b %Y');
+    assert.equal(out, compare);
+  });
+
+  // When week starts in one month and ends in another we need a special format
+  test('#getScale for week - multiple months', function() {
+    controller.move(new Date(2012, 0, 30));
+    var out = subject.getScale('week');
+    var compare = localeFormat(
+      new Date(2012, 0, 30),
+      '%b %Y'
+    );
+    compare += ' ' + localeFormat(
+      new Date(2012, 1, 4),
+      '%b %Y'
+    );
+    assert.equal(out, compare);
+  });
+
+  test('#getScale for week - month ending on Wednesday', function() {
+    controller.move(new Date(2013, 6, 30));
+    var out = subject.getScale('week');
+    assert.equal(
+      out,
+      localeFormat(new Date(2013, 6, 28), '%b %Y') + ' ' +
+      localeFormat(new Date(2013, 7, 3), '%b %Y')
+    );
   });
 
   test('#_updateTitle', function() {

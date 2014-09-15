@@ -1,104 +1,250 @@
+define(function(require) {
 'use strict';
 
-var Timer = {
-  get actionButton() {
-    delete this.actionButton;
-    return this.actionButton = document.getElementById('timer-action-button');
-  },
+var asyncStorage = require('shared/js/async_storage');
+var Utils = require('utils');
 
-  get tickerView() {
-    delete this.tickerView;
-    return this.tickerView = document.getElementById('timer-ticker-view');
-  },
+var timerPrivate = new WeakMap();
 
-  get chronoView() {
-    delete this.chronoView;
-    return this.chronoView = document.getElementById('timer-chrono-view');
-  },
+/**
+ * Timer
+ *
+ * Create new or revive existing timer objects.
+ *
+ * @param {Object} opts Optional timer object to create or revive
+ *                      a new or existing timer object.
+ *                 - startTime, number time in ms.
+ *                 - duration, time to count from `start`.
+ *                 - configuredDuration, time requested by user.
+ *                 - sound, string sound name.
+ *                 - vibrate, boolean, vibrate or not.
+ *                 - id, integer, mozAlarm API id number.
+ */
+function Timer(opts) {
+  opts = opts || {};
 
-  get durationField() {
-    delete this.durationField;
-    return this.durationField = document.getElementById('duration-field');
-  },
+  var now = Date.now();
+  if (opts.id !== undefined) {
+    delete opts.id;
+  }
+  // private properties
+  timerPrivate.set(this, Utils.extend({
+    state: Timer.INITIAL
+  }, extractProtected(opts)));
+  // public properties
+  Utils.extend(this, {
+    onend: null, // callback when the timer ends
+    startTime: now,
+    duration: null,
+    configuredDuration: null,
+    sound: 'ac_awake.opus',
+    vibrate: true
+  }, opts);
+}
 
-  execute: function ti_execute(action) {
-    if (!this[action]) {
-      return;
+Timer.prototype.constructor = Timer;
+
+/**
+ * request - get the persisted Timer object.
+ *
+ * @param {function} [callback] - called with (err, timer_raw).
+ */
+Timer.getFromStorage = function(callback) {
+  asyncStorage.getItem('active_timer', function(timer) {
+    if (timer) {
+      // Normalize the timer data. Pre-April-2014 code may have stored
+      // 'vibrate' and 'sound' as the string "0".
+      timer.sound = (timer.sound !== '0' ? timer.sound : null);
+      timer.vibrate = (timer.vibrate && timer.vibrate !== '0');
     }
+    callback && callback(timer || null);
+  });
+};
 
-    this[action]();
-  },
+/**
+ * singleton - get the unique persisted Timer object.
+ *
+ * @param {function} [callback] - called with (err, timer).
+ */
+var timerSingleton = Utils.singleton(Timer);
+Timer.singleton = function tm_singleton(callback) {
+  Timer.getFromStorage(function(err, obj) {
+    var ts = timerSingleton(obj);
+    callback && callback(null, ts);
+  });
+};
 
-  start: function ti_start() {
-    if (!this.durationField.validity.valid) {
-      return;
+function extractProtected(config) {
+  var ret = {};
+  var protectedProperties = new Set(['state']);
+  for (var i in config) {
+    if (protectedProperties.has(i)) {
+      ret[i] = config[i];
+      delete config[i];
     }
+  }
+  return ret;
+}
 
-    this.actionButton.dataset.action = 'cancel';
-    this.chronoView.parentNode.classList.remove('ended');
-    this.tickerView.classList.add('running');
-    this.durationField.disabled = true;
+/**
+ * toSerializable - convert `this` to a serialized format.
+ *
+ * @return {object} - object representation of this Timer.
+ */
+Timer.prototype.toSerializable = function timerToSerializable() {
+  var timer = Utils.extend({}, this, timerPrivate.get(this));
 
-    var duration = this.duration(this.durationField.value);
-    var endTime = Date.now() + duration;
-    this.updateChrono(duration);
+  // Normalize the data. TODO: Perform this normalization immediately
+  // at the getter/setter level when this class is refactored.
+  return {
+    startTime: timer.startTime,
+    duration: timer.duration,
+    configuredDuration: timer.configuredDuration,
+    sound: (timer.sound !== '0' ? timer.sound : null),
+    vibrate: (timer.vibrate !== '0' ? timer.vibrate : null),
+    state: timer.state
+  };
+};
 
-    this._ticker = setInterval(function ti_updateChrono(self) {
-      var remaining = endTime - Date.now();
-      if (remaining <= 0) {
-        self.updateChrono(0);
-        self.end();
-        return;
-      }
+/**
+ * save - Save the timer to the database.
+ *
+ * @param {function} [callback] - callback to call after the timer
+ *                                has been saved.
+ */
+Timer.prototype.save = function timerSave(callback) {
+  asyncStorage.setItem('active_timer', this.toSerializable(), function() {
+    callback && callback(null, this);
+  }.bind(this));
+};
 
-      self.updateChrono(remaining);
-    }, 500, this);
-  },
+/**
+ * register - Register the timer with mozAlarm API.
+ *
+ * @param {function} [callback] - callback to call after the timer
+ *                                has been registered.
+ */
+Timer.prototype.register = function timerRegister(callback) {
+  var data = {
+    type: 'timer'
+  };
+  var request;
 
-  cancel: function ti_cancel() {
-    this.actionButton.dataset.action = 'start';
-    this.tickerView.classList.remove('running');
-    this.durationField.disabled = false;
+  // Remove previously-created mozAlarm for this alarm, if necessary.
+  this.unregister();
 
-    this.updateChrono(0);
+  request = navigator.mozAlarms.add(
+    new Date(Date.now() + this.remaining), 'ignoreTimezone', data
+  );
 
-    clearInterval(this._ticker);
-    delete this._ticker;
-  },
+  request.onsuccess = (function(ev) {
+    this.id = ev.target.result;
+    callback && callback(null, this);
+  }.bind(this));
+  request.onerror = function(ev) {
+    callback && callback(ev.target.error);
+  };
+};
 
-  end: function ti_end() {
-    //TODO: ring too
-    if ('vibrate' in navigator) {
-      navigator.vibrate([200, 200, 200, 200, 200]);
-    }
-
-    this.cancel();
-    this.chronoView.parentNode.classList.add('ended');
-  },
-
-  updateChrono: function ti_updateChrono(remaining) {
-    var f = new navigator.mozL10n.DateTimeFormat();
-    var currentValue = this.chronoView.innerHTML;
-    var newValue = f.localeFormat(remaining, '%M:%S');
-    if (currentValue != newValue)
-      this.chronoView.innerHTML = newValue;
-  },
-
-  duration: function ti_duration(value) {
-    var durationComponents = value.split(':');
-    var duration = 0;
-    for (var i = 0; i < durationComponents.length; i++) {
-      var unitHandler = Math.pow(60, durationComponents.length - 1 - i);
-      duration += unitHandler * 1000 * durationComponents[i];
-    }
-
-    return duration;
+/**
+ * commit - save and register the timer as necessary.
+ *
+ * @param {function} [callback] - callback to call after the timer
+ *                                has been registered.
+ */
+Timer.prototype.commit = function timerCommit(callback) {
+  var saveSelf = this.save.bind(this, callback);
+  if (this.state === Timer.STARTED) {
+    this.register(saveSelf);
+  } else {
+    this.unregister();
+    saveSelf();
   }
 };
 
-window.addEventListener('load', function onLoad() {
-  window.removeEventListener('load', onLoad);
+Timer.prototype.unregister = function timerUnregister() {
+  if (typeof this.id === 'number') {
+    navigator.mozAlarms.remove(this.id);
+  }
+};
 
-  Timer.actionButton.onclick = Timer.start.bind(Timer);
+Object.defineProperty(Timer.prototype, 'remaining', {
+  get: function() {
+    if (this.state === Timer.INITIAL) {
+      return this.configuredDuration;
+    } else if (this.state === Timer.PAUSED) {
+      return this.duration;
+    } else if (this.state === Timer.STARTED) {
+      if (typeof this.startTime === 'undefined' ||
+          typeof this.duration === 'undefined') {
+        return 0;
+      }
+      var r = (this.startTime + this.duration) - Date.now();
+      return r >= 0 ? r : 0;
+    }
+  }
 });
 
+Object.defineProperty(Timer.prototype, 'state', {
+  get: function() {
+    var priv = timerPrivate.get(this);
+    return priv.state;
+  }
+});
+
+Timer.prototype.start = function timerStart() {
+  if (this.state !== Timer.STARTED) {
+    var priv = timerPrivate.get(this);
+    priv.state = Timer.STARTED;
+    this.startTime = Date.now();
+    this.duration = (typeof this.duration === 'number') ? this.duration :
+      this.configuredDuration;
+  }
+};
+
+Timer.prototype.pause = function timerPause() {
+  if (this.state === Timer.STARTED) {
+    this.duration = this.remaining; // remaining getter observes private state
+    var priv = timerPrivate.get(this);
+    priv.state = Timer.PAUSED;
+    this.startTime = null;
+  }
+};
+
+Timer.prototype.cancel = function timerReset() {
+  if (this.state !== Timer.INITIAL) {
+    var priv = timerPrivate.get(this);
+    priv.state = Timer.INITIAL;
+    this.startTime = null;
+    this.duration = this.configuredDuration;
+    this.onend && this.onend();
+  }
+};
+
+/**
+ * plus Increase the duration and extend the endAt time
+ *
+ * @param {Number} seconds The time in seconds to add.
+ *
+ * @return {Timer} Timer instance.
+ */
+Timer.prototype.plus = function timerPlus(seconds) {
+  // Convert to ms
+  var ms = seconds * 1000;
+
+  this.duration += ms;
+
+  return this;
+};
+
+/**
+ * Static "const" Timer states.
+ */
+Object.defineProperties(Timer, {
+  INITIAL: { value: 0 },
+  STARTED: { value: 1 },
+  PAUSED: { value: 2 }
+});
+
+return Timer;
+});

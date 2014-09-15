@@ -1,0 +1,21 @@
+The keyboard app uses large dictionary files for autocorrection. If we
+include all the dictionaries we have, our builds become too large. So
+the keyboard is configured at build time to include only the IMEs,
+layouts, and dictionaries we need for a particular build.
+
+Dictionaries files currently only apply for the latin IME and live in
+js/imes/latin/dictionaries, along with the source files (in XML) in
+Android format. There is a Makefile present to convert the source files
+into Firefox OS dictionaries.
+
+At build time we only package the IMEs and dictionaries required by the
+specified keyboard layouts.
+
+We also configure the manifest.webapp file at build time, to add entry
+points for each layout.
+
+Configuration is done with the GAIA_KEYBOARD_LAYOUTS environment
+variable, and there is a default value defined in the Makefile.
+
+The build happens in gaia/build_stage.
+The actual configuration code is in build/keyboard-config.js.

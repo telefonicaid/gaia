@@ -1,154 +1,117 @@
-#evmeContainer {
-    position: fixed;
-    overflow: hidden;
-    margin: 0;
-    padding: 0;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background: transparent;
-    background-size: 100% 100%;
-    font: normal 12px 'MozTT', Sans-Serif;
-    text-align: left;
-}
-
-#evmeContainer div, #evmeContainer p:not(.building-block), #evmeContainer span,
-#evmeContainer h1, #evmeContainer h2, #evmeContainer h3, #evmeContainer h4,
-#evmeContainer a, #evmeContainer em, #evmeContainer img, #evmeContainer b,
-#evmeContainer ol, #evmeContainer ul, #evmeContainer li,
-#evmeContainer fieldset, #evmeContainer form, #evmeContainer label, #evmeContainer legend,
-#evmeContainer input, #evmeContainer textarea,
-#evmeContainer table, #evmeContainer tr, #evmeContainer th, #evmeContainer td,
-#evmeContainer canvas {
-    margin: 0;
-    padding: 0;
-    border: 0;
-}
-
-#evmeContainer a {
+.evmeScope a {
     text-decoration: none;
     color: inherit;
 }
-#evmeContainer ul {
+.evmeScope ul {
     list-style-type: none;
-}
-
-#evmeContainer .textinput {
-    border: none;
-    background: #fff;
-    width: 100%;
-    height: 29px;
-    font-size: 16px;
-    color: #000;
-    padding: 0 4px;
-    margin: 0 -4px;
-    border-radius: 6px;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, .4), 0 2px 0 0 rgba(255, 255, 255, .2), 0 1px 2px 0 rgba(0, 0, 0, .4) inset;
-}
-#evmeContainer .screen {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, .5);
-    z-index: 500;
-}
-
-#evmeContainer .arrow-next {
-    font-weight: 600;
-    font-size: 15px;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, .7);
-    width: 25px;
-    height: 25px;
-    border-radius: 13px;
-    background: #a2d1e1;
-    cursor: pointer;
-    border: 1px solid #8dc1d2;
-    background: -moz-linear-gradient(center top, #d1e8f0 0, #89c4d8 100%);
-    box-shadow: 0 1px 0 0 rgba(255, 255, 255, .4) inset;
-}
-    #evmeContainer .arrow-next:before {
-        content: "";
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        margin: -4px 0 0 -5px;
-        width: 5px;
-        height: 5px;
-        border-top: 3px solid #000;
-        border-right: 3px solid #000;
-        -moz-transform: rotate(45deg);
-        transform: rotate(45deg);
-        z-index: 55;
-        box-shadow: 1px 0 0 0 #ffffff, 0 1px 0 0 #ffffff inset;
-    }
-
-#evmeContainer .bbutton {
-    display: inline-block;
-    color: #617075;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, .5);
-    height: 19px;
-    line-height: 19px;
-    text-align: center;
-    padding: 0 5px;
-    font-size: 11px;
-    font-weight: 600;
-    border: 1px solid #82bccf;
-    background: #def;
-    background: -moz-linear-gradient(center top, #cfe7ef 0, #bfdee9 50%, #b3dae7 50%, #8fc7da 100%);
-    box-shadow: 0 1px 0 0 rgba(255, 255, 255, .2) inset, 0 -1px 0 0 rgba(0, 0, 0, .05) inset;
-    border-radius: 4px;
-    cursor: pointer;
-    -moz-user-select: none;
-}
-#evmeContainer .bbutton.active {
-    color: #fff;
-    border-color: #6fadc2;
-    text-shadow: 0 -1px 0 rgba(0, 0, 0, .5);
-    background: -moz-linear-gradient(center top, #07a7db 0, #038cb8 50%, #0384ad 50%, #017297 100%);
-}
-
-#evmeContainer .pbutton {
-    display: inline-block;
-    cursor: pointer;
-    padding: 6px 12px;
-    color: #fff;
-    text-shadow: 0 -1px 0 rgba(0, 0, 0, .5);
-    border: 1px solid #611d4b;
-    border-radius: 6px;
-    background: #933e77;
-    background: -moz-linear-gradient(center top, #a8548d 0, #8d3972 100%);
-    box-shadow: 0 1px 1px 0 rgba(255, 255, 255, .3) inset;
 }
 
 /* When clicking on an app */
 .loading-app #header {
-    -moz-transition: all .2s linear;
     transition: all .2s linear;
     opacity: 0 !important;
 }
 
 #bgimage-overlay .content .close,
-.app-icon:after,
-#location-selector .close,
-#shortcuts .handle b:before,
-#shortcuts .done b:before,
-#shortcuts .add:before,
-#shortcuts-panel ul .shortcut .remove,
-.shortcut .remove,
-.fbbutton .button-real .icon:before,
-#shortcuts-customize:before,
-.shortcut.add .thumb:before,
-#shortcuts-favorites li.on:before,
-#close-category,
-#button-clear
+.app-icon:after
 {
     background-image: url('/everything.me/images/sprite.png');
     background-repeat: no-repeat;
 }
-#location-selector .options div:before,
-#dialog_location .content:before {
-    background-image: url('/everything.me/images/location/location_sprite.png');
+.evmeScope select {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    border: 0;
+    z-index: 800;
+}
+
+/* Results Containers */
+
+.evmeScope .evme-apps {
+    position: absolute;
+    top: 8.1rem; /* result's header height, overriden in collection.css */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    font-size: 0;
+}
+  .evmeScope .evme-apps > div {
+      -moz-box-orient: vertical;
+      -moz-box-sizing: border-box;
+      display: -moz-box;
+      width: 100%;
+      min-height: 100%;
+      padding-top: 2.4rem;
+  }
+  .evmeScope .apps-wrapper {
+    padding: 0 1rem;
+  }
+  .evmeScope .evme-apps.has-more > div {
+    padding-bottom: 4.9rem;
+  }
+
+
+/* Notifications */
+
+section[role="status"] {
+  /* override status.css to show above collections */
+  z-index: 10002 !important;
+}
+
+.evmeScope .evme-apps section[role="notification"] {
+    position: relative;
+    -moz-box-flex: 1;
+    display: none;
+    visibility: hidden;
+}
+.evmeScope .evme-apps section[role="notification"] > div {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    color: #fff;
+    font-size: 1.6rem;
+    text-align: center;
+    height: 2.9rem;
+}
+/* Prevent unnecessary cpu usage (bug 922341) */
+.evmeScope .evme-apps section[role="notification"] progress {
+    display: none;
+}
+
+.evmeScope:not(.connection-error) .evme-apps section[role="notification"].show progress {
+  display: inline-block;
+}
+.evmeScope .evme-apps.has-more section[role="notification"] > div {
+    margin-top: 1rem;
+    padding-top: 0.5rem;
+    box-shadow: 0 -0.1rem 0 0 rgba(255, 255, 255, .4),
+                0 -0.2rem 0 0 rgba(0, 0, 0, .4);
+}
+.evmeScope .evme-apps:not(.has-more) section[role="notification"] > div {
+    margin-top: -1.45rem;
+}
+.evmeScope .evme-apps.has-more section[role="notification"].connection-message > div {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.evmeScope:not(.connection-error) .evme-apps.has-more section[role="notification"].loading-more,
+.evmeScope.connection-error .evme-apps section[role="notification"].connection-message {
+    display: block;
+}
+
+.evmeScope:not(.connection-error) .evme-apps section[role="notification"].show,
+.evmeScope.connection-error .evme-apps section[role="notification"].connection-message {
+    display: block;
+    visibility: visible;
+}
+
+.evmeScope .evme-apps:not(.has-more) section[role="notification"].loading-more span {
+    display: none;
 }

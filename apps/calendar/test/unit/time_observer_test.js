@@ -1,9 +1,8 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('timespan.js');
-  requireLib('time_observer.js');
-});
+requireLib('timespan.js');
+requireLib('time_observer.js');
 
 suite('time_observer', function() {
+  'use strict';
 
   var subject;
   var SubjectClass;
@@ -134,8 +133,6 @@ suite('time_observer', function() {
     }
 
     test('object', function(done) {
-      this.timeout(250);
-
       var observer = {
         handleEvent: function(e) {
           done(function() {
@@ -150,8 +147,6 @@ suite('time_observer', function() {
     });
 
     test('function', function(done) {
-      this.timeout(250);
-
       subject.observeTime(span, function(e) {
         done(function() {
           assert.equal(e.time, true);

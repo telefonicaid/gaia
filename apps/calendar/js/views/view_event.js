@@ -1,6 +1,5 @@
 Calendar.ns('Views').ViewEvent = (function() {
-
-  var InputParser = Calendar.Utils.InputParser;
+  'use strict';
 
   function ViewEvent(options) {
     Calendar.Views.EventBase.apply(this, arguments);
@@ -13,7 +12,7 @@ Calendar.ns('Views').ViewEvent = (function() {
 
     selectors: {
       element: '#event-view',
-      cancelButton: '#event-view .cancel',
+      header: '#show-event-header',
       primaryButton: '#event-view .edit'
     },
 
@@ -46,19 +45,17 @@ Calendar.ns('Views').ViewEvent = (function() {
      * @param {Boolean} boolean true/false.
      */
     _markReadonly: function(boolean) {
-      if (boolean)
-        this.primaryButton.disabled = true;
-      else
-        this.primaryButton.disabled = false;
+      this.primaryButton.disabled = boolean;
     },
 
     /**
      * Sets content for an element
      * Hides the element if there's no content to set
      */
-    setContent: function(element, content) {
-      var element = this.getEl(element);
-      element.querySelector('.content').textContent = content;
+    setContent: function(element, content, method) {
+      method = method || 'textContent';
+      element = this.getEl(element);
+      element.querySelector('.content')[method] = content;
 
       if (!content) {
         element.style.display = 'none';
@@ -77,9 +74,28 @@ Calendar.ns('Views').ViewEvent = (function() {
 
       this.setContent('location', model.location);
 
-      var calendar = this.store.calendarFor(model);
-      if (calendar) {
-        this.setContent('current-calendar', calendar.name);
+      if (this.originalCalendar) {
+        // Set calendar color.
+        this.element
+          .querySelector('section[data-type="list"]')
+          .className = 'calendar-id-' + model.calendarId;
+
+        var calendarId = this.originalCalendar.remote.id;
+        var isLocalCalendar = calendarId === Calendar.Provider.Local.calendarId;
+        var calendarName = isLocalCalendar ?
+          navigator.mozL10n.get('calendar-local') :
+          this.originalCalendar.remote.name;
+
+        this.setContent(
+          'current-calendar',
+          calendarName
+        );
+
+        if (isLocalCalendar) {
+          this.getEl('current-calendar')
+            .querySelector('.content')
+            .setAttribute('data-l10n-id', 'calendar-local');
+        }
       }
 
       var dateSrc = model;
@@ -87,30 +103,25 @@ Calendar.ns('Views').ViewEvent = (function() {
         dateSrc = this.busytime;
       }
 
-      var startDate = dateSrc.startDate;
-      var endDate = dateSrc.endDate;
-      var startTime = InputParser.exportTime(startDate);
-      var endTime = InputParser.exportTime(endDate);
+      var duationTimeContent =
+        Calendar.Templates.DurationTime.durationTime.render(dateSrc);
+      this.setContent('duration-time', duationTimeContent, 'innerHTML');
 
-      // update the allday status of the view
-      if (model.isAllDay) {
+      var alarmContent = '';
+      var alarms = this.event.alarms;
+      if (alarms) {
+        this.getEl('alarms')
+          .classList
+          .toggle('multiple', alarms.length > 1);
 
-        endDate = this.formatEndDate(endDate);
-
-        // Do not display times in the UI for all day events
-        startTime = null;
-        endTime = null;
+        alarmContent =
+          Calendar.Templates.Alarm.reminder.render({
+            alarms: alarms,
+            isAllDay: this.event.isAllDay,
+          });
       }
 
-      this.setContent('start-date',
-        InputParser.exportDate(startDate));
-
-      this.setContent('end-date',
-        InputParser.exportDate(endDate));
-
-      this.setContent('start-time', startTime);
-
-      this.setContent('end-time', endTime);
+      this.setContent('alarms', alarmContent, 'innerHTML');
 
       this.setContent('description', model.description);
     },

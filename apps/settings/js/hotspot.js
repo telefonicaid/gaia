@@ -6,29 +6,166 @@
 var Hotspot = {
   init: function hotspot_init() {
     this.initHotspotPanel();
-    this.initWifiSettingDialog();
   },
 
   initHotspotPanel: function() {
     var settings = window.navigator.mozSettings;
-    var hotspotSettingBtn = document.querySelector('.hotspot-wifiSettings-btn');
-    var passwordItem = document.querySelector('#hotspot .password-item');
+    var lock = settings.createLock();
+
+    var hotspotSettingBtn =
+      document.querySelector('#hotspot-settings-section button');
+
+    var hotspotElement =
+      document.querySelector('input#tethering-wifi-enabled');
+
+    var usbTetheringElement =
+      document.querySelector('input#tethering-usb-enabled');
+
+    function generateHotspotPassword() {
+      var words = ['amsterdam', 'ankara', 'auckland',
+                   'belfast', 'berlin', 'boston',
+                   'calgary', 'caracas', 'chicago',
+                   'dakar', 'delhi', 'dubai',
+                   'dublin', 'houston', 'jakarta',
+                   'lagos', 'lima', 'madrid',
+                   'newyork', 'osaka', 'oslo',
+                   'porto', 'santiago', 'saopaulo',
+                   'seattle', 'stockholm', 'sydney',
+                   'taipei', 'tokyo', 'toronto'];
+      var password = words[Math.floor(Math.random() * words.length)];
+      for (var i = 0; i < 4; i++) {
+        password += Math.floor(Math.random() * 10);
+      }
+      return password;
+    }
+
+    var req = lock.get('tethering.wifi.security.password');
+    req.onsuccess = function onThetheringPasswordSuccess() {
+      var pwd = req.result['tethering.wifi.security.password'];
+      if (!pwd) {
+        pwd = generateHotspotPassword();
+        lock.set({ 'tethering.wifi.security.password': pwd });
+      }
+    };
 
     function setHotspotSettingsEnabled(enabled) {
       // disable the setting button when internet sharing is enabled
       hotspotSettingBtn.disabled = enabled;
-    }
-    function updatePasswordItemVisibility(securityType) {
-      passwordItem.hidden = (securityType == 'open');
+      hotspotElement.checked = enabled;
     }
 
-    // tehering enabled
+    function setUSBTetheringCheckbox(enabled) {
+      usbTetheringElement.checked = enabled;
+    }
+
+    // Wi-fi hotspot event listener
+    hotspotElement.addEventListener('change', _hotspotMasterSettingChanged);
+
+    // Wifi tethering enabled
     settings.addObserver('tethering.wifi.enabled', function(event) {
       setHotspotSettingsEnabled(event.settingValue);
     });
 
+    // USB tethering event listener
+    usbTetheringElement.addEventListener('change', _usbTetheringSettingChanged);
+
+    // USB tethering enabled
+    settings.addObserver('tethering.usb.enabled', function(event) {
+      setUSBTetheringCheckbox(event.settingValue);
+    });
+
+    function _hotspotMasterSettingChanged(evt) {
+      var checkbox = evt.target;
+      var lock = settings.createLock();
+      var cset = {};
+      var usbStorageSetting;
+      var usbTetheringSetting;
+
+      var promiseUsbTethering = new Promise(function(resolve, reject) {
+        var requestUsbTetheringSetting = lock.get('tethering.usb.enabled');
+
+        requestUsbTetheringSetting.onsuccess = function dt_getStatusSuccess() {
+          resolve(requestUsbTetheringSetting.result['tethering.usb.enabled']);
+        };
+      });
+      promiseUsbTethering.then(function(usbTetheringSetting) {
+        if (checkbox.checked) {
+          // In that case there is no need to show a dialog
+          if (!usbTetheringSetting) {
+            cset['tethering.wifi.enabled'] = true;
+            settings.createLock().set(cset);
+          } else {
+            openIncompatibleSettingsDialog('incompatible-settings-dialog',
+              'tethering.wifi.enabled', 'tethering.usb.enabled', null);
+          }
+        } else {
+          cset['tethering.wifi.enabled'] = false;
+          settings.createLock().set(cset);
+        }
+      });
+    }
+
+    function _usbTetheringSettingChanged(evt) {
+      var checkbox = evt.target;
+      var lock = navigator.mozSettings.createLock();
+      var cset = {};
+      var usbStorageSetting;
+      var wifiTetheringSetting;
+
+      var promiseUsbStorage = new Promise(function(resolve, reject) {
+        var requestUsbStorageSetting = lock.get('ums.enabled');
+
+        requestUsbStorageSetting.onsuccess = function dt_getStatusSuccess() {
+          resolve(requestUsbStorageSetting.result['ums.enabled']);
+        };
+      });
+
+      var promiseWifiTethering = new Promise(function(resolve, reject) {
+        var requestWifiTetheringSetting = lock.get('tethering.wifi.enabled');
+
+        requestWifiTetheringSetting.onsuccess = function dt_getStatusSuccess() {
+          resolve(requestWifiTetheringSetting.result['tethering.wifi.enabled']);
+        };
+      });
+
+      Promise.all([promiseUsbStorage, promiseWifiTethering])
+        .then(function(values) {
+          usbStorageSetting = values[0];
+          wifiTetheringSetting = values[1];
+          if (checkbox.checked) {
+            if (!usbStorageSetting && !wifiTetheringSetting) {
+              cset['tethering.usb.enabled'] = true;
+              settings.createLock().set(cset);
+            } else {
+              if (usbStorageSetting && wifiTetheringSetting) {
+                // First the user must disable wifi tethering setting
+                openIncompatibleSettingsDialog('incompatible-settings-dialog',
+                  'tethering.usb.enabled', 'tethering.wifi.enabled',
+                  openSecondWarning);
+              } else {
+                var oldSetting = usbStorageSetting ? 'ums.enabled' :
+                  'tethering.wifi.enabled';
+                openIncompatibleSettingsDialog('incompatible-settings-dialog',
+                  'tethering.usb.enabled', oldSetting, null);
+              }
+            }
+          } else {
+            cset['tethering.usb.enabled'] = false;
+            settings.createLock().set(cset);
+          }
+      });
+
+      function openSecondWarning() {
+        openIncompatibleSettingsDialog('incompatible-settings-dialog',
+          'tethering.usb.enabled', 'ums.enabled', null);
+      }
+    }
+
     var reqTetheringWifiEnabled =
       settings.createLock().get('tethering.wifi.enabled');
+
+    var reqTetheringUSBEnabled =
+      settings.createLock().get('tethering.usb.enabled');
 
     reqTetheringWifiEnabled.onsuccess = function dt_getStatusSuccess() {
       setHotspotSettingsEnabled(
@@ -36,127 +173,23 @@ var Hotspot = {
       );
     };
 
-    // security type
-    settings.addObserver('tethering.wifi.security.type', function(event) {
-      updatePasswordItemVisibility(event.settingValue);
-    });
-
-    var reqSecurityType =
-      settings.createLock().get('tethering.wifi.security.type');
-
-    reqSecurityType.onsuccess = function dt_getStatusSuccess() {
-      updatePasswordItemVisibility(
-        reqSecurityType.result['tethering.wifi.security.type']
+    reqTetheringUSBEnabled.onsuccess = function dt_getStatusSuccess() {
+      setUSBTetheringCheckbox(
+        reqTetheringUSBEnabled.result['tethering.usb.enabled']
       );
     };
 
     hotspotSettingBtn.addEventListener('click',
-      this.openWifiSettingDialog.bind(this));
-  },
+      openDialog.bind(window, 'hotspot-wifiSettings'));
 
-  initWifiSettingDialog: function() {
-    var settings = window.navigator.mozSettings;
-
-    var wifiSettingsSection = document.getElementById('hotspot-wifiSettings');
-    var securityTypeSelector =
-      wifiSettingsSection.querySelector('.security-selector');
-    var passwordItem = wifiSettingsSection.querySelector('.password-item');
-    var passwordInput = passwordItem.querySelector('input');
-    var submitBtn = wifiSettingsSection.querySelector('button[type="submit"]');
-
-    function updatePasswordItemVisibility(securityType) {
-      passwordItem.hidden = (securityType === 'open');
-    }
-
-    function updateSubmitButtonState(securityType, pwdLength) {
-      submitBtn.disabled =
-        (pwdLength < 8 || pwdLength > 63) && (securityType !== 'open');
-    }
-
-    securityTypeSelector.addEventListener('change', function(event) {
-      updatePasswordItemVisibility(this.value);
-      updateSubmitButtonState(this.value, passwordInput.value.length);
-    });
-
-    passwordInput.addEventListener('input', function(event) {
-      updateSubmitButtonState(securityTypeSelector.value, this.value.length);
-    });
-  },
-
-  openWifiSettingDialog: function() {
-    var settings = window.navigator.mozSettings;
-
-    var dialogID = 'hotspot-wifiSettings';
-    var dialog = document.getElementById(dialogID);
-    var fields =
-        dialog.querySelectorAll('[data-setting]:not([data-ignore])');
-    var securityTypeSelector =
-      document.querySelector('#hotspot-wifiSettings .security-selector');
-    var passwordItem =
-      document.querySelector('#hotspot-wifiSettings .password-item');
-
-    function updatePasswordItemVisibility(securityType) {
-      passwordItem.hidden = (securityType == 'open');
-    }
-
-    // initialize all setting fields in the panel
-    function reset() {
-      if (settings) {
-        var reqSecurityType =
-          settings.createLock().get('tethering.wifi.security.type');
-
-        reqSecurityType.onsuccess = function dt_getStatusSuccess() {
-          updatePasswordItemVisibility(
-            reqSecurityType.result['tethering.wifi.security.type']
-          );
-        };
-
-        var lock = settings.createLock();
-        for (var i = 0; i < fields.length; i++) {
-          (function(input) {
-            var key = input.dataset.setting;
-            var request = lock.get(key);
-            request.onsuccess = function() {
-              input.value = request.result[key] || '';
-
-              // dispatch the event manually for select element
-              if (input.nodeName === 'SELECT') {
-                var evt = document.createEvent('Event');
-                evt.initEvent('change', true, true);
-                input.dispatchEvent(evt);
-              }
-            };
-          })(fields[i]);
-        }
+    // Localize WiFi security type string when setting changes
+    SettingsListener.observe('tethering.wifi.security.type', 'wpa-psk',
+      function(value) {
+        var wifiSecurityType = document.getElementById('wifi-security-type');
+        wifiSecurityType.setAttribute('data-l10n-id', 'hotspot-' + value);
       }
-    }
-
-    // validate all settings in the dialog box
-    function submit() {
-      if (settings) {
-        var ignorePassword = (securityTypeSelector.value == 'open');
-
-        // mozSettings does not support multiple keys in the cset object
-        // with one set() call,
-        // see https://bugzilla.mozilla.org/show_bug.cgi?id=779381
-        var lock = settings.createLock();
-        for (var i = 0; i < fields.length; i++) {
-          var input = fields[i];
-          var cset = {};
-          var key = input.dataset.setting;
-
-          if (!(ignorePassword && key == 'tethering.wifi.security.password')) {
-            cset[key] = input.value;
-            lock.set(cset);
-          }
-        }
-      }
-    }
-
-    reset(); // preset all fields before opening the dialog
-    openDialog(dialogID, submit);
+    );
   }
 };
 
-navigator.mozL10n.ready(Hotspot.init.bind(Hotspot));
-
+navigator.mozL10n.once(Hotspot.init.bind(Hotspot));

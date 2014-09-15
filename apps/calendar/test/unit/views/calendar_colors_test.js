@@ -1,18 +1,12 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('models/calendar.js');
-  requireLib('views/calendar_colors.js');
-});
-
-suite('views/calendar_colors', function() {
+suiteGroup('Views.CalendarColors', function() {
+  'use strict';
 
   var subject;
   var model;
   var app;
   var store;
 
-  setup(function() {
-    this.timeout(5000);
-
+  setup(function(done) {
     app = testSupport.calendar.app();
     store = app.store('Calendar');
     subject = new Calendar.Views.CalendarColors();
@@ -21,6 +15,19 @@ suite('views/calendar_colors', function() {
       _id: '1xx',
       localDisplayed: true
     });
+
+    app.db.open(done);
+  });
+
+  teardown(function(done) {
+    testSupport.calendar.clearStore(
+      app.db,
+      ['calendars'],
+      function() {
+        app.db.close();
+        done();
+      }
+    );
   });
 
   test('initialization', function() {
@@ -48,23 +55,44 @@ suite('views/calendar_colors', function() {
 
   suite('#render', function() {
     var calledWith;
-    var first = {};
-    var second = {};
+    var first;
+    var second;
 
-    setup(function() {
-      calledWith = [];
-      subject.updateRule = function(item) {
-        calledWith.push(item);
+    setup(function(done) {
+      first = Factory('calendar', { _id: 'first' });
+      second = Factory('calendar', { _id: 'second' });
+
+      var trans = app.db.transaction('calendars', 'readwrite');
+      trans.oncomplete = function() {
+        done();
       };
 
-      store.cached[0] = first;
-      store.cached[1] = second;
+      trans.onerror = function(e) {
+        done(e);
+      };
+
+      store.persist(first, trans);
+      store.persist(second, trans);
+    });
+
+    setup(function(done) {
+      calledWith = {};
+      subject.updateRule = function(item) {
+        calledWith[item._id] = item;
+      };
 
       subject.render();
+      subject.onrender = done;
     });
 
     test('calls update', function() {
-      assert.deepEqual(calledWith, [first, second]);
+      assert.hasProperties(
+        first, calledWith.first, 'displays first'
+      );
+
+      assert.hasProperties(
+        second, calledWith.second, 'displays second'
+      );
     });
 
   });
@@ -134,7 +162,7 @@ suite('views/calendar_colors', function() {
       assert.match(rules[0].selectorText, /3xx/, msg);
       assert.match(rules[1].selectorText, /3xx/, msg);
 
-      assert.equal(rules.length, 2, 'should remove css rules');
+      assert.equal(rules.length, 3, 'should remove css rules');
     });
 
   });
@@ -149,31 +177,19 @@ suite('views/calendar_colors', function() {
       assert.equal(subject.colorMap[id], model.color);
 
       // check that the actual style is flushed to the dom...
-      assert.equal(subject._styles.cssRules.length, 2);
+      assert.equal(subject._styles.cssRules.length, 3);
       var bgRule = subject._styles.cssRules[0];
-      var displayRule = subject._styles.cssRules[1];
+      var borderRule = subject._styles.cssRules[1];
+      var textRule = subject._styles.cssRules[2];
 
       assert.include(bgRule.selectorText, subject.getId(model._id));
-      assert.include(bgRule.selectorText, 'calendar-color');
+      assert.include(bgRule.selectorText, 'calendar-bg-color');
 
-      assert.include(displayRule.selectorText, subject.getId(model._id));
-      assert.include(displayRule.selectorText, 'calendar-display');
+      assert.include(borderRule.selectorText, subject.getId(model._id));
+      assert.include(borderRule.selectorText, 'calendar-border-color');
 
-      // it may do the RGB conversion so its not strictly equal...
-      assert.ok(
-        bgRule.style.backgroundColor,
-        'should have set background color'
-      );
-
-      assert.ok(bgRule.style.borderColor, 'sets border color');
-    });
-
-    test('first time hidden', function() {
-      model.localDisplayed = false;
-      subject.updateRule(model);
-
-      // check that the actual style is flushed to the dom...
-      var bgRule = subject._styles.cssRules[0];
+      assert.include(textRule.selectorText, subject.getId(model._id));
+      assert.include(textRule.selectorText, 'calendar-text-color');
 
       // it may do the RGB conversion so its not strictly equal...
       assert.ok(
@@ -181,36 +197,33 @@ suite('views/calendar_colors', function() {
         'should have set background color'
       );
 
-      var displayRule = subject._styles.cssRules[1];
-      assert.equal(
-        displayRule.style.display, 'none',
-        'should set display to none'
-      );
+      assert.ok(borderRule.style.borderColor, 'sets border color');
+      assert.ok(textRule.style.color, 'sets text color');
     });
 
     test('second time', function() {
       subject.updateRule(model);
 
-      var bgStyle = subject._styles.cssRules[0].style;
-      var displayStyle = subject._styles.cssRules[1].style;
+      var rules = subject._styles.cssRules;
 
-      var oldColor = bgStyle.backgroundColor;
+      var bgStyle = rules[0].style;
+      var borderStyle = rules[1].style;
+      var textStyle = rules[2].style;
+
+      var oldBgColor = bgStyle.backgroundColor;
+      var oldBorderColor = borderStyle.borderColor;
+      var oldTextColor = textStyle.color;
 
       model.remote.color = '#FAFAFA';
 
       subject.updateRule(model);
 
-      assert.notEqual(bgStyle.backgroundColor, oldColor, 'should change color');
-      assert.notEqual(bgStyle.borderColor, oldColor, 'should change color');
-
-      model.localDisplayed = false;
-      subject.updateRule(model);
-
-      assert.equal(displayStyle.display, 'none');
-
-      model.localDisplayed = true;
-      subject.updateRule(model);
-      assert.equal(displayStyle.display, 'inherit');
+      assert.notEqual(bgStyle.backgroundColor, oldBgColor,
+        'should change bg color');
+      assert.notEqual(borderStyle.borderColor, oldBorderColor,
+        'should change border color');
+      assert.notEqual(textStyle.borderColor, oldTextColor,
+        'should change text color');
     });
   });
 
@@ -246,9 +259,8 @@ suite('views/calendar_colors', function() {
     toggleN(5);
 
     var rules = subject._styles.cssRules;
-    assert.equal(rules.length, 4, 'two calendars rules');
-
-    var rule;
+    // each calendar creates 3 rules (bg, border, text)
+    assert.equal(rules.length, 6, 'two calendars rules');
 
     function verify(calendar, start, end) {
       for (var i = start; i < end; i++) {
@@ -262,8 +274,8 @@ suite('views/calendar_colors', function() {
 
     // verify each of the kept calendars is in the right
     // spot with all the right events.
-    verify(keepOne, 0, 2);
-    verify(keepTwo, 2, 4);
+    verify(keepOne, 0, 3);
+    verify(keepTwo, 3, 6);
   });
 
 });

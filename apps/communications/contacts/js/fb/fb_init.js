@@ -1,36 +1,54 @@
+'use strict';
+
+/* global utils */
+
 var fb = window.fb || {};
+var config = window.config || {};
 
 if (typeof fb.init === 'undefined') {
   (function() {
+    var initialized = false;
+    var initializing = false;
+    var EV_FB_INIT = 'fb_init_initialized';
 
     fb.isEnabled = false;
 
     fb.init = function(callback) {
-      var req = utils.config.load('/contacts/config.json');
-
-      req.onload = function(configData) {
-        if (configData.facebookEnabled === true) {
-          fb.isEnabled = true;
-        }
-
-        fb.operationsTimeout = configData.operationsTimeout;
-        fb.logLevel = configData.logLevel || 'none';
-        fb.syncPeriod = configData.facebookSyncPeriod || 24;
-        fb.testToken = configData.testToken;
-
+      if (initialized) {
         callback();
+        return;
       }
 
-      req.onerror = function(code) {
-        window.console.error('Contacts: Error while checking if FB is enabled',
-                             code);
-
-        // The FB Contacts DB Cache is initialized regardless FB is enabled
-        // or not. That's because we would like to avoid to add extra conditions
-        // throughout the code, thus keeping it as simple as possible
-        initalizeDB(callback);
+      if (initializing) {
+        document.addEventListener(EV_FB_INIT, function handler(e) {
+          initializing = false;
+          document.removeEventListener(EV_FB_INIT, handler);
+          callback();
+        });
+        return;
       }
-    }
 
+      initializing = true;
+      utils.config.load('/contacts/config.json').then(
+        function cLoaded(configData) {
+          if (configData.facebookEnabled === true) {
+            fb.isEnabled = true;
+          }
+
+          fb.operationsTimeout = config.operationsTimeout =
+                                                  configData.operationsTimeout;
+          fb.logLevel = configData.logLevel || 'none';
+          fb.syncPeriod = configData.facebookSyncPeriod || 24;
+          fb.testToken = configData.testToken;
+
+          initialized = true;
+
+          document.dispatchEvent(new CustomEvent(EV_FB_INIT));
+
+          callback();
+      }, function loadError(err) {
+          console.error('Error while loading config.json', err);
+      });
+    };
   })();
 }

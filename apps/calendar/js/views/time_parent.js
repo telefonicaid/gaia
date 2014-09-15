@@ -1,4 +1,8 @@
+/* global GestureDetector */
 Calendar.ns('Views').TimeParent = (function() {
+  'use strict';
+
+  var XSWIPE_OFFSET = window.innerWidth / 10;
 
   /**
    * Parent view for busytime-based views
@@ -22,11 +26,6 @@ Calendar.ns('Views').TimeParent = (function() {
     __proto__: Calendar.View.prototype,
 
     /**
-     * Threshold between swipes.
-     */
-    swipeThreshold: window.innerWidth / 4,
-
-    /**
      * Maximum number of child elements to keep
      * around until we start removing them.
      */
@@ -45,8 +44,9 @@ Calendar.ns('Views').TimeParent = (function() {
     },
 
     _onswipe: function(data) {
-      if (Math.abs(data.dx) < this.swipeThreshold)
-        return;
+      if (Math.abs(data.dy) > (Math.abs(data.dx) - XSWIPE_OFFSET)) {
+        return false;
+      }
 
       var dir = data.direction;
       var controller = this.app.timeController;
@@ -57,6 +57,7 @@ Calendar.ns('Views').TimeParent = (function() {
       } else {
         controller.move(this._previousTime(this.date));
       }
+      return true;
     },
 
     handleEvent: function(e) {
@@ -68,6 +69,16 @@ Calendar.ns('Views').TimeParent = (function() {
           this.purgeFrames(e.data[0]);
           break;
       }
+    },
+
+    _onCalendarVisibilityChange: function() {
+      // we need to restore previous scroll position otherwise it would move
+      // back to top every time the calendar visibility is toggled which would
+      // be very confusing for the user
+      var scrollTop = this.currentFrame.getScrollTop() || 0;
+      this.purgeFrames(this.app.timeController.timespan);
+      this.changeDate(this.date);
+      this.currentFrame.setScrollTop(scrollTop);
     },
 
     /**
@@ -146,7 +157,6 @@ Calendar.ns('Views').TimeParent = (function() {
      * @return {Object} existing or newly added frame.
      */
     addFrame: function(date) {
-      var frame;
       var id = this._getId(date);
       var frame = this.frames.get(id);
       if (!frame) {
@@ -169,8 +179,11 @@ Calendar.ns('Views').TimeParent = (function() {
      * @param {Date} time center point to activate.
      */
     changeDate: function(time) {
+      var prevScrollTop = 0;
+
       // deactivate previous frame
       if (this.currentFrame) {
+        prevScrollTop = this.currentFrame.getScrollTop();
         this.currentFrame.deactivate();
       }
 
@@ -181,11 +194,12 @@ Calendar.ns('Views').TimeParent = (function() {
       var prev = this._previousTime(time);
 
       // add previous frame
-      prev = this.addFrame(prev);
+      this.addFrame(prev);
 
       // create & activate current frame
       var cur = this.currentFrame = this.addFrame(time);
       cur.activate();
+      cur.setScrollTop(prevScrollTop);
 
       // add next frame
       this.addFrame(next);
@@ -199,7 +213,6 @@ Calendar.ns('Views').TimeParent = (function() {
      * @param {Calendar.Timespan} timespan span of time.
      */
     purgeFrames: function(span) {
-      var key;
       var child;
       var i = 0;
       var len = this.frames.length;

@@ -1,7 +1,12 @@
 Calendar.ns('Store').IcalComponent = (function() {
+  'use strict';
 
   function IcalComponent() {
     Calendar.Store.Abstract.apply(this, arguments);
+
+    Calendar.Promise.denodeifyAll(this, [
+      'findRecurrences'
+    ]);
   }
 
   IcalComponent.prototype = {
@@ -20,10 +25,6 @@ Calendar.ns('Store').IcalComponent = (function() {
     _detectPersistType: function(object) {
       // always fire update.
       return 'update';
-    },
-
-    _parseId: function(id) {
-      return id;
     },
 
     /**

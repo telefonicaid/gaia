@@ -9,7 +9,6 @@ html, body {
   width: 100%;
   height: 100%;
   font-size: 10px;
-  font-family: "MozTT", sans-serif;
   overflow: hidden;
 }
 
@@ -26,57 +25,144 @@ section[role="region"] {
   width: 100%;
   height: 100%;
   border: 0;
-  background: url(images/document_bg.png);
   overflow: hidden;
 }
 
-
 /**
  * Panel targets -- transitions
- * the `.previous', '.current' and '.forward' classes are set by settings.js
- * we use the '.peek' class to force the rendering of the panel before
- * starting the transition, thus avoiding an ugly flickering with gecko 18
+ * the `.previous', '.current' classes are set by settings.js
  */
 
+/**
+ * bug 976299 non-visible regions take an extra layer
+ * in the layer tree. Remove them to improve scroll performance
+ * in exchange for a reflow on section transitions.
+ *
+ * bug 976630 non-visible regions should have a visibility of hidden
+ * for accessibility purposes. Removing the visibility transition
+ * in hidden->visible avoids flashing.
+ */
 section[role="region"] {
   transform: translateX(+100%);
-  transition: transform .4s ease;
-}
-section[role="region"].peek {
-  transition: transform 1ms linear;
-  transform: translateX(+0.1%);
+  visibility: hidden;
 }
 
 section[role="region"].previous {
   transform: translateX(-100%);
-}
-section[role="region"].previous.peek {
-  transform: translateX(-0.1%);
+  visibility: hidden;
 }
 
 section[role="region"].current {
   transform: translateX(0);
-  overflow-y: scroll;
+  visibility: visible;
 }
-section[role="region"].current.peek.forward {
-  transform: translateX(99.9%);
+
+/**
+ * Only use the animation when ready
+ */
+body[data-ready="true"] section[role="region"] {
+  transition: transform .4s ease, visibility .4s;
 }
-section[role="region"].current.peek {
-  transform: translateX(-99.9%);
+
+body[data-ready="true"] section[role="region"].current {
+  transition: transform .4s ease;
 }
 
 /**
  * Headers should not scroll with the rest of the page, except for #root.
  */
-section[role="region"] > header:first-child {
-  position: fixed;
+section[role="region"] > header {
+  position: absolute;
+}
+
+section[role="region"] > div {
+  position: absolute;
+  top: 5rem;
+  right: 0;
+  bottom: 0;
+  left: 0;
   width: 100%;
+  height: calc(100% - 5rem);
+  overflow-y: scroll;
+  will-change: scroll-position;
 }
 
-section[role="region"] > header:first-child + * {
-  margin-top: 5rem;
+/**
+ * The back button icon shouldn't be
+ * the same color as other icons.
+ */
+
+gaia-header a:first-child,
+gaia-header button:first-child {
+  color: var(--header-nav-button-color) !important;
 }
 
+/**
+ * :active
+ */
+
+gaia-header a:first-child:active,
+gaia-header button:first-child:active {
+  color: var(--header-nav-button-color-active) !important;
+}
+
+/*
+ * Need this for scrollable background layer
+ * optimization in gecko. See Bug 950250
+ */
+section[role="region"],
+section[role="region"] > div > ul {
+  background-color: #f4f4f4;
+}
+
+/**
+ * 1. Localized text in buttons
+ *    should be hidden.
+ */
+
+gaia-header [data-icon] > span {
+  font-size: 0; /* 1 */
+}
+
+/******************************************************************************
+ * Frame section
+ */
+#frame iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/******************************************************************************
+ * Activities section = "root" and filtered by category
+ */
+
+/**
+ * 1. !important required to override scoped
+ *    styles in <gaia-header>
+ */
+
+#activityDoneButton {
+  display: none !important; /* 1 */
+}
+
+body[data-filter-by] #activityDoneButton {
+  display: inherit !important; /* 1 */
+}
+
+body[data-filter-by] #root > div header,
+body[data-filter-by] #root > div li {
+  display: none;
+}
+
+/* These rules show the "Network & Connectivity" header and items related to
+   connectivity (airplane mode, Wi-Fi and cellular & data) */
+body[data-filter-by="connectivity"] #root > div [data-category="connectivity"] {
+  display: block;
+}
 
 /******************************************************************************
  * Explanation texts
@@ -90,17 +176,86 @@ section[role="region"] > header:first-child + * {
 }
 
 .description {
-  padding: 1rem 3rem;
-  font-size: 1.4rem;
+  font-size: 1.7rem;
+  line-height: 2.3rem;
+  white-space: normal;
+  -moz-hyphens: auto;
+}
+
+.description p,
+.description a,
+.description label {
+  font-size: 1.7rem;
+  line-height: 2.3rem;
   white-space: normal;
 }
 
-.link-text, .tel-text a {
+.description label {
+    padding: 0;
+}
+
+.description label span {
+  height: auto;
+  min-height: 6rem;
+  padding-top: 1.2rem;
+  padding-bottom: 1.2rem;
+  font-size: 1.7rem;
+  line-height: 2.3rem;
+  white-space: normal;
+}
+
+.description small {
+  font-size: 1.7rem;
+  color: #505859;
+}
+
+.link-text {
   font-size: 1.4rem;
-  color: #336699;
+  color: #35679A;
   text-decoration: underline;
 }
 
+.link-text:active {
+  background-color: #c1d6e6;
+}
+
+.hint label span {
+  top: 2.9rem !important;
+}
+
+.hint span {
+  line-height: 6rem;
+}
+
+.hint .explanation {
+  font-style: normal;
+  position: relative;
+  margin-top: -2rem;
+  padding: 0.5rem 4rem 1.3rem 1.5rem;
+  white-space: normal;
+}
+
+.hint > label:not([for]) ~ .explanation {
+  padding-right: 8rem;
+}
+
+.hint .explanation[hidden] {
+  display: none;
+}
+
+
+/******************************************************************************
+ * Disabled items
+ */
+
+.disabled a,
+.disabled p,
+.disabled h2,
+.disabled label,
+.disabled select {
+  opacity: 0.6;
+  pointer-events: none;
+}
 
 /******************************************************************************
  * Wi-Fi settings
@@ -119,6 +274,10 @@ ul[data-state="ready"] li[data-state="ready"] {
   display: block;
 }
 
+ul[data-state="ready"] li > a {
+  padding-right: 6.2rem; /* 3rem (initial padding) + 3.2rem (wifi icon width) */
+}
+
 /**
  * Wi-Fi authentication fields:
  *   - hide password field on open networks
@@ -126,49 +285,73 @@ ul[data-state="ready"] li[data-state="ready"] {
  */
 
 section li.password,
+section li.password[hidden],
+section li.eap,
+section li.auth-phase2,
+section li.server-certificate,
+section li.server-certificate-description,
 section li.identity {
   display: none;
 }
 
 section[data-security*="WEP"] li.password,
 section[data-security*="WPA"] li.password,
+section[data-security*="EAP"] li.eap,
+section[data-security*="EAP"] li.auth-phase2,
+section[data-security*="EAP"] li.server-certificate,
+section[data-security*="EAP"] li.server-certificate-description,
 section[data-security*="EAP"] li.identity {
-  display: block;
+  display: inherit;
 }
 
 section li.password {
-  display: block; /*asf*/
+  display: inherit; /*asf*/
   height: 12rem;
   padding-right: 0;
 }
 
 section li.password > label {
-  top: 8.6rem;
-  left: 3rem;
-  width: calc(100% - 6rem);
   height: 3rem;
-  z-index: 1;
+  min-height: 0;
+  margin-top: 0.5rem;
+  margin-left: 0;
 }
+
+section li.password > label > span:after {
+  left: 0;
+  right: auto;
+  margin-left: 0;
+}
+
 
 section li.password > label > span {
-  left: 1.1rem;
-  right: auto;
-}
-
-section li.password > span {
-  position: absolute;
-  top: 8.6rem;
-  left: 6rem;
-  padding: 0;
+  padding-left: 3rem;
   height: 3rem;
   color: #848484;
   font-size: 1.7rem;
   line-height: 3rem;
+  margin-right: 1.5rem;
+}
+
+section li.password > label:active {
+  background-color: transparent;
+  color: #848484;
 }
 
 section li.password > p {
-  padding: 0 3rem;
-  line-height: 4.4rem;
+  padding: 0.5rem 1.5rem 0;
+  line-height: 3.3rem;
+}
+
+#pwd-auth {
+  -moz-user-focus: ignore;
+}
+
+section ul.operate-certificate {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background: url(images/document_bg.png);
 }
 
 
@@ -176,47 +359,66 @@ section li.password > p {
 * Media Storage settings
 */
 
-#mediaStorage #space-stackedbar {
-  border: solid 0px green;
+#mediaStorage .space-stackedbar {
+  background-color: #E7E7E7;
+  border: solid 0.1rem #A6A6A6;
+  border-radius: 0.3rem;
   display: inline-block;
-  height: 30px;
+  height: 3rem;
   margin: 0.8rem 5%;
-  padding: 0;
+  padding: 0.1rem;
   width: 90%;
 }
 
-#mediaStorage #space-stackedbar .stackedbar-item {
+#mediaStorage .space-stackedbar .stackedbar-item {
   display: inline-block;
-  height: 30px;
+  height: 3rem;
 }
 
-#mediaStorage #space-stackedbar .stackedbar-item#stackedbar-item-music, #mediaStorage #music-space .stackedbar-color {
-  background-color: #ff7517;
+#mediaStorage .space-stackedbar .color-music,
+#mediaStorage .color-music .stackedbar-color-label {
+  background-color: #82C72C;
 }
 
-#mediaStorage #space-stackedbar .stackedbar-item#stackedbar-item-pictures, #mediaStorage #pictures-space .stackedbar-color {
-  background-color: #5da31d;
+#mediaStorage .space-stackedbar .color-pictures,
+#mediaStorage .color-pictures .stackedbar-color-label {
+  background-color: #00CAF2;
 }
 
-#mediaStorage #space-stackedbar .stackedbar-item#stackedbar-item-videos, #mediaStorage #videos-space .stackedbar-color {
-  background-color: #5917ba;
+#mediaStorage .space-stackedbar .color-videos,
+#mediaStorage .color-videos .stackedbar-color-label {
+  background-color: #2295D3;
 }
 
-#mediaStorage #space-stackedbar .stackedbar-item#stackedbar-item-free, #mediaStorage #media-free-space .stackedbar-color {
-  background-color: #fff;
+#mediaStorage .space-stackedbar .color-free,
+#mediaStorage .color-free .stackedbar-color-label {
+  background-color: #E7E7E7;
 }
 
-#mediaStorage .stackedbar-color {
+#mediaStorage .color-free .stackedbar-color-label {
+  border: solid 0.1rem #A6A6A6;
+}
+
+#mediaStorage .color-music .stackedbar-color-label,
+#mediaStorage .color-pictures .stackedbar-color-label,
+#mediaStorage .color-videos .stackedbar-color-label,
+#mediaStorage .color-free .stackedbar-color-label {
+  border-radius: 0.3rem;
+}
+
+#mediaStorage .stackedbar-color-label {
   display: inline-block;
   height: 2rem;
-  left: 0.5rem;
-  padding: 0px;
+  left: 1.5rem;
+  padding: 0;
   position: absolute;
   top: 2.1rem;
   width: 2rem;
 }
 
-
+#mediaStorage .stackedbar-color-label + a {
+  padding-left: 4rem;
+}
 /******************************************************************************
  * Call settings
  */
@@ -225,7 +427,7 @@ section li.password > p {
 #menuItem-callWaiting .checkbox-label,
 #menuItem-callWaiting[data-state="on"] .checkbox-label,
 #menuItem-callWaiting[data-state="off"] .checkbox-label {
-  display: block;
+  display: inherit;
 }
 
 #menuItem-callWaiting .alert-label,
@@ -234,12 +436,12 @@ section li.password > p {
   display: none;
 }
 
-#menuItem-callWaiting[data-state="unknown"] .checkbox-label {
+#menuItem-callWaiting[data-state="unknown"] .checkbox-label input ~ span:after {
   display: none;
 }
 
 #menuItem-callWaiting[data-state="unknown"] .alert-label {
-  display: block;
+  display: inherit;
 }
 
 #menuItem-callWaiting .alert-label > span {
@@ -252,33 +454,15 @@ section li.password > p {
 }
 
 #call .cw-alert .cw-alert-checkbox-label {
-  position: absolute;
   right: 0;
   height: 2.7rem;
+  width: 100%;
 }
 
-
-/******************************************************************************
- * Cellular and Data
- */
-
-.carrier-disabled a {
+#call li[aria-disabled="true"] .icon-dialog {
   opacity: 0.6;
-  color: #797e80;
+  pointer-events: none;
 }
-
-#carrier-dc-warning h1 > span:before,
-#carrier-dr-warning h1 > span:before {
-  content: "";
-  position: relative;
-  display: inline-block;
-  background: -moz-image-rect(url(images/icons_sprite.png), 0, 120, 30, 90) no-repeat scroll 0 50% transparent;
-  top: 0.9rem;
-  margin: 0.5rem;
-  width: 3rem;
-  height: 3rem;
-}
-
 
 /******************************************************************************
  * APN settings
@@ -292,6 +476,42 @@ section li.password > p {
   padding-bottom: 1em;
 }
 
+.apn-list .apn-item .name {
+  position: absolute;
+  left: -1.5rem;
+  top: 0;
+  width: calc(100% - 3.5rem);
+  padding-left: 1.5rem;
+}
+
+.apn-list .apn-item .name:active {
+  background-color: #B2F2FF;
+}
+
+.apn-list .apn-item:after {
+  content: '';
+  position: absolute;
+  background-color: #E6E6E3;
+  right: 3.5rem;
+  width: 0.1rem;
+  height: calc(100% - 1rem);
+  top: 0.5rem;
+}
+
+.apn-list .apn-item .pack-radio > span {
+  background-color: transparent;
+}
+
+/******************************************************************************
+ * Internet sharing (Wi-Fi HotSpot)
+ */
+
+#hotspot ul li > a span {
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /******************************************************************************
  * Wallpaper snapshot
@@ -299,14 +519,13 @@ section li.password > p {
 
 #wallpaper-header { border: none; }
 
-#wallpaper {
+.wallpaper {
   position: relative;
   overflow: hidden;
   height: 17rem;
 }
 
-#wallpaper-button {
-  background: url(images/wallpaper_edit.png) no-repeat 25rem 11.5rem;
+.wallpaper .wallpaper-button {
   position: absolute;
   border: none;
   height: 100%;
@@ -314,12 +533,33 @@ section li.password > p {
   top: 0;
   left: 0;
   margin: 0;
-}
-#wallpaper-button:active {
-  background-image: url(images/wallpaper_edit_pressed.png);
+  background: none;
 }
 
-#wallpaper-preview {
+.wallpaper .wallpaper-button > span {
+  position: absolute;
+  right: 0; bottom: 0;
+  width: 4.6rem;
+  height: 4.6rem;
+  margin: 1.5rem;
+  font-size: 21px;
+  line-height: 4.6rem;
+  text-align: center;
+  background: rgba(0,0,0,0.5);
+  border-radius: 50%;
+  color: #fff;
+}
+
+.wallpaper .wallpaper-button:active > span {
+ background: #00C7EF;
+}
+
+.wallpaper .wallpaper-button > span:before {
+  font-size: 40px;
+  margin-right: -2px;
+}
+
+.wallpaper .wallpaper-preview {
   margin-top: -10rem;
   position: absolute;
   width: 100%;
@@ -336,45 +576,95 @@ section li.password > p {
   border-bottom: none;
 }
 
+/******************************************************************************
+ * Sound settings
+ */
+
+#manage-tones-button {
+  padding-left: 3rem;
+}
 
 /******************************************************************************
  * Volume & Brightness: min/max icons
  */
 
-ul li > label .range-icons {
+ul li > label.range-icons:before {
+  content: '';
   position: absolute;
   top: calc(50% - 1.5rem);
   right: 0;
   bottom: 0;
   left: 0;
   margin: 0 auto;
-  width: calc(100% - 4.1rem);
+  width: calc(100% - 2.3rem);
   height: 3rem;
+  pointer-events: none;
 }
 
-ul li > label .range-icons.volume {
-  background:
-    url(images/range_icons_volume_min.png) no-repeat 0 50%,
-    url(images/range_icons_volume_max.png) no-repeat 100% 50%;
+ul li > label.range-icons span {
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
+  padding: 0px;
+  margin: 0px 1.5rem;
+  pointer-events: none;
+  color: #657073;
 }
 
-ul li > label .range-icons.brightness {
-  background:
-    url(images/range_icons_brightness_min.png) no-repeat 0 50%,
-    url(images/range_icons_brightness_max.png) no-repeat 100% 50%;
-  left: 2.5rem;
-  right: auto;
+ul li > label.range-icons span:last-child {
+  left: auto;
+  right: 0;
 }
 
-#brightness-manual div {
+ul li.brightness-manual > label input[type="range"] {
+  width: calc(100% - 10.8rem);
+}
+
+li.brightness-manual div {
   position: relative;
   top: calc(50% - 1.5rem);
-  left: 7.5rem;
-  right: 7.5rem;
+  left: 5rem;
   height: 3rem;
-  width: calc(100% - 15rem);
+  width: calc(100% - 10.7rem);
 }
 
+ul li > label.range-icons.volume:before {
+  left: 1.4rem;
+  right: auto;
+  width: 3rem;
+  top: 4.4rem;
+}
+
+ul li > label.range-icons.volume.media:before {
+  background:
+    url(images/sound_volume_media.png) no-repeat 0 50% / 3rem;
+}
+
+ul li > label.range-icons.volume.notification:before {
+  background:
+    url(images/sound_volume_ringer.png) no-repeat 0 50% / 3rem;
+}
+
+ul li > label.range-icons.volume.alarm:before {
+  background:
+    url(images/sound_volume_alarm.png) no-repeat 0 50% / 3rem;
+}
+
+ul li > label.range-icons.volume input {
+  position: inherit;
+  margin-left: 5.8rem;
+  width: calc(100% - 7.5rem);
+  opacity: 0;
+  transition: opacity .6s ease 0s;
+}
+
+/******************************************************************************
+ * Accessibility
+ */
+
+#accessibility ul li > a.menu-item {
+  padding: 0 3rem;
+}
 
 /******************************************************************************
  * SIM Toolkit
@@ -386,47 +676,48 @@ ul li > label .range-icons.brightness {
   background: none;
 }
 
+/**
+ * 1. !important required to override scoped
+ *    styles in <gaia-header>. When we have
+ *    ::content selector in the platform, this
+ *    shouldn't be requireed anymore.
+ */
 #icc .hidden {
+  display: none !important; /* 1 */
+}
+
+/******************************************************************************
+ * Messaging
+ */
+#messaging .simcards-container[hidden] {
   display: none;
 }
-
-#icc #icc-stk-alert {
-  position: fixed;
-}
-
-#icc #icc-stk-alert menu button:first-child {
-  margin: 0;
-}
-
-#icc #icc-stk-alert menu button {
-  width: calc((100% - 2rem) / 3);
-  margin-left: 1rem;
-}
-
-.multiline_title {
-  text-overflow: clip;
-  white-space: normal;
-  word-wrap: break-word;
-}
-
 
 /******************************************************************************
  * Date & Time
  */
 
-#dateTime ul[data-state="auto"] ~ * {
-  display: none;
+#dateTime ul.disabled p,
+#dateTime ul.disabled a,
+#dateTime .time-manual.disabled span {
+  color: #797e80;
 }
 
-#dateTime ul[hidden] + header {
-  margin-top: 5rem;
-}
-
-#time-manual span {
+#dateTime .timezone.disabled select {
+  color: #797e80;
+  opacity: 0.6;
+  top: 0.1rem;
+  left: 1rem;
+  padding: 0;
+  text-shadow: 0 0 0;
   pointer-events: none;
 }
 
-#time-manual input {
+#dateTime .time-manual span {
+  pointer-events: none;
+}
+
+#dateTime .time-manual input {
   position: absolute;
   width: 100%;
   height: 100%;
@@ -435,16 +726,98 @@ ul li > label .range-icons.brightness {
   opacity: 0;
 }
 
+#dateTime .time-manual label {
+  min-height: 0;
+  height: 0;
+  display: block;
+}
 
 /******************************************************************************
  * Improve Browser OS
  */
+#improveBrowserOS-chooseFeedback li,
+#improveBrowserOS-sendFeedback li {
+  border: none;
+}
+
+#improveBrowserOS-sendFeedback li:first-child {
+  min-height: 3rem;
+}
 
 #improveBrowserOS .link-text {
   white-space: nowrap;
 }
 
+#feedback-description {
+  display: block;
+  height: 10rem;
+  padding: 1rem 1rem 1.2rem;
+  resize: none;
+}
 
+#sendFeedback .pack-checkbox span {
+  left: 3rem;
+  right: auto;
+  top: 2rem;
+}
+
+.feedback-choose-face {
+  display: block;
+  background: url(images/feedback_faces.png);
+  width: 10rem;
+  min-height: 10rem;
+  background-repeat: no-repeat;
+  background-color: transparent;
+  background-size: 20rem;
+}
+
+#feedback-mood {
+  text-align: center;
+}
+
+#feedback-mood li {
+  display: inline-block;
+  max-width: 11rem;
+}
+
+.feedback-face-caption {
+  overflow: visible;
+  white-space: normal;
+  line-height: 2.6rem;
+  padding-top: 1rem;
+  min-height: 6rem;
+  height: auto;
+}
+
+#feedback-happy {
+  float: left;
+}
+
+#feedback-sad {
+  float: right;
+}
+
+#feedback-happy .feedback-choose-face {
+  display: inline-block;
+  background-position: 0;
+}
+
+#feedback-sad .feedback-choose-face {
+  display: inline-block;
+  background-position: 100%;
+}
+
+.feedback-feel {
+  text-align: center;
+}
+
+#feedback-email.hidden {
+  display: none;
+}
+
+#feedback-send-btn {
+  text-align: center;
+}
 /******************************************************************************
  * OS License
  */
@@ -453,6 +826,7 @@ ul li > label .range-icons.brightness {
 #os-license {
   width: 100%;
   height: calc(100% - 5rem);
+  border: 0;
 }
 
 
@@ -460,19 +834,106 @@ ul li > label .range-icons.brightness {
  * Help
  */
 
-#call-support-numbers {
-  position: absolute;
-  right: 2rem;
+#call-support-link, #online-support-link {
+  height: auto;
 }
 
-html[dir="rtl"] #call-support-numbers {
-  right: inherit;
-  left: 2rem;
+#help-call-support-numbers, #help-online-support-text {
+  display: block;
+  line-height: 3rem;
+  margin-bottom: 2rem;
+}
+
+#help-call-support-numbers a, #help-online-support-text a {
+  display: block;
 }
 
 #help[data-has-support-info] .no-support-info,
 #help:not([data-has-support-info]) .support-info {
   display: none;
+}
+
+/******************************************************************************
+ * Firefox Accounts
+ */
+
+.fxa-logo {
+  background-image: url('images/fxa_logo.png');
+  background-repeat: no-repeat;
+  background-size: 16.4rem;
+  margin: 3rem auto 0;
+  width: 17rem;
+  height: 19.5rem;
+}
+
+#fxa-unverified .description {
+  background-image: url('images/fxa_envelope.png');
+  background-repeat: no-repeat;
+  background-size: 7rem;
+  background-position: 0 1.5rem;
+  padding-top: 1.5rem;
+}
+
+#fxa-unverified .disabled {
+  color: #ccc;
+}
+
+#fxa-unverified-text {
+  padding-top: 0.8rem;
+  margin-left: 6rem;
+}
+
+/******************************************************************************
+ * Developer and Developer HUD
+ *
+ * Override default behavior to let checkbox text wrap on multiple lines
+ */
+
+#developer ul li > label > span,
+#developer-hud ul li > label > span {
+  overflow: visible;
+  white-space: normal;
+  min-height: 6rem;
+  height: auto;
+  line-height: 2.3rem;
+  padding: 1.9rem 4rem 1.5rem 3rem;
+}
+
+#developer ul li > label.pack-switch > span,
+#developer-hud ul li > label.pack-switch > span {
+  padding-right: 9rem;
+}
+
+#developer-hud ul li > label > span.color-preview {
+  padding-left: 5rem;
+}
+
+#developer-hud ul li.hud-separator {
+  border-top: 0.1rem solid #e6e6e3;
+}
+
+/******************************************************************************
+* App Permissions
+*
+* Note: The reason why we need this style is because element.hidden will make
+* the CSS specificity 0,0,1,0 (Yes, it is a pseudo class). And because our BB
+* 's CSS specificity is much higher than this, we have to override it again
+* to make sure it will display as hidden.
+*/
+.clear-bookmarks-app[hidden] {
+  display: none;
+}
+
+/******************************************************************************
+ * Toaster
+ */
+section[role="status"] {
+  transition: opacity .6s ease 0s;
+  opacity: 0;
+}
+
+section[role="status"].toast-visible {
+  opacity: 1;
 }
 
 /******************************************************************************
@@ -497,3 +958,106 @@ html[dir="rtl"] label[for^="pwd"] {
   padding-right: 3rem;
 }
 
+/* Following RTL Tweaks */
+
+html[dir="rtl"] .hint .explanation {
+  padding-left: 4rem;
+  padding-right: 1.5rem;
+  white-space: normal;
+}
+
+html[dir="rtl"] .hint > label:not([for]) ~ .explanation {
+  padding-left: 8rem;
+  padding-right: 1.5rem;
+}
+
+html[dir="rtl"] ul[data-state="ready"] li > a {
+  padding-left: 6.2rem; /* 3rem (initial padding) + 3.2rem (wifi icon width) */
+  padding-right: 3rem;
+}
+
+html[dir="rtl"] section li.password {
+  padding-left: 0;
+}
+
+html[dir="rtl"] section li.password > label {
+  left: 1.5rem;
+  right: 0;
+}
+
+html[dir="rtl"] section li.password > label > span:after {
+  left: auto;
+  right: 1.5rem;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+html[dir="rtl"] section li.password > label > span {
+  margin-left: 0;
+  margin-right: 0;
+  padding-right: 3rem;
+}
+
+html[dir="rtl"] #mediaStorage .stackedbar-color-label {
+  left: auto;
+  right: 1.5rem;
+}
+
+html[dir="rtl"] #mediaStorage .stackedbar-color-label + a {
+  padding-left: 0;
+  padding-right: 4rem;
+}
+
+html[dir="rtl"] #call .cw-alert .cw-alert-checkbox-label {
+  left: 0;
+  right: auto;
+}
+
+html[dir="rtl"] #wallpaper-button {
+  left: auto;
+  right: 0;
+}
+
+html[dir="rtl"] ul li > label.range-icons.brightness:before {
+  background-position: 100% 50%, 0 50%;
+  left: auto;
+  right: 1rem;
+}
+
+html[dir="rtl"] .brightness-manual div {
+  left: auto;
+  right: 5rem;
+}
+
+html[dir="rtl"] #time-manual input {
+  left: auto;
+  right: 0;
+}
+
+html[dir="rtl"] #sendFeedback .pack-checkbox span {
+  left: auto;
+  right: 3rem;
+}
+
+html[dir="rtl"] #feedback-happy {
+  float: right;
+}
+
+html[dir="rtl"] #feedback-sad {
+  float: left;
+}
+
+html[dir="rtl"] ul li > label.range-icons.volume:before {
+  left: auto;
+  right: 1.4rem;
+  background-position: 100% 50%;
+}
+
+html[dir="rtl"] ul li > label.range-icons.volume input {
+  margin-right: 5.8rem;
+}
+
+html[dir="rtl"] #developer-hud ul li > label > span.color-preview {
+  padding-left: 0;
+  padding-right: 5rem;
+}

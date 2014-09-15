@@ -1,12 +1,16 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('timespan.js');
-  requireLib('utils/ordered_map.js');
-  requireLib('templates/day.js');
-  requireLib('views/day_based.js');
-  requireLib('views/day_child.js');
-});
+/*
+requireLib('utils/ordered_map.js');
+requireLib('templates/day.js');
+requireLib('views/day_based.js');
+requireLib('views/day_child.js');
+*/
+requireLib('template.js');
+requireLib('templates/date_span.js');
+requireLib('timespan.js');
 
-suite('views/day_child', function() {
+suiteGroup('Views.DayChild', function() {
+  'use strict';
+
   var subject;
   var app;
   var db;
@@ -62,8 +66,7 @@ suite('views/day_child', function() {
     var event = Factory('event', {
       remote: {
         title: 'UX',
-        location: 'Paris',
-        attendees: ['zoo', 'barr']
+        location: 'Paris'
       }
     });
 
@@ -72,9 +75,39 @@ suite('views/day_child', function() {
     var result = subject._renderEvent(busytime, event);
     assert.ok(result);
 
+    assert.include(result, 'icon-calendar-alarm');
     assert.include(result, 'UX');
     assert.include(result, 'Paris');
-    assert.include(result, '>zoo<');
-    assert.include(result, '>barr<');
+  });
+
+  test('#_renderEvent without alarms', function() {
+    var event = Factory('event', {
+      remote: {
+        alarms: []
+      }
+    });
+
+    var busytime = Factory('busytime');
+
+    var result = subject._renderEvent(busytime, event);
+    assert.ok(result);
+
+    assert.ok(result.indexOf('icon-calendar-alarm') === -1);
+  });
+
+  test('#_renderEvent undefined alarms, bug 868600', function() {
+    var event = Factory('event', {
+      remote: {
+        title: '|rendercheck|'
+      }
+    });
+    delete event.remote.alarms;
+
+    var busytime = Factory('busytime');
+
+    var result = subject._renderEvent(busytime, event);
+    assert.ok(result);
+
+    assert.include(result, '|rendercheck|');
   });
 });

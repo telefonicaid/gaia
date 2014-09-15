@@ -1,11 +1,12 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('calc.js');
-  requireLib('db.js');
-  requireLib('store/abstract.js');
-  requireLib('store/alarm.js');
-});
+/*global Factory */
+
+requireLib('calc.js');
+requireLib('db.js');
+requireLib('store/abstract.js');
+requireLib('store/alarm.js');
 
 suite('store/alarm', function() {
+  'use strict';
 
   var subject;
   var db;
@@ -14,9 +15,8 @@ suite('store/alarm', function() {
 
 
   setup(function(done) {
-    this.timeout(5000);
     app = testSupport.calendar.app();
-    db = testSupport.calendar.db();
+    db = app.db;
     controller = app.alarmController;
     subject = db.getStore('Alarm');
 
@@ -38,24 +38,38 @@ suite('store/alarm', function() {
     db.close();
   });
 
-  suite('#findByBusytimeId', function() {
+  suite('#findAllByBusytimeId', function() {
     suite('existing', function() {
-      var alarm;
+      var alarms;
       var busytimeId = 'xfoo';
+      var busytime = {
+        _id: busytimeId
+      };
 
       setup(function(done) {
-        alarm = Factory('alarm', {
-          busytimeId: busytimeId
-        });
+        alarms = [];
+        var trans = db.transaction('alarms', 'readwrite');
 
-        subject.persist(alarm, done);
+        for (var i = 0; i < 3; i++) {
+          var alarm = Factory('alarm', { busytimeId: busytimeId });
+          alarms.push(alarm);
+          subject.persist(alarm, trans);
+        }
+
+        trans.oncomplete = function() {
+          done();
+        };
+
+        trans.onerror = function(e) {
+          done(e.target.error);
+        };
       });
 
       test('result', function(done) {
-        subject.findByBusytimeId(busytimeId, function(err, result) {
+        subject.findAllByBusytimeId(busytime._id, function(err, result) {
           done(function() {
             assert.ok(!err);
-            assert.deepEqual(result, alarm);
+            assert.equal(result.length, alarms.length);
           });
         });
       });
@@ -70,7 +84,7 @@ suite('store/alarm', function() {
       Disabled in Bug 838993, to be enabled asap in Bug 840489
 
     test('missing', function(done) {
-      subject.findByBusytimeId('foo', function(err, result) {
+      subject.findAllByBusytimeId('foo', function(err, result) {
         try {
           assert.ok(!err);
           assert.ok(!result);
@@ -156,17 +170,6 @@ suite('store/alarm', function() {
     });
   }
 
-  function getAll(cb) {
-    var trans = subject.db.transaction('alarms');
-    var store = trans.objectStore('alarms');
-
-    store.mozGetAll().onsuccess = function(e) {
-      cb(e.target.result);
-    };
-
-    store.mozGetAll().onerror = cb;
-  }
-
   suite('#workQueue', function() {
     var getAllResults = [];
     var added = [];
@@ -185,8 +188,9 @@ suite('store/alarm', function() {
             target: req
           };
 
-          if (req.onsuccess)
+          if (req.onsuccess) {
             req.onsuccess(event);
+          }
 
           req.emit('success', event);
 
@@ -200,10 +204,11 @@ suite('store/alarm', function() {
         var req = new Calendar.Responder();
 
         setTimeout(function() {
-          var id = lastId++;
+          lastId++;
 
-          if (req.onsuccess)
+          if (req.onsuccess) {
             req.onsuccess(lastId);
+          }
 
           req.emit('success', lastId);
 
@@ -265,9 +270,12 @@ suite('store/alarm', function() {
       add(new Date(2018, 0, 3), 3);
 
       setup(function(done) {
-        getAllResults.push(Factory('alarm', {
-          trigger: new Date()
-        }));
+        getAllResults.push({
+          data: Factory('alarm', {
+            trigger: new Date(),
+            eventId: 'xx'
+          })
+        });
 
         subject.workQueue(now, done);
       });
@@ -275,6 +283,27 @@ suite('store/alarm', function() {
       test('after', function() {
         assert.length(added, 0);
       });
+    });
+
+    suite('unrelated alarm in db', function() {
+      add(new Date(2018, 0, 3), 3);
+
+      setup(function(done) {
+        getAllResults.push({
+          data: { _randomField: true }
+        });
+        subject.workQueue(now, done);
+      });
+
+      test('after complete', function() {
+        assert.length(added, 1);
+
+        assert.deepEqual(
+          added[0][0],
+          new Date(2018, 0, 3)
+        );
+      });
+
     });
 
     suite('no alarm in db and no alarm within 48 hours', function() {

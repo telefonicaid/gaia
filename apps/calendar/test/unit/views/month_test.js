@@ -1,17 +1,18 @@
 requireCommon('test/synthetic_gestures.js');
+require('/shared/js/gesture_detector.js');
+requireLib('timespan.js');
 
-requireApp('calendar/test/unit/helper.js', function() {
-  require('/shared/js/gesture_detector.js');
+/*
+requireLib('utils/ordered_map.js');
+requireLib('templates/month.js');
+requireLib('views/time_parent.js');
+requireLib('views/month_child.js');
+requireLib('views/month.js');
+*/
 
-  requireLib('utils/ordered_map.js');
-  requireLib('timespan.js');
-  requireLib('templates/month.js');
-  requireLib('views/time_parent.js');
-  requireLib('views/month_child.js');
-  requireLib('views/month.js');
-});
+suiteGroup('Views.Month', function() {
+  'use strict';
 
-suite('views/month', function() {
   var subject,
       app,
       controller,
@@ -137,6 +138,24 @@ suite('views/month', function() {
       controller.selectedDay = date;
       assert.deepEqual(calledWith[0], date);
     });
+  });
+
+  test('#_onswipe', function() {
+    var date = new Date(2012, 4, 10);
+    var expected = new Date(2012, 5, 1);
+    subject.date = date;
+
+    subject._onswipe({
+      dy: 0,
+      dx: window.innerWidth / 5,
+      direction: 'left'
+    });
+
+    assert.deepEqual(
+      subject.controller.selectedDay,
+      expected,
+      'selects first day of month'
+    );
   });
 
   test('#_createChild', function() {

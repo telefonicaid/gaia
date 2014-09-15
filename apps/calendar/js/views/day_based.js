@@ -1,9 +1,17 @@
 Calendar.ns('Views').DayBased = (function() {
+  'use strict';
 
+  /**
+   * Module dependencies
+   */
   var Calc = Calendar.Calc;
-  var hoursOfOccurance = Calendar.Calc.hoursOfOccurance;
   var OrderedMap = Calendar.Utils.OrderedMap;
+  var hoursOfOccurence = Calendar.Calc.hoursOfOccurence;
+  /*var performance = Calendar.performance;*/
 
+  /**
+   * Constants
+   */
   const MINUTES_IN_HOUR = 60;
 
   /**
@@ -92,7 +100,6 @@ Calendar.ns('Views').DayBased = (function() {
      */
     _idsToHours: null,
 
-
     get element() {
       return this._element;
     },
@@ -100,8 +107,6 @@ Calendar.ns('Views').DayBased = (function() {
     get events() {
       return this._eventsElement;
     },
-
-    /** private **/
 
     /**
      * Reset the hour cache.
@@ -128,8 +133,9 @@ Calendar.ns('Views').DayBased = (function() {
      * Starts the process of loading records for display.
      *
      * @param {Object|Array} busytimes list or single busytime.
+     * @param {Function} [callback] callback
      */
-    _loadRecords: function(busytimes) {
+    _loadRecords: function(busytimes, callback) {
       // we want to fail loudly if nothing is given.
       busytimes = (Array.isArray(busytimes)) ? busytimes : [busytimes];
 
@@ -149,6 +155,8 @@ Calendar.ns('Views').DayBased = (function() {
         list.forEach(function(record) {
           this.add(record.busytime, record.event);
         }, self);
+
+        callback && callback();
       });
     },
 
@@ -182,10 +190,8 @@ Calendar.ns('Views').DayBased = (function() {
         // new event
         this._idsToHours[id] = [hour];
 
-        var html = this._renderEvent(busytime, record);
+        var html = this._renderEvent(busytime, record, hour);
         var eventArea = hourRecord.element;
-        var records = hourRecord.records;
-        var idx = records.insertIndexOf(busytime._id);
 
         if (this.template.hourEventsSelector) {
           eventArea = eventArea.querySelector(
@@ -216,11 +222,6 @@ Calendar.ns('Views').DayBased = (function() {
         }
       }
 
-      // hour flags
-      var calendarId = this.calendarId(busytime);
-      hourRecord.flags.push(calendarId);
-      hourRecord.element.classList.add(calendarId);
-
       // increment count of event per-hour (hour -> [events] counter)
       return hourRecord.records.set(id, eventRecord);
     },
@@ -238,7 +239,6 @@ Calendar.ns('Views').DayBased = (function() {
      */
     _insertElement: function(html, element, records, idx) {
       var el;
-      var len = records.length;
 
       if (!element.children.length || idx === 0) {
         element.insertAdjacentHTML(
@@ -263,9 +263,6 @@ Calendar.ns('Views').DayBased = (function() {
      * @param {HTMLElement} element target to apply top/height to.
      */
     _assignPosition: function(busytime, element) {
-      var topOffset = 0;
-      var height = 0;
-
       // cache dates
       var start = busytime.startDate;
       var end = busytime.endDate;
@@ -281,7 +278,9 @@ Calendar.ns('Views').DayBased = (function() {
       // check if end time is on same date.
       var endMin = 59;
       var endHour = 23;
-      if (Calendar.Calc.isSameDate(this.date, busytime.endDate)) {
+      var isSameDateWithEndDate =
+          Calendar.Calc.isSameDate(this.date, busytime.endDate);
+      if (isSameDateWithEndDate) {
         endHour = end.getHours();
         endMin = end.getMinutes();
       }
@@ -296,14 +295,29 @@ Calendar.ns('Views').DayBased = (function() {
       // Calculate duration in hours, with minutes as decimal part
       var hoursDuration = (endHour - startHour) +
                           ((endMin - startMin) / MINUTES_IN_HOUR);
+      var elementHeight = hoursDuration;
 
-      // If this event is less than a full hour, tweak the classname so that
-      // some alternate styles for a tiny event can apply (eg. hide details)
+      // If this event is less than a full hour and NOT cross next day,
+      // tweak the classname so that some alternate styles for
+      // a tiny event can apply. (eg. hide details)
+      // And if the event is cross next day, the height of event element is 1.
       if (hoursDuration < 1) {
-        element.className += ' partial-hour';
+        if (isSameDateWithEndDate) {
+          element.classList.add('partial-hour');
+          // we need to toggle layout if event lasts less than 20, 30 and 45min
+          if (hoursDuration < 0.3) {
+            element.classList.add('partial-hour-micro');
+          } else if (hoursDuration < 0.5) {
+            element.classList.add('partial-hour-tiny');
+          } else if (hoursDuration < 0.75) {
+            element.classList.add('partial-hour-small');
+          }
+        } else {
+          elementHeight = 1;
+        }
       }
 
-      return this._assignHeight(element, hoursDuration);
+      return this._assignHeight(element, elementHeight);
     },
 
     /**
@@ -313,13 +327,20 @@ Calendar.ns('Views').DayBased = (function() {
      * @param {Numeric} duration in hours, minutes as decimal part.
      */
     _assignHeight: function(element, hoursDuration) {
-      element.style.height = (hoursDuration * 100) + '%';
+      // we remove 0.1rem from height so multiple consecutive events doesn't
+      // "blend into each other" (works as a margin)
+      element.style.height = 'calc(' + (hoursDuration * 100) + '% - 0.1rem)';
     },
 
     /**
      * build the default elements for the view and return the parent element.
      */
     _buildElement: function() {
+      // XXX: wrapper used to create a new stacking context to fix Bug 972666
+      // without causing performance issues described on Bug 972675
+      var wrapper = document.createElement('div');
+      wrapper.classList.add('day-events-wrapper');
+
       // create the hidden values for element & eventsElement
       this._eventsElement = document.createElement('section');
       this._element = document.createElement('section');
@@ -338,19 +359,19 @@ Calendar.ns('Views').DayBased = (function() {
       }
 
       // setup/inject elements.
-      this.element.appendChild(this._eventsElement);
+      wrapper.appendChild(this._eventsElement);
+      this.element.appendChild(wrapper);
       this.events.classList.add(this.classType);
 
       return this.element;
     },
 
     /** must be overriden */
-    _renderEvent: function(busytime, event) {},
+    _renderEvent: function(busytime, event, hour) {},
 
     _renderHour: function(hour) {
       return this.template.hour.render({
-        displayHour: Calendar.Calc.formatHour(hour),
-        hour: String(hour)
+        hour: hour
       });
     },
 
@@ -371,8 +392,9 @@ Calendar.ns('Views').DayBased = (function() {
       var record = this.hours.get(hour);
 
       // skip records that do not exist.
-      if (record === null)
+      if (record === null) {
         return;
+      }
 
       var el = record.element;
 
@@ -384,32 +406,18 @@ Calendar.ns('Views').DayBased = (function() {
     },
 
     createHour: function(hour) {
-      this.hours.indexOf(hour);
-
-      var len = this.hours.items.length;
-      var idx = this.hours.insertIndexOf(hour);
-
       var html = this._renderHour(hour);
-      var parent = this.events;
-
-      if (hour === Calendar.Calc.ALLDAY) {
-        parent = this.allDayElement;
+      var parent = (hour === Calendar.Calc.ALLDAY) ?
+        this.allDayElement : this.events;
+      if (!parent) {
+        throw new Error('parent must be specified');
       }
 
-      if (!parent)
-        throw new Error('parent must be specified');
-
-      var el = this._insertElement(
-        html,
-        parent,
-        this.hours.items,
-        idx
-      );
-
+      var idx = this.hours.insertIndexOf(hour);
+      var el = this._insertElement(html, parent, this.hours.items, idx);
       return this.hours.set(hour, {
         element: el,
-        records: new OrderedMap(),
-        flags: []
+        records: new OrderedMap()
       });
     },
 
@@ -420,7 +428,7 @@ Calendar.ns('Views').DayBased = (function() {
      * @param {Object} event related event object.
      */
     add: function(busytime, event) {
-      var hours = hoursOfOccurance(
+      var hours = hoursOfOccurence(
         this.date,
         busytime.startDate,
         busytime.endDate
@@ -442,32 +450,12 @@ Calendar.ns('Views').DayBased = (function() {
 
       delete this._idsToHours[id];
 
-      if (!hours)
+      if (!hours) {
         return;
+      }
 
       hours.forEach(function(number) {
         var hour = this.hours.get(number);
-
-        var calendarClass = this.calendarId(busytime);
-
-
-        // handle flags
-        var flags = hour.flags;
-
-        // we need to remove them from the list
-        // then check again to see if there
-        // are any more...
-        var idx = flags.indexOf(calendarClass);
-
-        if (idx !== -1)
-          flags.splice(idx, 1);
-
-        // if after we have removed the flag there
-        // are no more we can remove the class
-        // from the element...
-        if (flags.indexOf(calendarClass) === -1) {
-          hour.element.classList.remove(calendarClass);
-        }
 
         // XXX: If renderAllHours is false we want to remove
         //      unsed hours.
@@ -531,32 +519,108 @@ Calendar.ns('Views').DayBased = (function() {
       var records = this.controller.queryCache(this.timespan);
 
       if (records && records.length) {
-        this._loadRecords(records);
+        this._loadRecords(records, () => Calendar.performance.dayBasedReady());
+      } else {
+        // if we don't load records (no events today) we still need to let the
+        // Performance controller know that the DayBased view is ready
+        Calendar.performance.dayBasedReady();
       }
     },
 
     /**
-     * Creates and returns
-     *
+     * Creates a DOM representation of this view.
+     * @return {Element} some element.
      */
     create: function() {
       var el = this._buildElement();
 
       if (this.renderAllHours) {
-        var hour = 0;
-
         if (this.outsideAllDay) {
           this.createHour('allday');
         }
 
-        for (; hour < 24; hour++) {
+        for (var hour = 0; hour < 24; hour++) {
           this.createHour(hour);
         }
       }
 
+      // TODO(gareth): This is maybe not a good place for this.
       this.changeDate(this.date);
 
+      this.delegate(el, 'click', 'section.hour',
+          this._onHourClick.bind(this));
       return el;
+    },
+
+    /**
+     * @param {MouseEvent} evt A click event on an hour element.
+     * @param {Element} el matched by css selector.
+     * @private
+     */
+    _onHourClick: function(evt, el) {
+      if (this._clickedOnEvent(evt.target)) {
+        // We just clicked on an event... bail!
+        return;
+      }
+
+      var hour = el.getAttribute('data-hour');
+      if (!hour) {
+        // Something went terribly wrong...
+        return;
+      }
+
+      var startDate = new Date(this.date.getTime());
+      startDate.setHours(0);
+      startDate.setMinutes(0);
+      startDate.setSeconds(0);
+
+      var endDate = new Date(this.date.getTime());
+      endDate.setHours(0);
+      endDate.setMinutes(0);
+      endDate.setSeconds(0);
+
+      var queryString = {};
+      if (hour === Calendar.Calc.ALLDAY) {
+        queryString.isAllDay = true;
+        endDate.setDate(startDate.getDate() + 1);
+      } else {
+        // If it's not all day it must be a number.
+        hour = parseInt(hour);
+        startDate.setHours(hour);
+        endDate.setHours(hour + 1);
+      }
+
+      queryString.startDate = startDate.toString();
+      queryString.endDate = endDate.toString();
+
+      this.app.go(
+          '/event/add/?' +
+          Calendar.QueryString.stringify(queryString)
+      );
+    },
+
+    /**
+     * The structure of one of these cells is:
+     * <div class="events">
+     *   <section class="event">...</section>
+     *   <section class="event">...</section>
+     * </div>
+     * @param {Element} target The HTML element that got clicked.
+     * @return {boolean} Whether or not we clicked on an event.
+     * @private
+     */
+    _clickedOnEvent: function(target) {
+      var el = target;
+      while (el && el.nodeType === 1 /** ELEMENT_NODE */) {
+        if (el.classList.contains('event')) {
+          return true;
+        }
+        if (el.classList.contains('events')) {
+          return false;
+        }
+        el = el.parentNode;
+      }
+      return true;
     },
 
     activate: function() {
@@ -578,12 +642,48 @@ Calendar.ns('Views').DayBased = (function() {
     destroy: function() {
       this._removeTimespanObserver();
       var el = this.element;
-
       if (el && el.parentNode) {
         el.parentNode.removeChild(el);
       }
-    }
+    },
 
+    getScrollTop: function() {
+      var scroll = this.element.querySelectorAll('.day-events-wrapper')[0];
+      var scrollTop = scroll.scrollTop;
+      return scrollTop;
+    },
+
+    setScrollTop: function(scrollTop) {
+      var scroll = this.element.querySelectorAll('.day-events-wrapper')[0];
+      scroll.scrollTop = scrollTop;
+    },
+
+    /**
+     * Animated scroll to the destination scrollTop for am element.
+     *
+     * @param {Number} destinationScrollTop the scrollTop of destination.
+     */
+    animatedScroll: function(scrollTop) {
+      var scroll = this.element.querySelectorAll('.day-events-wrapper')[0];
+      var content = scroll.querySelector('.day-events');
+      var SPEED = 500;
+      var scrollTo = scroll.scrollTop - scrollTop;
+      var seconds = Math.abs(scrollTo) / SPEED;
+
+      setTimeout(function() {
+        content.style.transform = 'translateY(' + scrollTo + 'px)';
+        // easeOutQuart borrowed from http://matthewlein.com/ceaser/
+        content.style.transition = 'transform ' + seconds + 's ' +
+          'cubic-bezier(0.165, 0.840, 0.440, 1.000)';
+      });
+
+      content.addEventListener('transitionend', function setScrollTop() {
+        content.removeEventListener('transitionend', setScrollTop);
+        content.style.transform = null;
+        content.style.transition = null;
+        scroll.scrollTop = scrollTop;
+      });
+    }
   };
 
   return DayBased;

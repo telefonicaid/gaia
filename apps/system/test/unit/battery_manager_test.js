@@ -1,60 +1,59 @@
 'use strict';
 
 requireApp('system/test/unit/mock_navigator_battery.js');
-requireApp('system/test/unit/mock_settings_listener.js');
+requireApp('system/shared/test/unit/mocks/mock_settings_listener.js');
 requireApp('system/test/unit/mock_sleep_menu.js');
-requireApp('system/test/unit/mock_gesture_detector.js');
-requireApp('system/test/unit/mocks_helper.js');
+requireApp('system/test/unit/mock_screen_manager.js');
+require('/shared/test/unit/mocks/mock_gesture_detector.js');
+require('/shared/test/unit/mocks/mock_l10n.js');
 requireApp('system/js/battery_manager.js');
 
-var mocksForBatteryManager = [
+var mocksForBatteryManager = new MocksHelper([
   'SettingsListener',
-  'SleepMenu',
+  'sleepMenu',
   'GestureDetector'
-];
-
-mocksForBatteryManager.forEach(function(mockName) {
-  if (! window[mockName]) {
-    window[mockName] = null;
-  }
-});
-
+]).init();
 
 suite('battery manager >', function() {
   var realBattery;
   var screenNode, notifNode, overlayNode;
-  var mocksHelper;
   var tinyTimeout = 10;
 
-  suiteSetup(function() {
-    mocksHelper = new MocksHelper(mocksForBatteryManager);
-    mocksHelper.suiteSetup();
+  var realL10n;
 
+  mocksForBatteryManager.attachTestHelpers();
+  suiteSetup(function() {
     realBattery = BatteryManager._battery;
     BatteryManager._battery = MockNavigatorBattery;
 
     // must be big enough, otherwise the BatteryManager timeout occurs
     // before the different suites execute.
     BatteryManager.TOASTER_TIMEOUT = tinyTimeout;
+    // for PowerSaveHandler
+    realL10n = navigator.mozL10n;
+    navigator.mozL10n = MockL10n;
   });
 
   suiteTeardown(function() {
-    mocksHelper.suiteTeardown();
-
     BatteryManager._battery = realBattery;
     realBattery = null;
+
+    navigator.mozL10n = realL10n;
   });
 
   setup(function() {
-    mocksHelper.setup();
-
     var batteryNotificationMarkup =
       '<div id="system-overlay" data-z-index-level="system-overlay">' +
         '<div id="battery">' +
           '<span class="icon-battery"></span>' +
-          '<span class="battery-notification" '+
-                 'data-l10n-id="battery-almost-empty">Battery almost empty' +
-          '</span>' +
+          '<div class="battery-notification"> ' +
+                '<span data-l10n-id="battery-almost-empty3">' +
+                  'Battery almost empty.' +
+                '</span>' +
+                '<span data-l10n-id="plug-in-your-charger">' +
+                  'Plug in your charger.' +
+                '</span>' +
+          '</div>' +
         '</div>' +
       '</div>';
 
@@ -72,8 +71,6 @@ suite('battery manager >', function() {
   });
 
   teardown(function() {
-    mocksHelper.teardown();
-
     screenNode.parentNode.removeChild(screenNode);
   });
 
@@ -119,6 +116,14 @@ suite('battery manager >', function() {
 
       test('display notification', function() {
         assertDisplayed();
+      });
+
+      test('should send batteryshutdown when battery is below threshold',
+      function() {
+        var dispatchEventStub = this.sinon.stub(window, 'dispatchEvent');
+        sendLevelChange(0.00);
+        sinon.assert.calledWithMatch(window.dispatchEvent,
+                                     { type: 'batteryshutdown' });
       });
     });
 

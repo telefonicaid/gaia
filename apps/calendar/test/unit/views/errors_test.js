@@ -1,8 +1,6 @@
-requireApp('calendar/test/unit/helper.js', function() {
-  requireLib('views/errors.js');
-});
+suiteGroup('Views.Errors', function() {
+  'use strict';
 
-suite('views/errors', function() {
   var subject, app, errorName;
 
   setup(function() {
@@ -13,7 +11,7 @@ suite('views/errors', function() {
 
     subject.showErrors = function(list) {
       errorName = list[0].name;
-    }
+    };
   });
 
   test('offline event', function() {

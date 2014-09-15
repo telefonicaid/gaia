@@ -1,4 +1,6 @@
 var MockStatusBar = {
+  height: 20,
+
   notificationsCount: null,
 
   wasMethodCalled: {},
@@ -14,7 +16,7 @@ var MockStatusBar = {
     this.methodCalled('updateNotification');
   },
 
-  updateNotificationUnread: function(unread) {
+  setActive: function(unread) {
     this.mNotificationUnread = unread;
   },
 
@@ -24,6 +26,7 @@ var MockStatusBar = {
     this.mNotificationsUpdated = false;
     this.mNotificationUnread = false;
     this.wasMethodCalled = {};
+    this.height = 20;
   },
 
   incSystemDownloads: function msb_incSystemDownloads() {
@@ -32,5 +35,13 @@ var MockStatusBar = {
 
   decSystemDownloads: function msb_decSystemDownloads() {
     this.methodCalled('decSystemDownloads');
+  },
+
+  expand: function() {
+    this.methodCalled('expand');
+  },
+
+  collapse: function() {
+    this.methodCalled('collapse');
   }
 };

@@ -3,17 +3,20 @@
   "description": "Gaia Homescreen",
   "launch_path": "/index.html#root",
   "type": "certified",
+  "role": "homescreen",
   "developer": {
     "name": "The Gaia Team",
     "url": "https://github.com/andreasgal/gaia"
   },
   "permissions": {
+    "mobileconnection":{},
     "webapps-manage":{},
     "systemXHR":{},
     "settings":{ "access": "readwrite" },
-    "device-storage:pictures":{ "access": "readonly" },
     "open-remote-window":{},
-    "geolocation": {}
+    "storage":{},
+    "geolocation": {},
+    "contacts":{ "access": "readonly" }
   },
   "locales": {
     "ar": {
@@ -34,16 +37,34 @@
     }
   },
   "default_locale": "en-US",
-  "orientation": "portrait-primary",
-  "activities": {
-    "save-bookmark": {
-      "filters": {
-        "type": "url",
-        "url": { "required":true, "regexp":"/^https?:/" }
+  "icons": {
+    "30": "/style/icons/HomeScreen.png",
+    "45": "/style/icons/HomeScreen_45.png",
+    "60": "/style/icons/HomeScreen_60.png",
+    "68": "/style/icons/HomeScreen_68.png"
+  },
+  "orientation": "default",
+  "datastores-access": {
+    "bookmarks_store": {
+      "readonly": false,
+      "description": "Read and migrate bookmarks"
+    },
+    "collections_store": {
+      "readonly": false,
+      "description": "Read and migrate collections"
+    },
+    "vertical_preferences_store": {
+      "readonly": false,
+      "description": "Vertical homescreen preferences to save layout"
+    }
+  },
+  "connections": {
+    "migrate": {
+      "description": "It migrates bookmarks & collections",
+      "rules": {
+        "manifestURLs": ["app://ftu.gaiamobile.org/manifest.webapp"]
       },
-      "disposition": "inline",
-      "href": "/save-bookmark.html",
-      "returnValue": true
+      "handler_path": "/migrate.html"
     }
   }
 }

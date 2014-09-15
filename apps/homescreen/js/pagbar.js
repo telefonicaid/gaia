@@ -1,7 +1,7 @@
 
 'use strict';
 
-const PaginationBar = (function() {
+var PaginationBar = (function() {
   var style, previousTotal, scroller;
 
   var dir = document.documentElement.dir === 'rtl' ? -100 : 100;
@@ -21,11 +21,16 @@ const PaginationBar = (function() {
 
     /*
      * Shows the pagination bar
-     *
-     * @param {String} container that holds the pagination bar
      */
     show: function pb_show() {
       style.visibility = 'visible';
+    },
+
+    /*
+     * Hides the pagination bar
+     */
+    hide: function pb_hide() {
+      style.visibility = 'hidden';
     },
 
     /*
@@ -38,6 +43,11 @@ const PaginationBar = (function() {
     update: function pb_update(current, total) {
       scroller.setAttribute('aria-valuenow', current);
       scroller.setAttribute('aria-valuemax', total - 1);
+      scroller.setAttribute('aria-valuetext', navigator.mozL10n.get(
+        'paginationBarText', {
+          current: current + 1,
+          total: total
+        }));
       if (total && previousTotal !== total) {
         style.width = (100 / total) + '%';
         // Force a reflow otherwise the pagination bar is not resized after
@@ -46,18 +56,19 @@ const PaginationBar = (function() {
         previousTotal = total;
       }
 
-      style.MozTransform = 'translateX(' + current * dir + '%)';
+      style.transform = 'translateX(' + current * dir + '%)';
     },
 
     handleEvent: function pb_handleEvent(evt) {
-      if (evt.type != 'keypress' || !evt.ctrlKey)
+      if (evt.type !== 'keypress' || evt.ctrlKey) {
         return;
+      }
 
       switch (evt.keyCode) {
-        case evt.DOM_VK_RIGHT:
+        case evt.DOM_VK_UP:
           GridManager.goToNextPage();
           break;
-        case evt.DOM_VK_LEFT:
+        case evt.DOM_VK_DOWN:
           GridManager.goToPreviousPage();
           break;
       }

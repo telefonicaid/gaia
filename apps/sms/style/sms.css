@@ -1,55 +1,33 @@
-/*
-Currently media queries with min/max resolution are not working
-in Firefox until fixing:
-https://bugzilla.mozilla.org/show_bug.cgi?id=779527
-That's why in SII or Nexus SMS App is not rendered properly.
-*/
-
-@media screen and (min-resolution: 230dpi) {
-
-  html {
-    font-size: 14.7px;
-  }
-}
-
-@media screen and (max-resolution: 220dpi) {
-
-  html {
-    font-size: 13.5px;
-  }
-}
-
-@media screen and (max-resolution: 200dpi) {
-
-  html {
-    font-size: 10px;
-  }
-}
-
 html, body {
   height: 100%;
   width: 100%;
   padding: 0;
   margin: 0;
+  font-size: 10px;
   overflow-x: hidden !important;
   overflow-y: hidden !important;
-  font-family: 'MozTT', sans-serif;
 }
 
-/* Override Building Block [Header] styles */
-section[role="region"] > header:first-child .icon.icon-clear {
-  background-image: url(images/icons/clear.png);
-  right: calc(-50% + 7rem);
-  width: 2rem;
-  margin: 0;
-  padding: 0 2rem;
-  position: absolute;
-  top: 0;
-  right: 0;
+
+/*
+  Override BB. Some CSS tweaks for having a better confirm readability
+*/
+form[role="dialog"][data-type="confirm"] p {
+  margin-top: 0 !important;
+  border-bottom: 0.1rem solid #686868;
 }
 
-section[role="region"] > header:first-child form {
-  display: none;
+form[role="dialog"][data-type="confirm"] p small {
+  line-height: 2rem;
+}
+
+form[data-type="confirm"] .phone-details .phone-number {
+  display: inline;
+}
+
+gaia-header {
+  position: relative;
+  z-index: 10;
 }
 
 /* Override Building Block [Imput areas] styles */
@@ -57,29 +35,18 @@ form.bottom[role="search"] {
   z-index: 3;
 }
 
-#receiver-input {
+#messages-recipient {
   padding-right: 3rem;
-  font-size: -moz-calc(8 * 0.226rem);
+  font-size: 1.8rem;
 }
 
 /* Override Building Block [Edit mode] styles */
-form[role="dialog"][data-type="edit"] header,
-form[role="dialog"][data-type="edit"] > menu {
-  transition: all 0.4s ease;
-}
-
-form[role="dialog"][data-type="edit"] header {
+form[role="dialog"][data-type="edit"] gaia-header {
   transform: translateY(-110%);
 }
 
 form[role="dialog"][data-type="edit"] > menu {
   transform: translateY(110%);
-}
-
-/* BB issue */
-form[role="dialog"][data-type="edit"] header menu[type="toolbar"] button {
-  border: none;
-  color: #fff;
 }
 
 /* Override Building Block [Lists] styles */
@@ -88,37 +55,113 @@ form[role="dialog"][data-type="edit"] header menu[type="toolbar"] button {
   text-align: left;
 }
 
+#main-wrapper.edit [data-type="list"] li a {
+  pointer-events: none;
+}
+
+#threads-container[data-type="list"] .mms-icon {
+  display: none;
+  margin-left: 0.3rem;
+
+  font-size: 1.5rem;
+  color: #ff6622;
+}
+
+#threads-container[data-type="list"] [data-last-message-type="mms"] .mms-icon {
+  display: inline;
+}
+
+#threads-container[data-type="list"] [data-last-message-type="mms"] .body-text {
+  display: none;
+}
+
 [data-type="list"] header {
   margin: 0 1.5rem;
-  padding: 0.5rem 1.5rem;
 }
 
-[data-type="list"] header:first-child {
-  padding-top: 1.5rem;
+#sticky {
+  position: absolute;
+
+  /* The sticky element is positioned at the beginning of the list. */
+  top: 5rem;
+
+  /* The width is not 100% so the scrollbar is visible. */
+  width: calc(100% - 1.5rem);
+
+  /* The height needs to be kept in sync with the header height. */
+  height: 3.1rem;
+
+  /* The sticky element needs to be above the list. */
+  z-index: 2;
+
+  /* Those style will affect the bagroundImage: -moz-element. */
+  background-repeat: no-repeat;
+  background-position: 1.5rem 0;
 }
 
-[data-type="list"] ul {
-  padding: 0 1.5rem;
+.edit #threads-container[data-type="list"] {
+  height: calc(100% - 12rem);
 }
 
-[data-type="list"] li {
-  height: 6.1rem;
+#threads-container[data-type="list"] header {
+  background: #fff;
+}
+
+#threads-container[data-type="list"] ul {
+  padding: 0 1.0rem;
+  background-color: #fff;
+}
+
+#threads-container[data-type="list"] aside.empty {
+  display: none;
+}
+
+/**
+ * Bug 967878, 979018 -[Messages] Background doesn't
+ * scroll with the threads causing expensive over-invalidation
+ */
+#threads-container > div {
+  background-color: #fff;
 }
 
 [data-type="list"] li > label {
-  opacity: 0;
+  right: 5rem;
   display: block;
   overflow: hidden;
-  right: 5rem; 
+  opacity: 0;
 }
 
 [data-type="list"] aside.icon-unread {
   margin: 0;
-  width: 1.5rem;
+  width: 1.9rem;
+  visibility: hidden;
+}
+
+[data-type="list"] aside.pack-end {
+  margin: 0 5px 0 0.5px;
 }
 
 [data-type="list"] .unread aside.icon-unread {
-  background: url("../style/images/unread.png") no-repeat scroll left center transparent;
+  background: url("../style/images/unread.png") no-repeat left center / 1rem;
+  visibility: visible;
+}
+
+[data-type="list"] .threadlist-item a * {
+  pointer-events: none;
+}
+
+[data-type="list"] .draft .icon-draft {
+  background: url("../style/images/draft.png") no-repeat left center / 1.2rem;
+  visibility: visible;
+}
+
+[data-type="list"] .is-draft .pack-end {
+  opacity: 0.5;
+}
+
+[data-type="list"] .is-draft .name {
+  font-style: italic;
+  color: #5f5f5f;
 }
 
 [data-type="list"] p time {
@@ -129,39 +172,41 @@ form[role="dialog"][data-type="edit"] header menu[type="toolbar"] button {
   color: #1D8399;
 }
 
-[data-type="list"] aside.pack-end img[src=""] {
-  opacity: 0;
-  width: 0;
+/* Lists: edit mode */
+.edit [data-type="list"] li > a {
+  transform: translateX(-1.5rem);
 }
 
-/* Lists: edit mode */
 .edit [data-type="list"] li > label {
   opacity: 1;
   pointer-events: auto;
-  transform: translateX(5rem);
-  transition: all 0.3s ease;
+  transform: translateX(2rem);
+}
+
+.edit [data-type="list"] .danger {
+  transform: translateX(2.5rem);
+}
+
+.edit [data-type="list"] li > .pack-checkbox input ~ span:after {
+  opacity: 1;
+  transform: translateX(2.5rem);
 }
 
 .edit [data-type="list"] li > a > aside.icon-unread {
-  opacity: 0;
+  transform: translateX(5rem);
 }
 
 .edit [data-type="list"] li > a > p {
-  transform: translateX(3.5rem);
-  transition: all 0.3s ease;
+  transform: translateX(5.0rem);
+  margin-right: 3.4rem;
 }
 
-.edit #thread-list-container[data-type="list"] aside.pack-end {
-  margin: 0 0 0 -3rem;
+.edit [data-type="list"] li[data-photo-url*="blob:"] > a > p {
+  margin-right: 10rem;
 }
 
-.edit #thread-list-container[data-type="list"] aside.pack-end img {
-  transform: translateX(7.5rem);
-  transition: all 0.3s ease;
-}
-
-.edit #thread-list-container[data-type="list"] aside.pack-end img[src=""] {
-  width: 6.5rem;
+.edit #threads-container[data-type="list"] aside.pack-end span {
+  transform: translateX(1.5rem);
 }
 
 /* Panel handling */
@@ -172,12 +217,7 @@ form[role="dialog"][data-type="edit"] header menu[type="toolbar"] button {
   height: 100%;
   left: 0;
   top: 0;
-
-  background-image: url(/shared/style/headers/images/ui/header.png),
-                    url(/shared/style/headers/images/ui/shadow.png);
-  background-repeat: repeat-x;
-  background-position: 0 0, 0 5rem;
-  background-size: 100% 5rem, 100% 0.3rem;
+  background: #fff;
 }
 
 .panel:first-child {
@@ -190,62 +230,79 @@ form[role="dialog"][data-type="edit"] header menu[type="toolbar"] button {
   width: 100%;
   height: 100%;
 
-  transition: transform .4s ease;
+  transition: transform 0.4s ease;
 }
 
-#main-wrapper.peek .panel {
-  transition: transform 1ms linear;
-}
-
-#main-wrapper[data-position='left'].peek .panel {
-  transform: translateX(-1px);
-}
 #main-wrapper[data-position='left'] .panel {
   transform: translateX(-100%);
 }
 
-#main-wrapper[data-position='right'].peek .panel {
-  transform: translateX(calc(-100% + 1px));
-}
-#main-wrapper[data-position='right'] .panel {
-  transform: translateX(0%);
-}
-
-#thread-list,#thread-messages {
+#threads-container, #thread-messages {
   z-index: 10;
   background: white;
 }
 
-#icon-contact {
+#messages-contact-pick-button {
   display: none;
 }
 
-/* 
+#messages-new-message-notice {
+  display: flex;
+  flex-direction: row;
+
+  padding: 1rem 1.5rem 1rem 2rem;
+  overflow: hidden;
+
+  white-space: nowrap;
+  line-height: 2rem;
+  font-size: 1.8rem;
+  text-align: left;
+}
+
+#messages-new-message-notice a {
+  margin: 0;
+}
+
+#messages-new-message-notice .contact {
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#messages-new-message-notice > div:first-child {
+  flex: auto;
+
+  overflow: hidden;
+}
+
+#messages-new-message-notice > div:nth-child(2) {
+  flex: none;
+
+  padding: 0.2rem 0 0.2rem 1.5rem;
+}
+
+/*
   Styles for Edit mode in Thread List
 */
+
+form[role="dialog"][data-type="edit"] {
+  visibility: hidden;
+}
+
+.edit form[role="dialog"][data-type="edit"] {
+  visibility: visible;
+}
 
 .edit form[role="dialog"][data-type="edit"] > menu {
   transform: translateY(0);
 }
 
-.edit .new-sms-form {
-  transform: translateY(3.6rem);
-}
-
-.edit form[role="dialog"][data-type="edit"] header {
+.edit form[role="dialog"][data-type="edit"] gaia-header {
   transform: translateY(0);
 }
 
-.edit #thread-list-container .item > a {
-  transform: translateX(3rem);
-  pointer-events: none;
-}
-
-.edit #thread-list-container .item > a.unread .unread-tag {
-  opacity: 0;
-}
-
-.edit #thread-list-container .checkbox-container {
+.edit #threads-container .checkbox-container {
   pointer-events:auto;
   opacity: 1;
   transform: translateX(0);
@@ -264,208 +321,161 @@ form[role="dialog"][data-type="edit"] header menu[type="toolbar"] button {
   Styles for new message
 */
 
-section[role="region"].new > header:first-child h1 {
-  display: none;
+section[role="region"].new > gaia-header h1 {
+  pointer-events: none;
+}
+
+.new #messages-contact-pick-button {
+  display: block;
+
+  width: 5rem;
+  height: 4rem;
 }
 
 section[role="region"].new > header:first-child form {
+ display: block;
+}
+
+#messages-contact-pick-button .icon-user {
+  position: absolute;
+  top: 0.6rem;
+  right: 1rem;
+
   display: block;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 50%;
+
+  color: #575757;
+  background-color: #FFF;
 }
 
-.carrier-wrapper {
-  z-index: 2;
-}
+#messages-contact-pick-button .icon-user:after {
+  content: "+";
+  position: absolute;
 
-.new .carrier-wrapper {
-  display: none;
-}
-
-.new #icon-edit {
-  display: none;
-}
-
-.new #icon-contact {
   display: block;
+  width: 2.8rem;
+  height: 2.8rem;
+
+  line-height: 2.8rem;
+  font-size: 2.1rem;
+  font-weight: 500;
+  text-align: center;
 }
 
+#messages-contact-pick-button .icon-user:active {
+  color: #FFF;
+  background-color: #29bbb5;
+}
 /*
   Messages Style as 'bubbles'
 */
 
-#messages-container {
-  -moz-box-sizing: border-box;
-  background: none repeat scroll 0 0 #F4F4F4;
+.carrier-wrapper {
+  display: none;
+
+  box-sizing: border-box;
+  height: 2.2rem;
+  padding: 0 1.5rem;
+
+  font-size: 1.4rem;
+  line-height: 2.2rem;
   text-align: left;
-}
-
-#messages-container header:first-child {
-  margin-top: 2rem;
-}
-
-#messages-container header {
-  border-bottom: 0.1rem solid #A6A6A6;
-  color: #606060;
-  font-size: calc(6 * 0.226rem);
-  margin: 0 1.5rem 1rem;
-  padding: 1rem 1.5rem 0;
-  text-align: left;
-  text-transform: uppercase;
-}
-
-#messages-container[data-type="list"] > ul:last-child {
-  margin-bottom: 7rem;
-}
-
-#messages-container[data-type="list"] li.bubble {
-  border-bottom: 0.1rem solid transparent;
-  display: block;
+  text-overflow: ellipsis;
   overflow: hidden;
+  white-space: nowrap;
+
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
+}
+
+.carrier-wrapper .phone-carrier {
+  color: #008787;
+}
+
+.has-carrier .carrier-wrapper {
+  display: block;
+}
+
+#messages-container .messages-date-group-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+
+  height: 2.2rem;
   margin: 0;
-  padding: 0.5rem 0;
-  position: relative;
+  padding: 0.6rem 3rem;
+
+  font-size: 1.4rem;
+  line-height: 2.2rem;
+  text-transform: uppercase;
+
+  background: rgba(225, 240, 236, 0.85);
+  color: #008787;
+}
+
+/* If has carrier change top position */
+.has-carrier #messages-container .messages-date-group-header {
+  top: 2.2rem;
+}
+
+.has-carrier #messages-container > .messages-date-group:first-child > .messages-date-group-header {
+  margin-top: 2.2rem;
+}
+
+/* TODO: check whether we need this rule */
+#messages-container .messages-date-group-header.hidden {
+  display: none;
+}
+
+.article-list[data-type="list"] .message {
+  z-index: 0; /* bug 970422 */
+
+  overflow: hidden;
   width: 100%;
   height: auto;
+  padding-bottom: 1rem;
+  border-bottom: none;
 }
 
-#messages-container[data-type="list"] li.hidden {
+.article-list[data-type="list"] .message.hidden {
   display: none;
 }
 
-#messages-container[data-type="list"] header.hidden {
-  display: none;
+/* remove margin for notice-button class of button */
+.notice-button {
+  margin: 0;
 }
 
-#messages-container[data-type="list"] li.bubble:first-child {
-  padding: 0 0 0.5rem 0;
+#messages-container[data-type="list"] .message.mms .bubble img {
+  height: auto;
+  width: auto;
 }
 
-#messages-container[data-type="list"] li.bubble a {
-  height: 100%;
-}
-
-#messages-container[data-type="list"] li.bubble p {  
-  text-align: right;
-  overflow: visible;
-  white-space: normal;
-  border-radius: 0.5rem 0.5rem 0.5rem 0.5rem;
-  border: 0.2rem solid #2c393b;
-  background: #fff;
-  margin-right: 0.7rem;
-  font-size: -moz-calc(8.5 * 0.226rem);
-  line-height: 2.2rem;
-  -moz-box-sizing: border-box;
-  max-width: 20.5rem;
-  padding: 1rem;
-  position: relative;
-  text-align: left;
-  float: right;
-}
-
-#messages-container[data-type="list"] li.bubble p:after {
-  content: '';
-  width: 1.1rem;
-  height: 1rem;
-  background-image: url('images/bubble_ticks.png');
-  position: absolute;
-  background-position: -22px 0;
-  right: -1.1rem;
-  top: 1rem;
-}
-
-#messages-container[data-type="list"] li.bubble .received p {
-  float: left;
-  background: #FBEAE0;
-  border: 0.2rem solid #FF4E00;
-  margin-left: 0.7rem;
-  float: left;
-}
-
-#messages-container[data-type="list"] li.bubble .received p:after {
-  background-position: 0 0;
-  left: -1.1rem;
-  margin-top: 0;
-}
-
-#messages-container[data-type="list"] li.bubble .sending p {
-  border: 0.2rem solid #5f5f5f;
-  color: #5f5f5f;
-}
-
-#messages-container[data-type="list"] li.bubble .sending p:after {
-  background-position: -33px 0;
-  right: -1.1rem;
-}
-
-#messages-container[data-type="list"] li.bubble .error p {
-  border: 0.2rem solid #B90000;
-}
-
-#messages-container[data-type="list"] li.bubble .error p:after {
-  background-position: -44px 0;
-  right: -1.1rem;
-}
-
-#messages-container[data-type="list"] li.bubble .error aside.pack-end {
-  background: url('images/icons/exclamation.png') no-repeat center center;
-  background-size: 2.2rem;
-  width: 3.2rem;
-  height: 2.2rem;
-  margin-top: 1rem;
-}
-#messages-container[data-type="list"] li.bubble aside progress {
-  margin-top: 0.4rem;
-}
-
-#messages-container[data-type="list"] li.bubble aside {
-  overflow: hidden;
-}
-
-/* 
+/*
   Styles for Edit mode in Messages Container
 */
 
-.edit #messages-container[data-type="list"] li {
+.edit #messages-container {
+  margin-bottom: 7rem;
+}
+
+.edit .article-list[data-type="list"] .message {
   border-color: #e7e7e7;
 }
 
-.edit #messages-container[data-type="list"] li:last-child {
-  border-color: transparent;
-}
-
-.edit [data-type="list"] li a {
+.edit [data-type="list"] .message .bubble {
   pointer-events: none;
 }
 
-.edit #messages-container[data-type="list"] li p {
-  transform: translateX(0);
+.edit .message .bubble {
+  pointer-events: none;
 }
 
-.edit #messages-container[data-type="list"] li .received p {
-  transform: translateX(4rem);
-  transition: all 0.3s ease 0s;
-}
-
-.edit #messages-container[data-type="list"] li.selected p {
-  border: 0.2rem solid #B90000;
-}
-
-.edit #messages-container[data-type="list"] li.selected p:after {
-  background-position: -44px 0;
-}
-
-.edit #messages-container[data-type="list"] li.selected .received p:after {
-  background-position: -11px 0;
-}
-
-.edit-button {
-  background: -moz-linear-gradient(top, #b50404 0%, #850a0a 100%);
-  height: 100%;
-  width: 100%;
-  -moz-box-sizing: border-box;
-  font-weight: 600;
-  font-size: calc(7 * 0.226rem);
-  color: white;
-  opacity: 0.99; /* hackaround for painting bug (bug 821221) */
+.edit .message.incoming .bubble {
+  transition: transform 0.4s ease 0s;
+  transform: translateX(2.5rem);
 }
 
 .disabled {
@@ -473,45 +483,14 @@ section[role="region"].new > header:first-child form {
   pointer-events: none;
 }
 
-/*
-  Bottom bar for sending SMS
-*/
-
-.new-sms-form {
-  transition: transform .2s ease-in;
+.edit #messages-compose-form {
+  display: none;
 }
 
-form.bottom[role="search"].new-sms-form {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-
-#send-message.active {
-  background: #008aaa;
-}
-
-#send-message:before {
-  content: attr(data-counter);
-  font-size: 1.2rem;
-  color: #606060;
-  position: absolute;
-  right: 1.5rem;
-  bottom: 2.4rem;
-}
-
-#message-to-send {
-  padding: 0.4rem 0.2rem 0.2rem 0.6rem;
-  line-height: -moz-calc(8 * 0.226rem) !important;
-  font-size: -moz-calc(8 * 0.226rem);
-  max-height: none;
-}
-
-#send-message-container {
-  height: 100%;
-  width: 6rem;
-  float: right;
+/* Add a margin at the end of the last thread or message node to avoid overlay
+ * with the edit mode menu */
+.edit .edit-container {
+  padding-bottom: 7rem;
 }
 
 /*
@@ -533,54 +512,334 @@ form.bottom[role="search"].new-sms-form {
 #loading [role="status"] {
   text-align: center;
   height: 4rem;
-} 
+}
+
+#loading p {
+  border-bottom: none;
+}
 
 /*
   No result container
 */
 
-#no-result-container {
+#threads-no-messages {
   background-image: url('images/SMS_200x200_bubble.png');
-  background-repeat:no-repeat;
-  background-attachment:fixed;
-  background-position:center;
-  height: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 20rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: calc(100% - 5rem);
   width: 100%;
 }
 
 #no-result-message {
-  text-align: left;
-  line-height: 3rem;
   position: relative;
   top: 50%;
-  border-top: .1rem solid rgba(96,96,96,.5);
-  padding: 2rem 0.5rem;
+
   width: 27rem;
+  padding: 2rem 0.5rem;
   margin: -8rem auto;
-  color: #606060;
+  border-top: .1rem solid rgba(96,96,96,.5);
+
+  line-height: 3rem;
+  text-align: left;
   font-weight: 300;
-  font-size: calc(10 * 0.226rem);
+  font-size: 2.2rem;
+  color: #606060;
 }
 
 /*
-  Fixed headers
+  Styles related to the layout of the composer
 */
-.fixed-title {
-  position: absolute;
-  top: 5rem;
-  width: calc(100% - 6rem);
-  padding: 1.5rem 1.5rem 0.5rem;
-  margin: 0 1.5rem;
-  border-bottom: solid 0.1rem #ff4e00;
-  background-repeat: no-repeat;
-  background-color: #FFFFFF;
-  transform: translateY(-3rem);
-  pointer-events: none;
+
+section[role="region"].new .subheader {
+  height: 0;
+}
+
+#messages-to-field {
+  position: relative;
+  /* To be above .article-list's with z-index = 5 */
+  z-index: 6;
+
+  display: none;
+  min-height: 5.5rem;
+
   text-align: left;
-  text-transform: uppercase;
-  font-size: 1.6rem;
-  font-weight: normal;
-  line-height: 1.8rem;
-  color: #FF4E00;
-  z-index: 4;
+  color: black;
+  font-size: 1.465rem;
+  background-color: #f2f2f2;
+  transition: transform 0.2s ease-in-out 0s;
+  transform: translateY(calc(-100% + 4rem));
+}
+
+.multiline-recipients-mode #messages-to-field {
+  transform: translateY(calc(-100% + 5.5rem));
+}
+
+section[role="region"].new #messages-to-field {
+  display: flex;
+  align-items: flex-end;
+}
+
+
+section[role="region"].new #messages-to-field.multiline {
+  transform: translateY(0);
+}
+
+#to-label {
+  flex-shrink: 0;
+
+  height: 4rem;
+  padding-left: 1.5rem;
+  padding-right: 0.7rem;
+
+  line-height: 4rem;
+  font-weight: 200;
+  font-size: 1.465rem;
+  color: #000;
+}
+
+#messages-recipients-list-container {
+  min-height: 4rem;
+  min-width: 0;
+  box-sizing: border-box;
+
+  flex-grow: 1;
+}
+
+#messages-recipients-list {
+  box-sizing: border-box;
+  min-height: 4rem;
+  padding: 0 0.6rem 0.6rem 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/*
+Used by Recipients.View to display multi or single line.
+Do not remove.
+*/
+#messages-recipients-list.singleline {
+  overflow-y: hidden;
+}
+
+#messages-recipients-list.multiline {
+  /* max-height = viewport - header - minimum composer - list margin */
+  max-height: calc(100vh - 5rem - 4rem - 0.6rem);
+  margin-bottom: 0.6rem;
+  padding-bottom: 0;
+
+  overflow-y: scroll;
+}
+
+.recipient[contenteditable] {
+  overflow: hidden;
+  /* Editable recipients have no `padding-left` so that they align with
+  * "assimilated" recipients (see `ThreadUI.assimilateRecipients`), but they
+  * maintain twice the `padding-right` so they wrap as if "assimilated". For
+  * discussion of this behavior, see "Bug 905260 - [messages] padding issues
+  * in the recipient panel". */
+  margin: 0.6rem 0.6rem 0 0;
+  padding-right: 1.6rem;
+
+  display: block;
+  float: left;
+
+   /* override BB [role="button"] selector (bug 1055363) */
+  height: auto;
+  width: auto;
+}
+
+.recipient[contenteditable].email {
+  padding-right: 3.8rem;
+  background: white url(images/icons/icon_sms_compose_email.png) calc(100% - 1.5rem) center no-repeat;
+}
+
+#messages-recipients-list > .recipient[contenteditable=true] {
+  flex-grow: 1;
+  height: 2.8rem;
+  line-height: 2.8rem;
+  border-radius: 0;
+
+  word-wrap: unset;
+
+  /* Building blocks override (bug xxx) */
+  background: none;
+  color: #000;
+}
+
+.recipient[contenteditable=true]:empty:not(:last-of-type) {
+  display: none;
+}
+
+/* Disable padding and give negative margin-right on empty contenteditable
+ * recipients when they do not have focus. This allows the Recipients List
+ * to intelligently collapse when the final row contains no "assimilated"
+ * (i.e. non-contenteditable) recipients. */
+.recipient[contenteditable=true]:empty {
+  margin-right: -0.5rem;
+  padding: 0;
+}
+
+.recipient[contenteditable=true]:focus,
+.recipient[contenteditable=true]:hover,
+.recipient[contenteditable=true]:empty:focus {
+  margin-right: 0.5rem;
+  padding-right: 0.3rem;
+}
+
+#messages-recipient-suggestions {
+  position: absolute;
+  /* 9rem (5 rem from app header + 4rem from "To" panel heights) */
+  top: 9rem;
+
+  overflow-y: auto;
+
+  max-height: calc(100% - 9rem);
+  width: 100%;
+}
+
+.multiline-recipients-mode #messages-recipient-suggestions {
+  top: 10.5rem;
+
+  max-height: calc(100% - 10.5rem);
+}
+
+#messages-recipient-suggestions li:first-child {
+  margin-top: 0;
+}
+
+.article-list[data-type="list"] ul.contact-list {
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  width: calc(100% - 3.1rem);
+  padding: 0 1.5rem;
+
+  background: #fff;
+}
+
+body[role="application"] form[role="dialog"][data-type="action"] > section:first-child{
+  height: auto;
+  border-bottom: 0.1rem solid #616262;
+  padding-bottom: 1rem;
+  padding-left: 2.5rem;
+}
+
+form[role="dialog"][data-type="action"].contact-prompt > header {
+  height: auto;
+  min-height: 5rem;
+  font-weight: 100;
+}
+
+.contact-header {
+  /* bottom padding is .9rem because we need .1rem more for the
+   * nice shadow line at the header bottom, defined as a :after element */
+  padding: 0.8rem 0 0.9rem;
+}
+
+.contact-header .name {
+  line-height: 2.5rem;
+  padding: 0.5rem 0 0.8rem;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  font-size: 2.3rem;
+}
+
+.contact-header .details {
+  line-height: 1.5rem;
+  padding: 0 0 0.7rem;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 1.5rem;
+}
+
+.contact-header span[data-type=img] {
+  display: block;
+  width: 6rem;
+  height: 6rem;
+  background-size: cover;
+  background-position: center;
+}
+
+.contact-header aside.pack-end {
+  float: right;
+  margin-right: -1.5rem; /* compensate the header's 3rem padding */
+}
+
+section[role="region"].new .article-list[data-type="list"] li:first-child {
+  margin-top: 4.6rem;
+}
+
+section[role="region"].new .article-list[data-type="list"]  li {
+  pointer-events: auto;
+}
+
+.suggestion * {
+  pointer-events: none;
+}
+
+.subheader {
+  position: absolute;
+  z-index: 6; /* should be between 4 and 9 (inclusive). 3 is the z-index for
+                 the input form, 10 is the z-index for the header */
+  left: 0;
+  right: 0;
+  top: 5rem;
+}
+
+body[role="application"] form[role="dialog"][data-type="action"] > header:first-child{
+ text-align: left;
+}
+
+.subheader menu {
+  position: relative;
+  flex-shrink: 0;
+
+  width: 5rem;
+  height: 4rem;
+}
+
+/**
+ * 1. COMPLEX: Scoped style-sheets within <gaia-header>
+ * trump all other rules. !important is required
+ * for an app to over-ride the default appearance
+ * of content within the custom-element. This may
+ * change when we get `:host` and `:content` selectors
+ * in shadow-dom.
+ */
+
+/* Elements related to information view */
+section[role="region"][class$='information'] #messages-options-button,
+section[role="region"][class$='information'] #messages-subheader,
+section[role="region"][class$='information'] #messages-container,
+section[role="region"][class$='information'] #messages-compose-form {
+  display: none !important; /* 1 */
+}
+
+#messages-back-button:hover {
+  background-color: transparent;
+}
+
+/* Activity mode specific style */
+#messages-close-button {
+  display: none;
+}
+
+/* Phone details label styles */
+.phone-details > .phone-details-item {
+  display: none;
+}
+
+.phone-details.has-phone-type > .phone-type,
+.phone-details.has-phone-type > .phone-type-separator,
+.phone-details > .phone-number,
+.phone-details.has-phone-carrier > .phone-carrier,
+.phone-details.has-phone-carrier > .phone-carrier-separator {
+  display: inline;
 }

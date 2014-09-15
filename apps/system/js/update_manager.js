@@ -19,10 +19,15 @@ var UpdateManager = {
   _errorTimeout: null,
   _wifiLock: null,
   _systemUpdateDisplayed: false,
-  _isDataConnectionWarningDialogEnabled: true,
+  _dataConnectionWarningEnabled: true,
+  _startedDownloadUsingDataConnection: false,
   _settings: null,
+  UPDATE_NOTIF_ID: 'update-notification',
   NOTIFICATION_BUFFERING_TIMEOUT: 30 * 1000,
   TOASTER_TIMEOUT: 1200,
+  UPDATE_2G_SETT: 'update.2g.enabled',
+  ROAMING_SETTING_KEY: 'ril.data.roaming_enabled',
+  DATA_TYPES_NO_ALLOWED: ['edge', 'gprs', '1xrtt', 'is95a', 'is95b'],
 
   container: null,
   message: null,
@@ -33,7 +38,9 @@ var UpdateManager = {
   downloadButton: null,
   downloadViaDataConnectionButton: null,
   downloadDialog: null,
+  downloadViaDataConnectionTitle: null,
   downloadViaDataConnectionDialog: null,
+  downloadViaDataConnectionMessage: null,
   downloadDialogTitle: null,
   downloadDialogList: null,
   lastUpdatesAvailable: 0,
@@ -61,7 +68,7 @@ var UpdateManager = {
     this.systemUpdatable = new SystemUpdatable();
 
     this.container = document.getElementById('update-manager-container');
-    this.message = this.container.querySelector('.message');
+    this.message = this.container.querySelector('.title-container');
 
     this.toaster = document.getElementById('update-manager-toaster');
     this.toasterMessage = this.toaster.querySelector('.message');
@@ -77,6 +84,10 @@ var UpdateManager = {
     this.downloadDialogList = this.downloadDialog.querySelector('ul');
     this.downloadViaDataConnectionDialog =
       document.getElementById('updates-viaDataConnection-dialog');
+    this.downloadViaDataConnectionMessage =
+      this.downloadViaDataConnectionDialog.querySelector('p');
+    this.downloadViaDataConnectionTitle =
+      this.downloadViaDataConnectionDialog.querySelector('h1');
 
     this.container.onclick = this.containerClicked.bind(this);
     this.laterButton.onclick = this.cancelPrompt.bind(this);
@@ -102,29 +113,23 @@ var UpdateManager = {
     this.updateWifiStatus();
     this.updateOnlineStatus();
 
-    window.asyncStorage.
-      getItem('gaia.system.isDataConnectionWarningDialogEnabled',
-      (function(value) {
-        value = value || true;
-        this._isDataConnectionWarningDialogEnabled = true;
-        this.downloadDialog.dataset.dataConnectionInlineWarning = !value;
-    }).bind(this));
+    // Always display the warning after users reboot the phone.
+    this._dataConnectionWarningEnabled = true;
+    this.downloadDialog.dataset.dataConnectionInlineWarning = false;
   },
 
   requestDownloads: function um_requestDownloads(evt) {
     evt.preventDefault();
 
     if (evt.target == this.downloadViaDataConnectionButton) {
-      window.asyncStorage.
-        setItem('gaia.system.isDataConnectionWarningDialogEnabled', false);
-      this._isDataConnectionWarningDialogEnabled = false;
-      this.downloadDialog.dataset.dataConnectionInlineWarning = true;
+      this._startedDownloadUsingDataConnection = true;
       this.startDownloads();
     } else {
-      if (this._isDataConnectionWarningDialogEnabled &&
+      if (this._dataConnectionWarningEnabled &&
           this.downloadDialog.dataset.nowifi === 'true') {
-        this.downloadViaDataConnectionDialog.classList.add('visible');
+        this._openDownloadViaDataDialog();
       } else {
+        this._startedDownloadUsingDataConnection = false;
         this.startDownloads();
       }
     }
@@ -175,9 +180,58 @@ var UpdateManager = {
     var _ = navigator.mozL10n.get;
     var self = this;
     this._errorTimeout = setTimeout(function waitForMore() {
-      SystemBanner.show(_('downloadError'));
+      var systemBanner = new SystemBanner();
+      systemBanner.show(_('downloadError'));
       self._errorTimeout = null;
     }, this.NOTIFICATION_BUFFERING_TIMEOUT);
+  },
+
+  launchDownload: function um_launchDownload() {
+    var self = this;
+    // If it's not connected to a wifi we need to verify what kind of
+    // connection it has
+    if (self._isNotWifiConnected()) {
+      var reqUpdate = self._settings.createLock().get(self.UPDATE_2G_SETT);
+      reqUpdate.onsuccess = reqUpdate.onerror = (function() {
+        // If setting doesn't exist, we can't update over slow connections
+        var update2G =
+             reqUpdate.result && reqUpdate.result[self.UPDATE_2G_SETT] || false;
+
+        // If update 2G is available we don't need to know what kind
+        // of connection the phone has
+        if (update2G) {
+          self.showDownloadPrompt();
+        } else {
+          // We can download the update only if the current connection
+          // is not forbidden for download
+          var conns = window.navigator.mozMobileConnections;
+          if (!conns) {
+            console.error('mozMobileConnections is not available we can ' +
+                          'not update the phone.');
+            self.showForbiddenDownload();
+          } else {
+            var dataType;
+            // In DualSim only one of them will have data active
+            for (var i = 0, iLen = conns.length; i < iLen && !dataType; i++) {
+              dataType = conns[i].data.type;
+            }
+            if (!dataType) {
+              console.error('There are not wifi connection nor data ' +
+                            'connection. We can not download update');
+              self.showForbiddenDownload();
+            } else {
+              if (self.DATA_TYPES_NO_ALLOWED.indexOf(dataType) >= 0) {
+                self.showForbiddenDownload();
+              } else {
+                self.showDownloadPrompt();
+              }
+            }
+          }
+        }
+      });
+    } else {
+      self.showDownloadPrompt();
+    }
   },
 
   containerClicked: function um_containerClicker() {
@@ -185,31 +239,56 @@ var UpdateManager = {
 
     if (this._downloading) {
       var cancel = {
-        title: _('no'),
+        title: 'no',
         callback: this.cancelPrompt.bind(this)
       };
 
       var confirm = {
-        title: _('yes'),
+        title: 'yes',
         callback: this.cancelAllDownloads.bind(this)
       };
 
-      CustomDialog.show(_('cancelAllDownloads'), _('wantToCancelAll'),
-                        cancel, confirm);
+      var screen = document.getElementById('screen');
+
+      CustomDialog.show(
+        'cancelAllDownloads',
+        'wantToCancelAll',
+        cancel,
+        confirm,
+        screen
+      )
+      .setAttribute('data-z-index-level', 'system-dialog');
     } else {
-      this.showDownloadPrompt();
+      this.launchDownload();
     }
 
     UtilityTray.hide();
   },
 
-  showDownloadPrompt: function um_showDownloadPrompt() {
+  showForbiddenDownload: function um_showForbiddenDownload() {
     var _ = navigator.mozL10n.get;
 
+    var ok = {
+      title: _('ok'),
+      callback: this.cancelPrompt.bind(this)
+    };
+
+    var systemUpdate = _('systemUpdate');
+    var downloadUpdatesVia2GForbidden2 = _('downloadUpdatesVia2GForbidden2');
+    var screen = document.getElementById('screen');
+
+    CustomDialog
+      .show(systemUpdate, downloadUpdatesVia2GForbidden2, ok, null, screen)
+      .setAttribute('data-z-index-level', 'system-dialog');
+  },
+
+  showDownloadPrompt: function um_showDownloadPrompt() {
+    var _localize = navigator.mozL10n.setAttributes;
+
     this._systemUpdateDisplayed = false;
-    this.downloadDialogTitle.textContent = _('numberOfUpdates', {
-                                              n: this.updatesQueue.length
-                                           });
+    _localize(this.downloadDialogTitle, 'numberOfUpdates', {
+      n: this.updatesQueue.length
+    });
 
     var updateList = '';
 
@@ -234,7 +313,7 @@ var UpdateManager = {
       // The user can choose not to update an app
       var checkContainer = document.createElement('label');
       if (updatable instanceof SystemUpdatable) {
-        checkContainer.textContent = _('required');
+        _localize(checkContainer, 'required');
         checkContainer.classList.add('required');
         this._systemUpdateDisplayed = true;
       } else {
@@ -245,6 +324,7 @@ var UpdateManager = {
 
         var span = document.createElement('span');
 
+        checkContainer.classList.add('pack-checkbox');
         checkContainer.appendChild(checkbox);
         checkContainer.appendChild(span);
       }
@@ -252,7 +332,11 @@ var UpdateManager = {
 
       var name = document.createElement('div');
       name.classList.add('name');
-      name.textContent = updatable.name;
+      if (updatable.nameL10nId) {
+        _localize(name, updatable.nameL10nId);
+      } else {
+        name.textContent = updatable.name;
+      }
       listItem.appendChild(name);
 
       if (updatable.size) {
@@ -267,6 +351,7 @@ var UpdateManager = {
     }, this);
 
     this.downloadDialog.classList.add('visible');
+    this.updateDownloadButton();
   },
 
   updateDownloadButton: function() {
@@ -307,36 +392,40 @@ var UpdateManager = {
     }
   },
 
+  downloaded: function um_downloaded(udatable) {
+    if (this._startedDownloadUsingDataConnection) {
+      this._startedDownloadUsingDataConnection = false;
+      this._dataConnectionWarningEnabled = false;
+      this.downloadDialog.dataset.dataConnectionInlineWarning = true;
+    }
+  },
+
   startedUncompressing: function um_startedUncompressing() {
     this._uncompressing = true;
     this.render();
   },
 
   render: function um_render() {
-    var _ = navigator.mozL10n.get;
+    var _localize = navigator.mozL10n.setAttributes;
 
-    this.toasterMessage.innerHTML =
-      _('updateAvailableInfo', {
-        n: this.updatesQueue.length - this.lastUpdatesAvailable
-      });
+    _localize(this.toasterMessage, 'updateAvailableInfo', {
+      n: this.updatesQueue.length - this.lastUpdatesAvailable
+    });
 
-    var message = '';
     if (this._downloading) {
       if (this._uncompressing && this.downloadsQueue.length === 1) {
-        message = _('uncompressingMessage');
+        _localize(this.message, 'uncompressingMessage');
       } else {
-        var humanProgress = this._humanizeSize(this._downloadedBytes);
-        message = _('downloadingUpdateMessage', {
-                    progress: humanProgress
-                  });
+        _localize(this.message, 'downloadingUpdateMessage', {
+          progress: this._humanizeSize(this._downloadedBytes)
+        });
       }
     } else {
-      message = _('updateAvailableInfo', {
-                 n: this.updatesQueue.length
-                });
+      _localize(this.message, 'updateAvailableInfo', {
+        n: this.updatesQueue.length
+      });
     }
 
-    this.message.innerHTML = message;
     var css = this.container.classList;
     this._downloading ? css.add('downloading') : css.remove('downloading');
   },
@@ -382,7 +471,8 @@ var UpdateManager = {
     this.updatesQueue.push(updatable);
 
     if (this._notificationTimeout === null) {
-      this._notificationTimeout = setTimeout(this.displayNotificationAndToaster.bind(this),
+      this._notificationTimeout = setTimeout(
+        this.displayNotificationAndToaster.bind(this),
         this.NOTIFICATION_BUFFERING_TIMEOUT);
     }
     this.render();
@@ -392,7 +482,6 @@ var UpdateManager = {
     this._notificationTimeout = null;
     if (this.updatesQueue.length && !this._downloading) {
       this.lastUpdatesAvailable = this.updatesQueue.length;
-      StatusBar.updateNotificationUnread(true);
       this.displayNotificationIfHidden();
       this.toaster.classList.add('displayed');
       var self = this;
@@ -473,14 +562,14 @@ var UpdateManager = {
   hideNotificationIfDisplayed: function() {
     if (this.container.classList.contains('displayed')) {
       this.container.classList.remove('displayed');
-      NotificationScreen.decExternalNotifications();
+      NotificationScreen.removeUnreadNotification(this.UPDATE_NOTIF_ID);
     }
   },
 
   displayNotificationIfHidden: function() {
     if (!this.container.classList.contains('displayed')) {
       this.container.classList.add('displayed');
-      NotificationScreen.incExternalNotifications();
+      NotificationScreen.addUnreadNotification(this.UPDATE_NOTIF_ID);
     }
   },
 
@@ -555,13 +644,16 @@ var UpdateManager = {
     }
   },
 
-  updateWifiStatus: function su_updateWifiStatus() {
+  _isNotWifiConnected: function su_isNotWifiConnected() {
     var wifiManager = window.navigator.mozWifiManager;
-    if (!wifiManager)
+    if (!wifiManager) {
       return;
+    }
+    return wifiManager.connection.status != 'connected';
+  },
 
-    this.downloadDialog.dataset.nowifi =
-      (wifiManager.connection.status != 'connected');
+  updateWifiStatus: function su_updateWifiStatus() {
+    this.downloadDialog.dataset.nowifi = this._isNotWifiConnected();
   },
 
   checkForUpdates: function su_checkForUpdates(shouldCheck) {
@@ -579,6 +671,64 @@ var UpdateManager = {
     lock.set({
       'gaia.system.checkForUpdates': false
     });
+  },
+
+  _openDownloadViaDataDialog: function um_downloadViaDataDialog() {
+    var _ = navigator.mozL10n.setAttributes;
+    var connections = window.navigator.mozMobileConnections;
+    var dataType;
+    var sim;
+
+    if (!connections) {
+      this.showForbiddenDownload();
+      return;
+    }
+    // In DualSim only one of them will have data active
+    for (var i = 0; i < connections.length && !dataType; i++) {
+      dataType = connections[i].data.type;
+      sim = connections[i];
+    }
+
+    if (!dataType) {
+      //No connection available
+      self.showForbiddenDownload();
+      return;
+    }
+    var dataRoamingSettingPromise = this._getDataRoamingSetting();
+    dataRoamingSettingPromise.then(function(roaming) {
+      if (roaming && sim.data.roaming) {
+        _(this.downloadViaDataConnectionTitle,
+          'downloadUpdatesViaDataRoamingConnection');
+        _(this.downloadViaDataConnectionMessage,
+          'downloadUpdatesViaDataRoamingConnectionMessage');
+      } else {
+        _(this.downloadViaDataConnectionTitle,
+          'downloadUpdatesViaDataConnection');
+        _(this.downloadViaDataConnectionMessage,
+          'downloadUpdatesViaDataConnectionMessage2');
+      }
+
+      this.downloadViaDataConnectionDialog.classList.add('visible');
+    }.bind(this));
+  },
+
+  _getDataRoamingSetting: function um_getDataRoamingSetting() {
+    var lock = this._settings.createLock();
+    var reqDataRoaming = lock.get(this.ROAMING_SETTING_KEY);
+    var dataRoamingSettingPromise;
+    var self = this;
+
+    dataRoamingSettingPromise = new Promise(function(resolve, reject) {
+      reqDataRoaming.onsuccess = function() {
+        resolve(reqDataRoaming.result[self.ROAMING_SETTING_KEY]);
+      };
+
+      reqDataRoaming.onerror = function() {
+        resolve(false);
+      };
+    });
+
+    return dataRoamingSettingPromise;
   },
 
   _dispatchEvent: function um_dispatchEvent(type, result) {
@@ -606,8 +756,7 @@ var UpdateManager = {
   }
 };
 
-window.addEventListener('localized', function startup(evt) {
-  window.removeEventListener('localized', startup);
-
-  UpdateManager.init();
-});
+// unit tests call init() manually
+if (navigator.mozL10n) {
+  navigator.mozL10n.once(UpdateManager.init.bind(UpdateManager));
+}

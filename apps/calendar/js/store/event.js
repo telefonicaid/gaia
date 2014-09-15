@@ -1,7 +1,15 @@
 (function(window) {
+  'use strict';
 
   function Events() {
     Calendar.Store.Abstract.apply(this, arguments);
+
+    Calendar.Promise.denodeifyAll(this, [
+      'providerFor',
+      'findByIds',
+      'ownersOf',
+      'eventsForCalendar'
+    ]);
   }
 
   Events.prototype = {
@@ -47,29 +55,8 @@
      */
     _assignId: function(obj) {
       var id = obj.calendarId + '-' + obj.remote.id;
-      return obj._id = id;
-    },
-
-    /**
-     * Shortcut finds the calendar model for given event.
-     *
-     * @param {Object} event full event record from the db.
-     * @return {Calendar.Model.Calendar} related calendar.
-     */
-    calendarFor: function(event) {
-      var calStore = this.db.getStore('Calendar');
-      return calStore.cached[event.calendarId];
-    },
-
-    /**
-     * Shortcut finds the account model for given event.
-     *
-     * @param {Object} event full event record from the db.
-     * @return {Calendar.Model.Account} related account.
-     */
-    accountFor: function(event) {
-      var cal = this.calendarFor(event);
-      return this.db.getStore('Calendar').accountFor(cal);
+      obj._id = id;
+      return id;
     },
 
     /**
@@ -77,29 +64,12 @@
      *
      * @param {Object} event full event record from db.
      */
-    providerFor: function(event) {
-      // XXX: maybe we need to shortcut this somehow?
-      var accStore = this.db.getStore('Account');
-
-      var cal = this.calendarFor(event);
-      var acc = accStore.cached[cal.accountId];
-
-      return Calendar.App.provider(acc.providerType);
-    },
-
-    busytimeIdFor: function(event, start, end) {
-      if (!start)
-        start = event.remote.start;
-
-      if (!end)
-        end = event.remote.end;
-
-
-      var id = start.utc + '-' +
-               end.utc + '-' +
-               event._id;
-
-      return id;
+    providerFor: function(event, callback) {
+      this.ownersOf(event, function(err, owners) {
+        callback(null, Calendar.App.provider(
+          owners.account.providerType
+        ));
+      });
     },
 
     /**
@@ -150,6 +120,13 @@
     },
 
     /**
+     * Finds calendar/account for a given event.
+     *
+     * @param {Object} event must contain .calendarId.
+     * @param {Function} callback [err, { ... }].
+     */
+    ownersOf: Calendar.Store.Calendar.prototype.ownersOf,
+    /**
      * Loads all events for given calendarId
      * and returns results. Does not cache.
      *
@@ -171,14 +148,6 @@
       req.onerror = function(e) {
         callback(e);
       };
-    },
-
-    /**
-     * Override default parse id which
-     * does a parseInt operation.
-     */
-    _parseId: function(id) {
-      return id;
     }
 
   };

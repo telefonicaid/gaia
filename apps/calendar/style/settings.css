@@ -1,29 +1,3 @@
-/* change display of header - this css needs improvement in BB */
-
-body[data-path^="/settings/"] section[role="region"] > header > button,
-body[data-path^="/settings/"] section[role="region"] > header > a {
-  width: 6rem;
-}
-
-body[data-path^="/settings/"] section[role="region"] > header > a .icon.icon-menu,
-body[data-path^="/settings/"] section[role="region"] > header > button .icon.icon-menu {
-  background-position: center center;
-}
-
-body[data-path^="/settings/"] section[role="region"] > header > button .icon:after,
-body[data-path^="/settings/"] section[role="region"] > header > a .icon:after {
-  width: 4rem;
-}
-
-body[data-path^="/settings/"] section[role="region"] > header > button,
-body[data-path^="/settings/"] section[role="region"] > header > a {
-  background-position: 4rem center;
-}
-
-body[data-path^="/settings/"] section[role="region"] > header h1 {
-  padding-left: 5rem;
-}
-
 body[data-path^='/event'] #time-views,
 body[data-path^='/month'] #time-views,
 body[data-path^='/day'] #time-views,
@@ -33,100 +7,209 @@ body[data-path^='/week'] #time-views {
   transition: transform 0.5s ease-in-out;
 }
 
+body[data-path^='/settings'] #settings {
+  z-index: 300;
+}
 
-body[data-path^='/advanced-settings'] #time-views,
-body[data-path^='/select-preset'] #time-views,
-body[data-path^='/create-account'] #time-views,
-body[data-path^='/settings'] #time-views {
-  position: relative;
-  transform: translateX(80%);
-  box-shadow: 1px 1px 5px 5px #222;
-  transition: transform 0.5s ease-in-out;
+/*
+Do not show pending candy stripe on settings drawer, since the
+sync icon already spins and having both animations hurts the
+animation performance.
+*/
+body[data-path^='/settings'].pending-operation #progress-indicator {
+  display: none;
 }
 
 #settings {
-  font-size: 1.6rem;
+  font-size: 1.7rem;
   color: white;
-  width: 80%;
+  background-color: transparent;
+  width: 100%;
   z-index: 0;
   visibility: visible;
 }
 
+#settings gaia-header {
+  background: transparent;
+}
+
+/*
+The text in the back button is just for accessibility concerns,
+not actually shown since the top header should be transparent.
+*/
+#settings .settings-back {
+  font-size: 0;
+}
+
+#settings .settings-shield {
+  position: absolute;
+  top: 5rem;
+  width: 100%;
+  height: 100%;
+  background-color: black;
+
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
+  transition-delay: 0s;
+}
+
+.settings-drawer-visible #settings .settings-shield {
+  opacity: .6;
+}
+
+#settings .settings-drawer-container {
+  position: absolute;
+  top: 5rem;
+  width: 100%;
+  min-height: calc(100% - 19rem);
+  max-height: calc(100% - 9.5rem);
+  overflow: hidden;
+}
+
+#settings .settings-drawer {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: #5f5f5f;
+  background-color: #f4f4f4;
+
+  transform: translateY(-100%);
+  transition-property: transform;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
+  transition-delay: 0s;
+}
+
+.settings-drawer-visible #settings .settings-drawer {
+  transform: translateY(0);
+}
+
+#settings .calendars li:active,
+#settings .toolbar-item:active {
+  color: white;
+  background-color: #00caf2;
+}
 
 #settings ol.calendars {
-  height: calc(100% - 9rem);
+  height: calc(100% - 4.5rem);
   overflow-y: scroll;
+  background-color: #eeeeee;
 }
 
-#settings .calendars label > span {
+#settings .calendars label > .name {
   display: block;
-  overflow: visible;
+  overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  width: -moz-calc(100% - 20px);
+  width: -moz-calc(100% - 2rem);
+  height: 100%;
 }
 
 #settings .calendars label > span {
-  line-height: 100%;
   display: block;
   float: left;
 }
 
+#settings .calendars .error label {
+  background: transparent url('icons/accountwarning.png') no-repeat 2.3rem center / 2rem auto;
+  padding-left: 4.5rem;
+}
+
 #settings .calendars label {
   display: block;
-  padding: 1.6rem;
-  border-bottom: 1px solid #7E8C91;
-  -moz-user-select: none;
-  -moz-box-flex: 1;
-  user-select: none;
+  height: 100%;
   width: 100%;
+  padding: 0 3rem;
+  -moz-user-select: none;
 }
 
 #settings .calendars li {
+  position: relative;
   width: 100%;
-  display: -moz-box;
-  -moz-box-orient: horizontal;
+  height: 5rem;
+  line-height: 5rem;
+  border-bottom: 0.1rem solid #dfdfdf;
 }
 
-#settings .calendars .calendar-color {
-  height: 10px;
-  width: 0.5rem;
-  display: block;
-  background-image: linear-gradient(
-    to bottom,
-    rgba(255,255,255,0.2) 0%,
-    rgba(255,255,255,0) 40%,
-    rgba(0, 0, 0, 0.3) 100%
-  )
+#settings .calendars .icon-calendar-dot:before {
+  font-size: 5rem;
+  line-height: 5rem;
+  margin-left: -1rem;
 }
 
 #settings > menu {
   position: absolute;
-  bottom: 0px;
-  height: 40px;
-  padding: 5px 0px;
+  bottom: 0;
+  height: 4rem;
+  padding: 0.5rem 0;
   background-color: rgba(0, 0, 0, 0.3);
 }
 
-.pending-operation #settings .sync {
+#settings [role="toolbar"] {
+  display: flex;
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+}
+
+#settings .toolbar-item {
+  font-size: 0;
+}
+
+#settings [role="toolbar"].noaccount .settings {
+  width: 100%;
+}
+
+#settings [role="toolbar"] .settings:after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4.5rem;
+  background: url("icons/settings_icon.png") no-repeat 50% 50% / 3rem auto;
+}
+
+#settings [role="toolbar"] .settings:active:after {
+  background-image: url("icons/settings_icon_press.png");
+}
+
+#settings [role="toolbar"] .sync {
+  border-left: 0.1rem solid #dfdfdf;
+}
+
+#settings [role="toolbar"] .sync:after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4.5rem;
+  background: url("icons/refresh.png") no-repeat 50% 50% / 3rem auto;
+}
+
+#settings [role="toolbar"] .sync:active:after {
+  background-image: url("icons/refresh_press.png");
+}
+
+.pending-operation #settings [role="toolbar"] .sync:after {
+  animation: 0.9s msg-refresh-rotate infinite steps(30);
+}
+
+@keyframes msg-refresh-rotate {
+  from { transform: rotate(1deg); }
+  to   { transform: rotate(360deg); }
+}
+
+#settings [role="toolbar"].noaccount .sync {
   display: none;
 }
 
-#settings .settings {
-  width: 5.5rem;
-  height: 4rem;
-  background: transparent url('/style/icons/ActionIcons_30x30_settings.png') no-repeat center;
-  font-size: 0;
-  display: block;
-}
-
-#settings .settings:active {
-  background-color: #008aaa;
-}
-
 #settings .calendars > li label {
-  text-transform: none;
-  font: inherit;
   text-transform: none;
 }
 
@@ -134,20 +217,20 @@ body[data-path^='/settings'] #time-views {
  display: none;
 }
 
-#settings .calendars input[type="checkbox"]:checked + span {
-  width: 14px;
-  height: 14px;
-  background: transparent url('/style/icons/checkmark.png') no-repeat;
+#settings .calendars input[type="checkbox"]:checked + span:after {
+  width: 2.2rem;
+  height: 1.9rem;
+  background: transparent url('/style/icons/check_mark_on.png') no-repeat center / 1.4rem;
 }
 
-#settings .calendars input[type="checkbox"]+span {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  float: right;
-  position: static;
-  background: transparent;
-  left: inherit;
-  top: inherit;
+#settings .calendars li:active input[type="checkbox"]:checked + span:after {
+  background: transparent url('/style/icons/check_mark_press.png') no-repeat center / 1.4rem;
+}
+
+#settings .calendars input[type="checkbox"] + span:after {
+  left: auto;
+  top: 1.5rem;
+  right: 1.3rem;
+  background: none;
   margin: 0;
 }

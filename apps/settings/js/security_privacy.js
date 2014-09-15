@@ -5,49 +5,84 @@
 
 /**
  * This library displays the security status in the main panel without
- * requiring the full `phone_lock.js' + `simcard_lock.js'
+ * requiring the full `screen_lock.js' + `simcard_lock.js'
  */
 
-// display scurity status on the main panel
+// display security status on the main panel
 var Security = {
+  _airplaneMode: false,
+
   init: function init() {
-    var _ = navigator.mozL10n.get;
     var settings = navigator.mozSettings;
     if (!settings)
       return;
 
     // update phone code status
-    var phonelockDesc = document.getElementById('phoneLock-desc');
+    var screenlockDesc = document.querySelector('.screenLock-desc');
     var lock = settings.createLock();
     var reqLockscreenEnable = lock.get('lockscreen.enabled');
     reqLockscreenEnable.onsuccess = function onLockscreenEnableSuccess() {
       var enable = reqLockscreenEnable.result['lockscreen.enabled'];
-      phonelockDesc.textContent = enable ? _('enabled') : _('disabled');
-      phonelockDesc.dataset.l10nId = enable ? 'enabled' : 'disabled';
+      screenlockDesc.setAttribute('data-l10n-id',
+                                  enable ? 'enabled' : 'disabled');
     };
 
-    var mobileConnection = navigator.mozMobileConnection;
+    this.updateSimLockDesc();
+
+    var self = this;
+    SettingsListener.observe('ril.radio.disabled', false, function(value) {
+      self._airplaneMode = value;
+      self.updateSimLockDesc();
+    });
+
+    if (!IccHelper)
+      return;
+
+    IccHelper.addEventListener('cardstatechange',
+                               self.updateSimLockDesc.bind(self));
+  },
+
+  updateSimLockDesc: function updateSimLockDesc() {
+    var _ = navigator.mozL10n.get;
+    var mobileConnection = window.navigator.mozMobileConnections &&
+        window.navigator.mozMobileConnections[0];
+
     if (!mobileConnection)
       return;
 
-    var simSecurityDesc = document.getElementById('simCardLock-desc');
+    if (!IccHelper)
+      return;
 
-    if (mobileConnection.cardState === 'absent') {
-      simSecurityDesc.textContent = _('noSimCard');
+    var simSecurityDesc = document.getElementById('simCardLock-desc');
+    simSecurityDesc.style.fontStyle = 'italic';
+
+    if (this._airplaneMode) {
+      simSecurityDesc.setAttribute('data-l10n-id', 'simCardNotReady');
       return;
     }
+
+    switch (IccHelper.cardState) {
+      case null:
+        simSecurityDesc.setAttribute('data-l10n-id', 'noSimCard');
+        return;
+      case 'unknown':
+        simSecurityDesc.setAttribute('data-l10n-id', 'unknownSimCardState');
+        return;
+    }
+
+    simSecurityDesc.style.fontStyle = 'normal';
     // with SIM card, query its status
-    var req = mobileConnection.getCardLock('pin');
+    var req = IccHelper.getCardLock('pin');
     req.onsuccess = function spl_checkSuccess() {
       var enabled = req.result.enabled;
-      simSecurityDesc.textContent = (enabled) ?
-        _('enabled') : _('disabled');
+      simSecurityDesc.setAttribute('data-l10n-id',
+                                   enabled ? 'enabled' : 'disabled');
     };
   }
 };
 
 // starting when we get a chance
-navigator.mozL10n.ready(function loadWhenIdle() {
+navigator.mozL10n.once(function loadWhenIdle() {
   var idleObserver = {
     time: 5,
     onidle: function() {

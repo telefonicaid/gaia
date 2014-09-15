@@ -4,13 +4,6 @@
 
   var MAX_FREQUENCY = 10000;
 
-  var IMELayouts = {
-    'EN': 'jp-kanji-en',
-    'EN-CAPS': 'jp-kanji-en-caps',
-    'JP': 'jp-kanji',
-    'NUM': 'jp-kanji-number'
-  };
-
   // IME special key code map
   // see `layout.js`
   var IMESpecialKey = {
@@ -21,11 +14,7 @@
     TRANSFORM: -14,
     CASE_CHANGE: -16,
     FULL: -17,
-    H2K: -18,
-    CAPSLOCK: -19,
-    EN_LAYOUT: -20,
-    NUM_LAYOUT: -21,
-    BASIC_LAYOUT: -22
+    H2K: -18
   };
 
   // Keyboard mode mapping
@@ -286,9 +275,6 @@
     // Code of previous key pressed
     var _previousKeycode = 0;
 
-    // Current keyboard
-    var _currLayout = IMELayouts.JP;
-
     var KeyMode = {
       'NORMAL': 0,
       'TRANSFORM': 1,
@@ -299,7 +285,7 @@
 
     var _keyboardMode = IMEMode.FULL_HIRAGANA;
 
-    var _layoutPage = LAYOUT_PAGE_DEFAULT;
+    var _layoutPage = PAGE_INDEX_DEFAULT;
 
     // ** The following functions are compulsory functions in IME
     // and explicitly called in `keyboard.js` **
@@ -318,7 +304,7 @@
     };
 
     this.click = function ime_click(keyCode) {
-      if (_layoutPage !== LAYOUT_PAGE_DEFAULT) {
+      if (_layoutPage !== PAGE_INDEX_DEFAULT) {
         _glue.sendKey(keyCode);
         return;
       }
@@ -334,7 +320,7 @@
 
     this.select = function ime_select(kanji, kana) {
       debug('select ' + kanji + ' ' + kana);
-      _glue.sendString(kanji);
+      sendString(kanji);
 
       _inputBuf.splice(0, kana.length);
       _selectedKanji = kanji;
@@ -369,16 +355,8 @@
       }
     };
 
-    this.activate = function ime_activate(language, suggestions, state) {
-      var inputType = state.type;
-      debug('Activate. Input type: ' + inputType);
-      var layout = IMELayouts.JP;
-      if (inputType === '' || inputType === 'text' ||
-          inputType === 'textarea') {
-        layout = _currLayout;
-      }
-
-      _glue.alterKeyboard(layout);
+    this.activate = function ime_activate(language, state, options) {
+      debug('Activate.');
     };
 
 
@@ -406,7 +384,10 @@
 
       if (!_dict) {
         debug('DB has not initialized, defer processing.');
-        initDB(qNext.bind(self));
+        initDB(function() {
+          _qIsWorking = false;
+          qNext();
+        });
         return;
       }
 
@@ -451,7 +432,7 @@
       // append new key code to the end of `_inputBuf`
       // and begin to deal with the new buf
       if (!(kana in IMEKeyMap)) {
-        _glue.sendString(kana);
+        sendString(kana);
         return 1;
       }
       if (_previousKeycode !== IMESpecialKey.BACK &&
@@ -480,10 +461,8 @@
 
       switch (code) {
 
-        case 32:
-          // Space
-          debug('space');
-          _glue.sendString(' ');
+        case KeyEvent.DOM_VK_SPACE:
+          _glue.sendKey(code);
           break;
 
         case 0:
@@ -553,7 +532,7 @@
             break;
           }
           if (_inputBuf.length === 0) {
-            _glue.sendString(' ');
+            _glue.sendKey(KeyEvent.DOM_VK_SPACE);
             break;
           }
 
@@ -602,29 +581,6 @@
           handleInputBuf();
           break;
 
-        case IMESpecialKey.CAPSLOCK:
-          if (_currLayout === IMELayouts.EN) {
-            alterKeyboard(IMELayouts['EN-CAPS']);
-          } else {
-            alterKeyboard(IMELayouts.EN);
-          }
-          break;
-
-        // Switch to basic layout
-        case IMESpecialKey.BASIC_LAYOUT:
-          alterKeyboard(IMELayouts.JP);
-          break;
-
-        // Switch to english layout
-        case IMESpecialKey.EN_LAYOUT:
-          alterKeyboard(IMELayouts.EN);
-          break;
-
-        // Switch to number layout
-        case IMESpecialKey.NUM_LAYOUT:
-          alterKeyboard(IMELayouts.NUM);
-          break;
-
         // Default key event
         case KeyEvent.DOM_VK_RETURN:
           handleReturn();
@@ -639,7 +595,7 @@
         case IMESpecialKey.MARK:
           debug(_inputBuf.length);
           if (_inputBuf.length !== 0) {
-            _glue.sendString(SyllableUtils.arrayToString(_inputBuf));
+            sendString(SyllableUtils.arrayToString(_inputBuf));
             _inputBuf = [];
             _firstKana = '';
             _firstKanji = '';
@@ -677,12 +633,6 @@
 
       return 0;
 
-    };
-
-    var alterKeyboard = function ime_alterKeyboard(layout) {
-      _currLayout = layout;
-      self.empty();
-      _glue.alterKeyboard(layout);
     };
 
     var handleH2K = function ime_handleH2K(kanaArr) {
@@ -746,7 +696,7 @@
 
         debug('handle return in transform mode or select mode');
         // select first term
-        _glue.sendString(_firstKanji);
+        sendString(_firstKanji);
         _inputBuf.splice(0, _firstKana.length);
 
         // query to generate first term
@@ -765,7 +715,7 @@
         } else if (_keyboardMode === IMEMode.HALF_KATAKANA) {
           mode = IMEMode.FULL_KATAKANA;
         }
-        _glue.sendString(_getPossibleStrings(mode)[0]);
+        sendString(_getPossibleStrings(mode)[0]);
         _inputBuf = [];
         _candidateList = [];
         _keyboardMode = IMEMode.FULL_HIRAGANA;
@@ -780,7 +730,7 @@
 
         debug('handle return in transform mode or select mode');
         // select first term
-        _glue.sendString(_firstKanji);
+        sendString(_firstKanji);
         _inputBuf.splice(0, _firstKana.length);
 
         // query to generate first term
@@ -792,7 +742,7 @@
       } else {
         if (_firstKana.length > 0) {
           debug('first term ' + _firstKanji + ' ' + _firstKana);
-          _glue.sendString(_firstKanji);
+          sendString(_firstKanji);
           _inputBuf.splice(0, _firstKana.length);
           handleInputBuf();
 
@@ -1061,6 +1011,12 @@
       return [displayStr, strFullHiragana, strFullKatakana, strHalfKatakana];
     };
 
+    // Send string to input field
+    var sendString = function ime_sendString(text) {
+      _glue.setComposition('');
+      _glue.endComposition(text);
+    };
+
     // Send pending symbols to display
     var sendPendingSymbols = function ime_sendPendingSymbols() {
 
@@ -1070,12 +1026,12 @@
       debug('sending pending symbols: ' + bufStr);
 
       if (_inputBuf.length === 0) {
-        _glue.sendPendingSymbols('');
+        _glue.endComposition();
         return;
       }
 
       if (_keyMode === KeyMode.NORMAL) {
-        _glue.sendPendingSymbols(bufStr);
+        _glue.setComposition(bufStr);
         return;
 
       } else if (_keyMode === KeyMode.TRANSFORM) {
@@ -1084,7 +1040,12 @@
           _keyMode = KeyMode.NORMAL;
 
         } else {
-          _glue.sendPendingSymbols(bufStr, 0, _firstKana.length, 'blue');
+          // XXX: New composition APIs don't support changing the style of
+          // composition string so we left the previous statements here to
+          // remind us of the original design.
+
+          // _glue.sendPendingSymbols(bufStr, 0, _firstKana.length, 'blue');
+          _glue.setComposition(bufStr);
         }
 
         return;
@@ -1094,7 +1055,8 @@
           _keyMode = KeyMode.NORMAL;
 
         } else {
-          _glue.sendPendingSymbols(bufStr, 0, _firstKana.length, 'green');
+          //_glue.sendPendingSymbols(bufStr, 0, _firstKana.length, 'green');
+          _glue.setComposition(bufStr);
         }
 
         return;
@@ -1102,7 +1064,8 @@
 
         var strs = _getPossibleStrings(_keyboardMode);
         var candidates = [];
-        _glue.sendPendingSymbols(bufStr, 0, strs[1].length, 'red');
+        //_glue.sendPendingSymbols(bufStr, 0, strs[1].length, 'red');
+        _glue.setComposition(bufStr);
 
         // candidate list is updated here
         // to avoide loop again in `handleInputBuf`
@@ -1115,7 +1078,7 @@
         return;
       }
 
-      _glue.sendPendingSymbols(bufStr);
+      _glue.setComposition(bufStr);
     };
 
     // Update candidate list
@@ -1179,7 +1142,8 @@
   if (!KeyEvent) {
     var KeyEvent = {
       DOM_VK_BACK_SPACE: 0x8,
-      DOM_VK_RETURN: 0xd
+      DOM_VK_RETURN: 0xd,
+      DOM_VK_SPACE: 0x20
     };
   }
   /* end copy */
@@ -1607,7 +1571,7 @@
         if (callback) {
           callback(self._status);
         }
-      }
+      };
       // Check if we could initilize.
       if (this._status != DatabaseStorageBase.StatusCode.UNINITIALIZED) {
         doCallback();
@@ -1662,7 +1626,7 @@
         if (callback) {
           callback();
         }
-      }
+      };
 
       // Check if we could uninitilize the storage
       if (this._status == DatabaseStorageBase.StatusCode.UNINITIALIZED) {
@@ -1688,7 +1652,7 @@
         if (callback) {
           callback(homonymsArray);
         }
-      }
+      };
 
       // Check if the storage is ready.
       if (!this.isReady()) {
@@ -1700,7 +1664,7 @@
         // Query all terms
         homonymsArray = homonymsArray.concat(self._dataArray);
         doCallback();
-      }
+      };
 
       setTimeout(perform, 0);
     },
@@ -1712,7 +1676,7 @@
         if (callback) {
           callback(homonymsArray);
         }
-      }
+      };
 
       // Check if the storage is ready.
       if (!this.isReady()) {
@@ -1727,7 +1691,7 @@
           homonymsArray.push(self._dataArray[index]);
         }
         doCallback();
-      }
+      };
 
       setTimeout(perform, 0);
     },
@@ -1759,7 +1723,7 @@
            homonymsArray.push(self._dataArray[index]);
          }
          doCallback();
-       }
+       };
 
        setTimeout(perform, 0);
      },
@@ -2306,7 +2270,7 @@
         callback(result);
       });
 
-    },
+    };
     /* end getSuggestions */
 
     this.getTerms = function imedb_getTerms(kanaArr, callback) {

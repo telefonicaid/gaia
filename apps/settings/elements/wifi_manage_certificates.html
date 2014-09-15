@@ -1,0 +1,42 @@
+<element name="wifi-manageCertificates" extends="section">
+  <template>
+
+    <gaia-header>
+      <button type="reset" data-icon="back"><span data-l10n-id="back">Back</span></button>
+      <h1 data-l10n-id="manageCert"> Manage Cert. </h1>
+    </gaia-header>
+
+    <div>
+      <header>
+        <h2 data-l10n-id="certificateList"> Certificate list </h2>
+      </header>
+      <ul class="wifi-certificateList">
+      </ul>
+      <ul class="operate-certificate">
+        <li>
+          <button class="icon deleteCertificate" data-l10n-id="deleteCertificate" disabled="true">
+            Delete certificate
+          </button>
+        </li>
+        <li>
+          <button class="icon icon-view importCertificate" data-l10n-id="importCertificate">
+            Import certificate
+          </button>
+        </li>
+      </ul>
+    </div>
+
+    <form role="dialog" data-type="confirm" class="certificate-deletion-failed" hidden>
+      <section>
+        <h1 data-l10n-id="certificate-deletion-failed">Certificate deletion failed</h1>
+        <p data-l10n-id="certificate-deletion-failed-description">This may be due to a storage issue, for example.</p>
+      </section>
+      <menu>
+        <button data-l10n-id="ok" class="full danger" id="certificate-deletion-failed-confirm">OK</button>
+      </menu>
+    </form>
+
+    <panel data-path="panels/wifi_manage_certificates/panel"></panel>
+
+  </template>
+</element>

@@ -1,4 +1,5 @@
 Calendar.ns('Provider').Abstract = (function() {
+  'use strict';
 
   function Abstract(options) {
     var key;
@@ -7,11 +8,24 @@ Calendar.ns('Provider').Abstract = (function() {
         this[key] = options[key];
       }
     }
+
+
+    Calendar.Promise.denodeifyAll(this, [
+      'eventCapabilities',
+      'getAccount',
+      'findCalendars',
+      'syncEvents',
+      'ensureRecurrencesExpanded',
+      'createEvent',
+      'updateEvent',
+      'deleteEvent'
+    ]);
   }
 
   Abstract.prototype = {
 
-    defaultColor: '#D2642A',
+    // orange (used by local calendar)
+    defaultColor: '#F97C17',
 
     /**
      * Does this provider require credentials.
@@ -123,16 +137,21 @@ Calendar.ns('Provider').Abstract = (function() {
 
     /**
      * Returns the capabilities of a single event.
+     *
+     * @param {Object} event object.
+     * @param {Function} callback [err, caps].
      */
-    eventCapabilities: function() {
+    eventCapabilities: function(event, callback) {
       var caps = this.calendarCapabilities();
-      return {
-        canCreate: caps.canCreateEvent,
-        canUpdate: caps.canUpdateEvent,
-        canDelete: caps.canDeleteEvent
-      };
-    }
 
+      Calendar.nextTick(function() {
+        callback(null, {
+          canCreate: caps.canCreateEvent,
+          canUpdate: caps.canUpdateEvent,
+          canDelete: caps.canDeleteEvent
+        });
+      });
+    }
   };
 
   return Abstract;

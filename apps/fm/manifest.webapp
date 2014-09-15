@@ -8,8 +8,10 @@
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
+    "storage":{},
     "fmradio":{},
-    "settings":{ "access": "readonly" }
+    "settings":{ "access": "readonly" },
+    "speaker-control":{}
   },
   "locales": {
     "ar": {
@@ -31,8 +33,11 @@
   },
   "default_locale": "en-US",
   "icons": {
-    "128": "/style/icons/Fm.png",
-    "60": "/style/icons/60/Fm.png"
+    "84": "/style/icons/fm_84.png",
+    "126": "/style/icons/fm_126.png",
+    "142": "/style/icons/fm_142.png",
+    "189": "/style/icons/fm_189.png",
+    "284": "/style/icons/fm_284.png"
   },
-  "orientation": "portrait-primary"
+  "orientation": "default"
 }

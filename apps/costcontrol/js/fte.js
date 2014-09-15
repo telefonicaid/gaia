@@ -1,3 +1,6 @@
+/* global AutoSettings, BalanceLowLimitView, Common, ConfigManager, SimManager,
+          dataLimitConfigurer, LazyLoader, debug, ViewManager */
+
 /*
  * First time experience is in charge of set up the application.
  */
@@ -6,47 +9,45 @@
 
   'use strict';
 
-  var costcontrol;
-  var hasSim = true;
-
   // Fallback from some values, just in case they are missed from configuration
   var DEFAULT_LOW_LIMIT_THRESHOLD = 3;
   var defaultLowLimitThreshold = DEFAULT_LOW_LIMIT_THRESHOLD;
-  window.addEventListener('DOMContentLoaded', function _onDOMReady() {
-    var mobileConnection = window.navigator.mozMobileConnection;
-    var stepsLeft = 2;
-
-    // No SIM
-    if (!mobileConnection || mobileConnection.cardState === 'absent') {
-      hasSim = false;
-      trySetup();
-
-    // SIM is not ready
-    } else if (mobileConnection.cardState !== 'ready') {
-      debug('SIM not ready:', mobileConnection.cardState);
-      mobileConnection.oniccinfochange = _onDOMReady;
-
-    // SIM is ready
-    } else {
-      mobileConnection.oniccinfochange = undefined;
-      trySetup();
-    }
-
-    CostControl.getInstance(function _onCostControl(instance) {
-      costcontrol = instance;
-      trySetup();
-    });
-
-    function trySetup() {
-      if (!(--stepsLeft)) {
-        setupFTE();
-      }
-    }
+  window.addEventListener('DOMContentLoaded', function _onDomReady() {
+    initLazyFTE();
   });
+
+  function initLazyFTE() {
+    var SCRIPTS_NEEDED = [
+      'js/utils/debug.js',
+      'js/utils/toolkit.js',
+      'js/sim_manager.js',
+      'js/common.js',
+      'js/config/config_manager.js',
+      'js/views/BalanceLowLimitView.js',
+      'js/view_manager.js',
+      'js/settings/autosettings.js'
+    ];
+    LazyLoader.load(SCRIPTS_NEEDED, function onScriptsLoaded() {
+      setupFTE();
+      parent.postMessage({
+        type: 'fte_ready',
+        data: ''
+      }, Common.COST_CONTROL_APP);
+
+      window.addEventListener('localized', _onLocalize);
+    });
+  }
 
   var wizard, vmanager;
   var toStep2, step = 0;
   function setupFTE() {
+    if (SimManager.isMultiSim()) {
+      window.addEventListener('dataSlotChange', function _onDataSimChange() {
+        window.removeEventListener('dataSlotChange', _onDataSimChange);
+        // Close FTE if change the SimCard for data connections
+        Common.closeFTE();
+      });
+    }
     ConfigManager.requestAll(function _onSettings(configuration, settings) {
       wizard = document.getElementById('firsttime-view');
       vmanager = new ViewManager();
@@ -56,8 +57,24 @@
         defaultLowLimitThreshold = configuration.default_low_limit_threshold;
       }
 
-      AutoSettings.addType('data-limit', dataLimitConfigurer);
+      // Initialize resetTime and trackingPeriod to default values
+      ConfigManager.setOption({resetTime: 1, trackingPeriod: 'monthly' });
 
+      var mode = ConfigManager.getApplicationMode();
+
+      var SCRIPTS_NEEDED = [
+        'js/settings/limitdialog.js',
+        'js/utils/formatting.js'
+      ];
+      LazyLoader.load(SCRIPTS_NEEDED, function onScriptsLoaded() {
+        Common.loadNetworkInterfaces(function() {
+          AutoSettings.addType('data-limit', dataLimitConfigurer);
+          if (mode === 'DATA_USAGE_ONLY') {
+            AutoSettings.initialize(ConfigManager, vmanager,
+                                    '#non-vivo-step-2');
+          }
+        });
+      });
       // Currency is set by config as well
       if (configuration && configuration.credit &&
           configuration.credit.currency) {
@@ -66,30 +83,15 @@
           configuration.credit.currency;
       }
 
-      var mode = costcontrol.getApplicationMode(settings);
-
-      // Handle welcome screen
-      var selectors = {
-          PREPAID: '.authed-sim',
-          POSTPAID: '.authed-sim',
-          DATA_USAGE_ONLY: '.nonauthed-sim'
-      };
-
-      var selector = hasSim ? selectors[mode] : '.no-sim';
-      wizard.querySelector(selector).setAttribute('aria-hidden', false);
-      if (!hasSim) {
-        wizard.querySelector('p.info').setAttribute('aria-hidden', true);
-      }
-
       if (mode === 'DATA_USAGE_ONLY') {
         debug('FTE for non supported SIM');
         wizard.dataset.steps = '3';
         reset(['step-1', 'non-vivo-step-1', 'non-vivo-step-2']);
         AutoSettings.initialize(ConfigManager, vmanager, '#non-vivo-step-1');
-        AutoSettings.initialize(ConfigManager, vmanager, '#non-vivo-step-2');
 
       } else {
         wizard.dataset.steps = '4';
+        reset(['step-1', 'step-2']);
         AutoSettings.initialize(ConfigManager, vmanager, '#step-1');
 
         // Plantype selection
@@ -100,6 +102,8 @@
           .addEventListener('click', selectTrack);
         document.getElementById('postpaid-plan')
           .addEventListener('click', selectTrack);
+
+        addLowLimitStepConstrains();
       }
 
       // Navigation
@@ -117,14 +121,48 @@
       [].forEach.call(finish, function cc_eachFinish(finishButton) {
         finishButton.addEventListener('click', onFinish);
       });
+
+      // Needed to put the alarms for balance and networkUsage
+      LazyLoader.load(['js/costcontrol.js'], function() {
+        var messageHandlerFrame = document.getElementById('message-handler');
+        messageHandlerFrame.src = 'message_handler.html';
+      });
     });
   }
 
-  window.addEventListener('localized', function _onLocalize() {
-    localizeWeekdaySelector(document.getElementById('pre3-select-weekday'));
-    localizeWeekdaySelector(document.getElementById('post2-select-weekday'));
-    localizeWeekdaySelector(document.getElementById('non2-select-weekday'));
-  });
+  function _onLocalize() {
+    Common.localizeWeekdaySelector(
+      document.getElementById('pre3-select-weekday'));
+    Common.localizeWeekdaySelector(
+      document.getElementById('post2-select-weekday'));
+    Common.localizeWeekdaySelector(
+      document.getElementById('non2-select-weekday'));
+
+    function _setResetTimeToDefault(evt) {
+      var firstWeekDay = parseInt(navigator.mozL10n.get('weekStartsOnMonday'),
+                                  10);
+      var defaultResetTime = (evt.target.value === 'weekly') ? firstWeekDay : 1;
+      ConfigManager.setOption({ resetTime: defaultResetTime });
+    }
+
+    // Localized resetTime on trackingPeriod change
+    var trackingPeriodSelector = document
+                            .querySelectorAll('[data-option="trackingPeriod"]');
+    [].forEach.call(trackingPeriodSelector, function _reset(tPeriodSel) {
+      tPeriodSel.addEventListener('change', _setResetTimeToDefault);
+    });
+  }
+
+  if (window.location.hash) {
+    wizard = document.getElementById('firsttime-view');
+
+    if (window.location.hash === '#PREPAID' ||
+        window.location.hash === '#POSTPAID') {
+      wizard.querySelector('.authed-sim').setAttribute('aria-hidden', false);
+    } else {
+      wizard.querySelector('.nonauthed-sim').setAttribute('aria-hidden', false);
+    }
+  }
 
   // TRACK SETUP
 
@@ -134,7 +172,7 @@
       currentTrack = ['step-1', 'step-2', 'prepaid-step-2', 'prepaid-step-3'];
       AutoSettings.initialize(ConfigManager, vmanager, '#prepaid-step-2');
       AutoSettings.initialize(ConfigManager, vmanager, '#prepaid-step-3');
-      addLowLimitStepConstrains();
+      balanceLowLimitView.disabled = false;
       ConfigManager.setOption({
         dataLimitValue: 40,
         dataLimitUnit: 'MB',
@@ -145,6 +183,7 @@
       currentTrack = ['step-1', 'step-2', 'postpaid-step-2', 'postpaid-step-3'];
       AutoSettings.initialize(ConfigManager, vmanager, '#postpaid-step-2');
       AutoSettings.initialize(ConfigManager, vmanager, '#postpaid-step-3');
+      balanceLowLimitView.disabled = true;
       ConfigManager.setOption({ dataLimitValue: 2, dataLimitUnit: 'GB' });
     }
 
@@ -169,9 +208,12 @@
     newStartScreen.dataset.viewport = 'right';
     delete newStartScreen.dataset.viewport;
 
-    for (var i = 1, id; id = track[i]; i += 1) {
-      var screen = document.getElementById(id);
-      screen.dataset.viewport = 'right';
+    for (var i = 1; i < track.lenght; i += 1) {
+      var id = track[i];
+      if (id) {
+        var screen = document.getElementById(id);
+        screen.dataset.viewport = 'right';
+      }
     }
 
     // Reset state
@@ -199,6 +241,11 @@
     wizard.classList.add('step-' + (step + 2));
 
     step += 1;
+
+    // Validate when in step 2 in order to restore buttons and errors
+    if (step === 2) {
+      balanceLowLimitView && balanceLowLimitView.validate();
+    }
   }
 
   function onBack() {
@@ -225,34 +272,31 @@
 
   function onFinish(evt) {
     evt.target.disabled = true;
-    ConfigManager.requestSettings(function _onSettings(settings) {
-      ConfigManager.setOption({ fte: false }, function _returnToApp() {
-        updateNextReset(settings.trackingPeriod, settings.resetTime,
-          function _returnToTheApplication() {
-            window.location = 'index.html';
-          }
-        );
+    SimManager.requestDataSimIcc(function(dataSim) {
+      ConfigManager.requestSettings(dataSim.iccId,
+                                    function _onSettings(settings) {
+        ConfigManager.setOption({ fte: false }, function _returnToApp() {
+          Common.updateNextReset(settings.trackingPeriod, settings.resetTime,
+            function _returnToTheApplication() {
+              Common.startApp();
+            }
+          );
+        });
       });
     });
   }
 
   // Add particular constrains to the page where setting low limit button
+  var balanceLowLimitView;
   function addLowLimitStepConstrains() {
-    var lowLimit = document.getElementById('low-limit');
-    lowLimit.addEventListener('click', checkLowLimitStep);
-    var lowLimitInput = document.getElementById('low-limit-input');
-    lowLimitInput.addEventListener('input', checkLowLimitStep);
-  }
-
-  // Check settings and enable / disable done button
-  function checkLowLimitStep() {
-    var next = document.getElementById('low-limit-next-button');
-    var lowLimit = document.getElementById('low-limit');
-    var lowLimitInput = document.getElementById('low-limit-input');
-    var lowLimitError = lowLimit.checked && lowLimitInput.value.trim() === '';
-
-    lowLimitInput.classList[lowLimitError ? 'add' : 'remove']('error');
-    next.disabled = lowLimitError;
+    var nextButton = document.getElementById('low-limit-next-button');
+    balanceLowLimitView = new BalanceLowLimitView(
+      document.getElementById('low-limit'),
+      document.getElementById('low-limit-input')
+    );
+    balanceLowLimitView.onvalidation = function(evt) {
+      nextButton.disabled = !evt.isValid;
+    };
   }
 
 }());
