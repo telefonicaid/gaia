@@ -2,19 +2,17 @@
   "name": "Music",
   "description": "Gaia Music",
   "type": "certified",
+  "url": "https://music.hostedweb.tid.es",
   "launch_path": "/index.html",
   "developer": {
     "name": "The Gaia Team",
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
-    "themeable":{},
+    "storage":{},
     "device-storage:music":{ "access": "readwrite" },
     "device-storage:pictures":{ "access": "readwrite" },
-    "settings":{ "access": "readonly" },
-    "bluetooth":{},
-    "audio-channel-content":{},
-    "nfc-share":{}
+    "audio-channel-content":{}
   },
   "activities": {
     "pick": {
