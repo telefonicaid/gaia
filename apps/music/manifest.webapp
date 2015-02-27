@@ -63,5 +63,6 @@
   "orientation": "default",
   "messages": [
      { "media-button": "/index.html" }
-  ]
+  ],
+  "csp" : "default-src *; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'"
 }
