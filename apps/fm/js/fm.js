@@ -836,11 +836,6 @@ function init() {
   // Disable the power button and the fav list when the airplane mode is on.
   updateAirplaneModeUI();
 
-  AirplaneModeHelper.addEventListener('statechange', function(status) {
-    airplaneModeEnabled = status === 'enabled';
-    updateAirplaneModeUI();
-  });
-
   // Load the fav list and enable the FM radio if an antenna is available.
   historyList.init(function hl_ready() {
     if (mozFMRadio.antennaAvailable) {
@@ -882,7 +877,7 @@ function init() {
   // ought to be a better way, but this is a quick and easy way to
   // fix a last-minute release blocker.
   //
-  navigator.mozSettings.addObserver(
+  /*navigator.mozSettings.addObserver(
     'private.broadcast.attention_screen_opening',
     function(event) {
       // An attention screen is in the process of opening. Save the
@@ -910,34 +905,18 @@ function init() {
         }
       }
     }
-  );
+  );*/
+}
+
+function onAirplaneModeChange(enabled) {
+  airplaneModeEnabled = enabled;
+  updateAirplaneModeUI();
 }
 
 window.addEventListener('load', function(e) {
-  AirplaneModeHelper.ready(function() {
-    airplaneModeEnabled = AirplaneModeHelper.getStatus() == 'enabled';
-    init();
-
-    // PERFORMANCE EVENT (2): moz-chrome-interactive
-    // Designates that the app's *core* chrome or navigation interface
-    // has its events bound and is ready for user interaction.
-    window.performance.mark('navigationInteractive');
-    window.dispatchEvent(new CustomEvent('moz-chrome-interactive'));
-
-    // PERFORMANCE EVENT (3): moz-app-visually-complete
-    // Designates that the app is visually loaded (e.g.: all of the
-    // "above-the-fold" content exists in the DOM and is marked as
-    // ready to be displayed).
-    window.performance.mark('visuallyLoaded');
-    window.dispatchEvent(new CustomEvent('moz-app-visually-complete'));
-
-    // PERFORMANCE EVENT (4): moz-content-interactive
-    // Designates that the app has its events bound for the minimum
-    // set of functionality to allow the user to interact with the
-    // "above-the-fold" content.
-    window.performance.mark('contentInteractive');
-    window.dispatchEvent(new CustomEvent('moz-content-interactive'));
-  });
+  window.SettingService.observe('airplaneMode.enabled', false,
+    onAirplaneModeChange);
+  init();
 }, false);
 
 // Turn off radio immediately when window is unloaded.
