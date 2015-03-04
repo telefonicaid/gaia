@@ -1,0 +1,12 @@
+{
+  "apps": [
+    {
+      "name": "Music",
+      "manifestURL": "https://music.hostedweb.tid.es/manifest.webapp"
+    },
+    {
+      "name": "FM",
+      "manifestURL": "https://fm.hostedweb.tid.es/manifest.webapp"
+    }
+  ]
+}

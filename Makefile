@@ -101,6 +101,8 @@ endif
 DOGFOOD?=0
 NODE_MODULES_SRC?=modules.tar
 
+HOSTED?=0
+
 # GAIA_DEVICE_TYPE customization
 # phone - default
 # tablet
@@ -208,6 +210,10 @@ endif
 
 ifeq ($(DOGFOOD), 1)
 GAIA_APP_TARGET=dogfood
+endif
+
+ifeq ($(HOSTED), 1)
+GAIA_APP_TARGET=hosted
 endif
 
 ifdef NODE_MODULES_GIT_URL
