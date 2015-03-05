@@ -53,7 +53,7 @@
     },
 
     set: function ss_set(settingKey, settingValue) {
-      if (!settingKey || !settingValue) {
+      if (!settingKey || typeof settingValue === 'undefined') {
         console.error('Missing parameter');
         return;
       }

@@ -490,14 +490,8 @@ CameraController.prototype.updateZoomForMako = function() {
   debug('update zoom for mako');
 
   var self = this;
-  navigator.mozSettings
-    .createLock()
-    .get('deviceinfo.hardware')
-    .onsuccess = onSuccess;
-
   debug('settings request made');
-  function onSuccess(e) {
-    var device = e.target.result['deviceinfo.hardware'];
+  window.SettingService.get('deviceinfo.hardware').then(function(device) {
     if (device !== 'mako') { return; }
 
     var frontCamera = self.camera.selectedCamera === 'front';
@@ -509,7 +503,7 @@ CameraController.prototype.updateZoomForMako = function() {
     self.camera.set('maxHardwareZoom', maxHardwareZoom);
     self.camera.emit('zoomconfigured', self.camera.getZoom());
     debug('zoom reconfigured for mako');
-  }
+  });
 };
 
 });

@@ -56,23 +56,10 @@ Sounds.prototype.add = function(data) {
  */
 Sounds.prototype.isEnabled = function(sound, done) {
   setTimeout(function() {
-    var mozSettings = navigator.mozSettings;
     var key = sound.setting;
-
-    // Requires navigator.mozSettings
-    if (!mozSettings) {
-      return;
-    }
-
-    mozSettings
-      .createLock()
-      .get(key)
-      .onsuccess = onSuccess;
-
-    function onSuccess(e) {
-      var result = e.target.result[key];
-      done(result);
-    }
+    window.SettingService.get(key).then(function(value) {
+      done(value);
+    });
   });
 };
 
@@ -84,14 +71,11 @@ Sounds.prototype.isEnabled = function(sound, done) {
  *
  */
 Sounds.prototype.observeSetting = function(sound) {
-  var mozSettings = navigator.mozSettings;
   var key = sound.setting;
   var self = this;
-  if (mozSettings) {
-    mozSettings.addObserver(key, function(e) {
-      self.setEnabled(sound, e.settingValue);
-    });
-  }
+  window.SettingService.observe(key, null, function(settingValue) {
+    self.setEnabled(sound, settingValue);
+  });
 };
 
 /**
