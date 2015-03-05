@@ -168,18 +168,14 @@ AlarmListPanel.prototype = {
   },
 
   updateAlarmStatusBar: function() {
-    if (navigator.mozSettings) {
-      var anyAlarmEnabled = false;
-      for (var id in this.alarmIdMap) {
-        if (this.alarmIdMap[id].isEnabled()) {
-          anyAlarmEnabled = true;
-          break;
-        }
+    var anyAlarmEnabled = false;
+    for (var id in this.alarmIdMap) {
+      if (this.alarmIdMap[id].isEnabled()) {
+        anyAlarmEnabled = true;
+        break;
       }
-      navigator.mozSettings.createLock().set({
-        'alarm.enabled': anyAlarmEnabled
-      });
     }
+    window.SettingService.set('alarm.enabled', anyAlarmEnabled);
   }
 
 };
