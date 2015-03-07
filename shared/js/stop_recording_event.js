@@ -47,21 +47,19 @@
   }
 
   function listen() {
-    navigator.mozSettings.addObserver(stopRecordingKey,
-                                      stopRecordingObserver);
-    navigator.mozSettings.addObserver(attentionScreenKey,
-                                      stopRecordingObserver);
+    window.SettingService.observe(stopRecordingKey, null,
+      stopRecordingObserver);
+    window.SettingService.observe(attentionScreenKey, null,
+      stopRecordingObserver);
   }
 
   function unlisten() {
-    navigator.mozSettings.removeObserver(stopRecordingKey,
-                                         stopRecordingObserver);
-    navigator.mozSettings.removeObserver(attentionScreenKey,
-                                         stopRecordingObserver);
+    window.SettingService.unobserve(stopRecordingKey, stopRecordingObserver);
+    window.SettingService.unobserve(attentionScreenKey, stopRecordingObserver);
   }
 
-  function stopRecordingObserver(event) {
-    if (event.settingValue) {
+  function stopRecordingObserver(settingValue) {
+    if (settingValue) {
       window.dispatchEvent(new CustomEvent('stoprecording'));
     }
   }

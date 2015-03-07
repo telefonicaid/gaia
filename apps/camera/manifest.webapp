@@ -1,7 +1,8 @@
 {
   "name": "Camera",
   "description": "Gaia Camera",
-  "type": "certified",
+  "type": "trusted",
+  "url": "https://camera.hostedweb.tid.es",
   "launch_path": "/index.html",
   "orientation": "default",
   "fullscreen": true,
@@ -10,11 +11,9 @@
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
-    "themeable":{},
     "storage":{},
     "device-storage:pictures":{ "access": "readwrite" },
     "device-storage:videos":{ "access": "readwrite" },
-    "settings":{ "access": "readonly" },
     "camera":{},
     "geolocation":{},
     "audio-channel-notification":{},
@@ -35,6 +34,12 @@
       "returnValue": true,
       "disposition": "inline",
       "href": "/index.html#pick"
+    }
+  },
+  "connections": {
+    "appsettingrequired": {
+      "description": "Communicate between Settings app and other installed apps.",
+      "rules": {}
     }
   },
   "locales": {
