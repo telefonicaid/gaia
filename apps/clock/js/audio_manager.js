@@ -38,17 +38,20 @@ define(function(require) {
   function requestAlarmSystemVolume() {
     // Asynchronously load the alarm volume from mozSettings.
     return new Promise(function(resolve, reject) {
-      window.SettingService.get(VOLUME_SETTING).then(function(volume) {
-        var floatVolume = systemVolumeToFloat(volume);
-        if (isValidVolume(floatVolume)) {
-          globalVolumeManager._volume = floatVolume;
-          resolve(floatVolume);
-          return;
+      var lock = navigator.mozSettings.createLock();
+      var req = lock.get(VOLUME_SETTING);
+      req.onsuccess = function() {
+        var volume = systemVolumeToFloat(req.result[VOLUME_SETTING]);
+        if (isValidVolume(volume)) {
+          globalVolumeManager._volume = volume;
+          resolve(volume);
         }
+      };
 
+      req.onerror = function() {
         var DEFAULT_VOLUME = 1.0;
         resolve(DEFAULT_VOLUME);
-      });
+      };
     });
   }
 
@@ -57,8 +60,11 @@ define(function(require) {
     this.DEFAULT_VOLUME = 1.0;
     this._volume = this.DEFAULT_VOLUME;
 
-    window.SettingService.observe(VOLUME_SETTING, this.DEFAULT_VOLUME,
-      this.onSystemAlarmVolumeChange.bind(this));
+    if (navigator.mozSettings) {
+      navigator.mozSettings.addObserver(
+        VOLUME_SETTING,
+        this.onSystemAlarmVolumeChange.bind(this));
+    }
   }
 
   VolumeManager.prototype = {
@@ -80,12 +86,17 @@ define(function(require) {
       if (isValidVolume(volume)) {
         this._volume = volume;
 
-        window.SettingService.set(VOLUME_SETTING,
-          floatToSystemVolume(volume)).then(function(result) {
-            if (result && cb) {
-              cb();
-            }
-        });
+        if (navigator.mozSettings) {
+          var lock = navigator.mozSettings.createLock();
+
+          var opts = {};
+          opts[VOLUME_SETTING] = floatToSystemVolume(volume);
+          var req = lock.set(opts);
+
+          if (cb) {
+            req.onsuccess = cb;
+          }
+        }
       }
     }
 
