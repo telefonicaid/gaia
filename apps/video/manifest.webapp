@@ -1,7 +1,8 @@
 {
   "name": "Video",
   "description": "Gaia Video",
-  "type": "certified",
+  "type": "trusted",
+  "url": "https://video.hostedweb.tid.es",
   "launch_path": "/index.html",
   "developer": {
     "name": "The Gaia Team",
@@ -9,7 +10,7 @@
   },
   "fullscreen": true,
   "permissions": {
-    "themeable":{},
+    "storage":{},
     "device-storage:pictures":{ "access": "readwrite" },
     "device-storage:videos":{ "access": "readwrite" },
     "audio-channel-content":{},
@@ -66,5 +67,6 @@
       "disposition": "inline",
       "returnValue": true
     }
-  }
+  },
+  "csp" : "default-src *; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'"
 }
