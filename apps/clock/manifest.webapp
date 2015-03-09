@@ -1,24 +1,19 @@
 {
   "name": "Clock",
   "description": "Gaia Clock",
-  "type": "trusted",
-  "url": "https://clock.hostedweb.tid.es",
+  "type": "certified",
   "launch_path": "/index.html",
   "developer": {
     "name": "The Gaia Team",
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
+    "themeable":{},
     "storage":{},
     "alarms":{},
+    "settings":{ "access": "readwrite" },
     "attention":{},
     "audio-channel-alarm":{}
-  },
-  "connections": {
-    "appsettingrequired": {
-      "description": "Communicate between Settings app and other installed apps.",
-      "rules": {}
-    }
   },
   "locales": {
     "ar": {

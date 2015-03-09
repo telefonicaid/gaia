@@ -59,7 +59,7 @@
     },
 
     set: function ss_set(data) {
-      if (typeof data.value === 'undefined') {
+      if (!data.value) {
         window.DUMP('Message received bad formed. Missing parameter: value');
         return;
       }
