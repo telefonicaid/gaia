@@ -179,10 +179,11 @@
 
     get name() {
       var userLang = document.documentElement.lang;
+      var prefix = this.app.manifestURL.contains('hostedweb.tid') ? 'H - ' : '';
 
       if (navigator.mozL10n && userLang in navigator.mozL10n.qps) {
-        return navigator.mozL10n.qps[userLang].
-          translate(this.descriptor.short_name || this.descriptor.name);
+        return prefix + (navigator.mozL10n.qps[userLang].
+          translate(this.descriptor.short_name || this.descriptor.name));
       }
 
       var locales = this.descriptor.locales;
@@ -190,7 +191,8 @@
         locales && locales[userLang] &&
         (locales[userLang].short_name || locales[userLang].name);
 
-      return localized || this.descriptor.short_name || this.descriptor.name;
+      return prefix +
+             (localized || this.descriptor.short_name || this.descriptor.name);
     },
 
     asyncName: function() {
