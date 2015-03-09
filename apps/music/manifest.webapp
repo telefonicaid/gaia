@@ -1,7 +1,7 @@
 {
   "name": "Music",
   "description": "Gaia Music",
-  "type": "trusted",
+  "type": "certified",
   "url": "https://music.hostedweb.tid.es",
   "launch_path": "/index.html",
   "developer": {
