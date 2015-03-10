@@ -1,7 +1,7 @@
 {
   "name": "Video",
   "description": "Gaia Video",
-  "type": "trusted",
+  "type": "certified",
   "url": "https://video.hostedweb.tid.es",
   "launch_path": "/index.html",
   "developer": {
