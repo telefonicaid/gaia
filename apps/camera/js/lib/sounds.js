@@ -55,25 +55,25 @@ Sounds.prototype.add = function(data) {
  * @param  {Function} done
  */
 Sounds.prototype.isEnabled = function(sound, done) {
-  setTimeout(function() {
-    var mozSettings = navigator.mozSettings;
-    var key = sound.setting;
+  // setTimeout(function() {
+  //   var mozSettings = navigator.mozSettings;
+  //   var key = sound.setting;
 
-    // Requires navigator.mozSettings
-    if (!mozSettings) {
-      return;
-    }
+  //   // Requires navigator.mozSettings
+  //   if (!mozSettings) {
+  //     return;
+  //   }
 
-    mozSettings
-      .createLock()
-      .get(key)
-      .onsuccess = onSuccess;
+  //   mozSettings
+  //     .createLock()
+  //     .get(key)
+  //     .onsuccess = onSuccess;
 
-    function onSuccess(e) {
-      var result = e.target.result[key];
-      done(result);
-    }
-  });
+  //   function onSuccess(e) {
+  //     var result = e.target.result[key];
+  //     done(result);
+  //   }
+  // });
 };
 
 /**

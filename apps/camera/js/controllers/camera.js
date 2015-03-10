@@ -160,7 +160,7 @@ CameraController.prototype.onSettingsConfigured = function() {
 
   // Defer this work as it involves
   // expensive mozSettings calls
-  setTimeout(this.updateZoomForMako);
+  // setTimeout(this.updateZoomForMako);
 
   debug('camera configured with final settings');
 };
@@ -505,29 +505,29 @@ CameraController.prototype.onGalleryClosed = function(reason) {
  * @private
  */
 CameraController.prototype.updateZoomForMako = function() {
-  debug('update zoom for mako');
+  // debug('update zoom for mako');
 
-  var self = this;
-  navigator.mozSettings
-    .createLock()
-    .get('deviceinfo.hardware')
-    .onsuccess = onSuccess;
+  // var self = this;
+  // navigator.mozSettings
+  //   .createLock()
+  //   .get('deviceinfo.hardware')
+  //   .onsuccess = onSuccess;
 
-  debug('settings request made');
-  function onSuccess(e) {
-    var device = e.target.result['deviceinfo.hardware'];
-    if (device !== 'mako') { return; }
+  // debug('settings request made');
+  // function onSuccess(e) {
+  //   var device = e.target.result['deviceinfo.hardware'];
+  //   if (device !== 'mako') { return; }
 
-    var frontCamera = self.camera.selectedCamera === 'front';
-    var maxHardwareZoom = frontCamera ? 1 : 1.25;
+  //   var frontCamera = self.camera.selectedCamera === 'front';
+  //   var maxHardwareZoom = frontCamera ? 1 : 1.25;
 
-    // Nexus 4 needs zoom preview adjustment since the viewfinder preview
-    // stream does not automatically reflect the current zoom value.
-    self.settings.zoom.set('useZoomPreviewAdjustment', true);
-    self.camera.set('maxHardwareZoom', maxHardwareZoom);
-    self.camera.emit('zoomconfigured', self.camera.getZoom());
-    debug('zoom reconfigured for mako');
-  }
+  //   // Nexus 4 needs zoom preview adjustment since the viewfinder preview
+  //   // stream does not automatically reflect the current zoom value.
+  //   self.settings.zoom.set('useZoomPreviewAdjustment', true);
+  //   self.camera.set('maxHardwareZoom', maxHardwareZoom);
+  //   self.camera.emit('zoomconfigured', self.camera.getZoom());
+  //   debug('zoom reconfigured for mako');
+  // }
 };
 
 });
