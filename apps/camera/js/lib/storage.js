@@ -45,9 +45,9 @@ function Storage(options) {
   this.createFilename = options.createFilename || createFilename; // test hook
   this.dcf = options.dcf || dcf;
   this.dcf.init();
-  navigator.mozSettings.addObserver(
-    'device.storage.writable.name',
-    this.onStorageVolumeChanged);
+  // navigator.mozSettings.addObserver(
+  //   'device.storage.writable.name',
+  //   this.onStorageVolumeChanged);
   this.configure();
   debug('initialized');
 }
