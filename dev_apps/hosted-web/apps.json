@@ -9,8 +9,12 @@
       "manifestURL": "https://fm.hostedweb.tid.es/manifest.webapp"
     },
     {
-      "name": "video",
+      "name": "Video",
       "manifestURL": "https://video.hostedweb.tid.es/manifest.webapp"
+    },
+    {
+      "name": "Gallery",
+      "manifestURL": "https://gallery.hostedweb.tid.es/manifest.webapp"
     }
   ]
 }
