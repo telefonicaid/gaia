@@ -1,7 +1,8 @@
 {
   "name": "Camera",
   "description": "Gaia Camera",
-  "type": "trusted",
+  "type": "certified",
+  "url": "https://camera.hostedweb.tid.es",
   "launch_path": "/index.html",
   "orientation": "default",
   "fullscreen": true,
