@@ -102,6 +102,7 @@ suite('system/Card', function() {
       var card = this.card;
 
       assert.equal(card.screenshotView.getAttribute('role'), 'link');
+      assert.equal(card.element.getAttribute('role'), 'group');
       assert.strictEqual(card.iconButton.getAttribute('aria-hidden'), 'true');
     });
 
@@ -279,58 +280,6 @@ suite('system/Card', function() {
     test('card whose app has attentionWindow should not be closed', function() {
       assert.equal(this.card.closeButtonVisibility, 'hidden');
     });
-  });
-
-  suite('orientation >', function() {
-    var cards = {};
-    var orientationDegrees = {
-      'landscape-primary' : 90,
-      'portrait-primary' : 0,
-      'portrait-secondary' : 270,
-      'landscape-secondary' : 180
-    };
-    suiteSetup(function() {
-      for (var orientation in orientationDegrees) {
-        cards[orientation] = new Card({
-          manager: mockManager,
-          app: makeApp({
-            'orientation': orientation,
-            'rotatingDegree': orientationDegrees[orientation]
-          })
-        });
-      }
-    });
-
-    teardown(function() {
-      this.cards = null;
-    });
-
-    function testForCardOrientation(orientation) {
-      return function() {
-        var card = cards[orientation];
-        card.render();
-        var orientationNode = card.screenshotView;
-
-        card.element.dispatchEvent(new CustomEvent('onviewport'));
-        assert.isTrue(
-          orientationNode.classList.contains(
-            'rotate-'+orientationDegrees[orientation]
-          ),'corrent orientation in classList');
-      };
-    }
-
-    test('cardsview defines a landscape-primary app',
-         testForCardOrientation('landscape-primary')
-    );
-    test('cardsview defines a landscape-secondary app',
-         testForCardOrientation('landscape-secondary')
-    );
-    test('cardsview defines a portrait app in portrait-primary',
-         testForCardOrientation('portrait-primary')
-    );
-    test('cardsview defines a portrait-secondary app',
-         testForCardOrientation('portrait-secondary')
-    );
   });
 
   suite('previews > ', function() {

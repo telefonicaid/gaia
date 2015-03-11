@@ -25,7 +25,6 @@
     "device-storage:music":{ "access": "readcreate" },
     "device-storage:apps":{ "access": "readonly" },
     "settings":{ "access": "readwrite" },
-    "storage":{},
     "camera":{},
     "geolocation":{},
     "audio-capture": {},
@@ -109,6 +108,10 @@
     },
     "search-results": {
       "description": "Communicate between search results and search app",
+      "rules": {}
+    },
+    "app-metrics": {
+      "description": "Communicate between system app metrics and search app",
       "rules": {}
     },
     "ftucomms": {

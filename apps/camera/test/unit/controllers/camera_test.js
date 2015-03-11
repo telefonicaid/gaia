@@ -33,7 +33,7 @@ suite('controllers/camera', function() {
       notification: {
         display: sinon.spy()
       }
-    }
+    };
 
     // Activity
     this.app.activity = {};
@@ -194,37 +194,41 @@ suite('controllers/camera', function() {
     });
   });
 
-  suite('CameraController#handleKeyDown', function() {
-    var cameraKeyEv  = { key: 'camera' };
-    var volupKeyEv   = { key: 'volumeup' };
-    var voldownKeyEv = { key: 'volumedown' };
-    var focusKeyEv   = { key: 'mozcamerafocusadjust' };
+  suite('CameraController#onCaptureKey', function() {
+    test('`keydown:capture` triggers capture', function() {
+      var callback = this.app.on.withArgs('keydown:capture').args[0][1];
+      var event = { preventDefault: sinon.spy() };
 
-    var captureSpy;
+      callback(event);
+      sinon.assert.called(this.camera.capture);
+    });
+
+    test('It calls preventDefault if the capture call doesn\'t return false', function() {
+      var callback = this.app.on.withArgs('keydown:capture').args[0][1];
+      var event = { preventDefault: sinon.spy() };
+
+      this.camera.capture.returns(false);
+      callback(event);
+      sinon.assert.notCalled(event.preventDefault);
+
+      this.camera.capture.returns(undefined);
+      callback(event);
+      sinon.assert.called(event.preventDefault);
+    });
+  });
+
+  suite('CameraController#onFocusKey', function() {
     setup(function() {
-      captureSpy = this.sinon.spy(this.controller, 'capture');
       this.camera.focus = {
         focus: this.sinon.spy()
       };
     });
 
-    test('camera button triggers capture', function() {
-      this.controller.handleKeyDown(cameraKeyEv);
-      sinon.assert.called(captureSpy);
-    });
+    test('`keydown:focus` triggers focus', function() {
+      var callback = this.app.on.withArgs('keydown:focus').args[0][1];
+      var event = { preventDefault: sinon.spy() };
 
-    test('volume up button triggers capture', function() {
-      this.controller.handleKeyDown(volupKeyEv);
-      sinon.assert.called(captureSpy);
-    });
-
-    test('volume down button triggers capture', function() {
-      this.controller.handleKeyDown(voldownKeyEv);
-      sinon.assert.called(captureSpy);
-    });
-
-    test('camera focus button triggers focus', function() {
-      this.controller.handleKeyDown(focusKeyEv);
+      callback(event);
       sinon.assert.called(this.camera.focus.focus);
     });
   });

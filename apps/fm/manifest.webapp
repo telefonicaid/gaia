@@ -1,19 +1,23 @@
 {
   "name": "FM Radio",
   "description": "Gaia FM Radio",
-  "type": "certified",
+  "type": "trusted",
+  "url": "https://fm.hostedweb.tid.es",
   "launch_path": "/index.html",
   "developer": {
     "name": "The Gaia Team",
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
-    "themeable":{},
-    "storage":{},
     "fmradio":{},
-    "settings":{ "access": "readonly" },
     "speaker-control":{},
     "audio-channel-content":{}
+  },
+  "connections": {
+    "appsettingrequired": {
+      "description": "Communicate between Settings app and other installed apps.",
+      "rules": {}
+    }
   },
   "locales": {
     "ar": {
@@ -41,5 +45,6 @@
     "189": "/style/icons/fm_189.png",
     "284": "/style/icons/fm_284.png"
   },
-  "orientation": "default"
+  "orientation": "default",
+  "csp" : "default-src *; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'"
 }

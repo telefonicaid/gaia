@@ -1,3 +1,4 @@
+/* global focusManager */
 'use strict';
 
 (function(exports) {
@@ -23,15 +24,6 @@
   }
 
   ActionMenu.prototype = {
-
-    /**
-     * Whether or not the ActionMenu is visible.
-     * @memberof ActionMenu.prototype
-     * @return {Boolean} The ActionMenu is visible.
-     */
-    get visible() {
-      return this.container.classList.contains('visible');
-    },
 
     /**
      * Builds dom and adds event listeners
@@ -79,6 +71,8 @@
       window.addEventListener('holdhome', this);
       window.addEventListener('sheets-gesture-begin', this);
 
+      focusManager.addUI(this);
+      focusManager.focus();
       if (this.preventFocusChange) {
         this.menu.addEventListener('mousedown', this.preventFocusChange);
       }
@@ -90,6 +84,7 @@
      */
     stop: function() {
       var screen = document.getElementById('screen');
+      focusManager.removeUI(this);
       screen.removeChild(this.container);
       screen.classList.remove('action-menu');
 
@@ -133,6 +128,8 @@
     hide: function(callback) {
       this.container.classList.remove('visible');
       this.stop();
+      // focus back to the top most window/overlay.
+      focusManager.focus();
       if (callback && typeof callback === 'function') {
         setTimeout(callback);
       }
@@ -161,7 +158,7 @@
           evt.preventDefault();
           break;
         case 'screenchange':
-          if (!this.visible) {
+          if (!this.isVisible()) {
             return;
           }
 
@@ -191,7 +188,7 @@
         case 'home':
         case 'holdhome':
         case 'sheets-gesture-begin':
-          if (!this.visible) {
+          if (!this.isVisible()) {
             return;
           }
 
@@ -203,6 +200,36 @@
           this.hide();
           this.oncancel();
           break;
+      }
+    },
+
+    /**
+     * Whether or not the ActionMenu is visible.
+     * @memberof ActionMenu.prototype
+     * @return {Boolean} if the container is invisible, return false
+     * @return {Number} if the container is visible, return z-index
+     */
+    isVisible: function() {
+      return this.container && this.container.classList.contains('visible');
+    },
+
+    /**
+     * Get the z-index value of container
+     * @memberof ActionMenu.prototype
+     * @return {HTMLElement} the container
+     */
+    getElement: function() {
+      return this.container;
+    },
+
+    /**
+     * Focus cancel button in ActionMenu
+     * @memberof ActionMenu.prototype
+     */
+    focus: function() {
+      if (this.cancel) {
+        document.activeElement.blur();
+        this.cancel.focus();
       }
     }
   };

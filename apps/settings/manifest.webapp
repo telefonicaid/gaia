@@ -9,7 +9,6 @@
   },
   "permissions": {
     "themeable":{},
-    "storage":{},
     "browser": {},
     "embed-apps": {},
     "mobileconnection":{},
@@ -57,6 +56,11 @@
   "connections": {
     "settingsstk": {
       "description": "Communicate between Settings app and System app for SIM Toolkit.",
+      "rules": {}
+    },
+    "appsettingrequired": {
+      "handler_path": "/service_handler.html",
+      "description": "Communicate between Settings app and other installed apps.",
       "rules": {}
     }
   },

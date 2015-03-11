@@ -22,7 +22,6 @@ apps/email/test/marionette/notification_set_interval_test.js
 apps/email/test/marionette/reply_imap_email_test.js
 apps/email/test/marionette/send_imap_email_test.js
 apps/email/test/unit/app_messages_test.js
-apps/email/test/unit/evt_test.js
 apps/email/test/unit/header_cursor_test.js
 apps/email/test/unit/mail_app_test.js
 apps/email/test/unit/mix_test.js
@@ -312,7 +311,6 @@ apps/system/test/unit/update_manager_test.js
 apps/system/test/unit/utility_tray_test.js
 apps/system/test/unit/value_picker_test.js
 apps/system/test/unit/wifi_test.js
-apps/system/test/unit/wrapper_factory_test.js
 apps/video/js/db.js
 apps/video/js/metadata.js
 apps/video/js/thumbnail_date_group.js

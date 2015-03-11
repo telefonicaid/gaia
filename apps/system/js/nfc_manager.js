@@ -1,6 +1,3 @@
-/* -*- Mode: js; js-indent-level: 2; indent-tabs-mode: nil -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
 /* Copyright © 2013, Deutsche Telekom, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +14,8 @@
  */
 
 /* globals CustomEvent, MozActivity, Service,
-           NfcUtils, NDEF, ScreenManager, BaseModule */
+           NfcUtils, NDEF, ScreenManager, BaseModule, NfcIcon,
+           LazyLoader */
 
 'use strict';
 
@@ -94,6 +92,12 @@
     _start: function nm_start() {
       this._debug('Starting NFC Manager');
       this._hwState = this.NFC_HW_STATE.OFF;
+      LazyLoader.load(['js/nfc_icon.js']).then(function() {
+        this.icon = new NfcIcon(this);
+        this.icon.start();
+      }.bind(this)).catch(function(err) {
+        console.error(err);
+      });
 
       window.navigator.mozSetMessageHandler('nfc-manager-tech-discovered',
         (msg) => this._handleTechDiscovered(msg));
@@ -184,7 +188,7 @@
       if (msg.records.length) {
         this._fireNDEFDiscovered(msg.records);
       } else if (msg.peer) {
-        this.checkP2PRegistration();
+        this._checkP2PRegistration();
       } else {
         this._logVisibly('Got tag without NDEF records, ignoring.');
       }
@@ -233,7 +237,7 @@
         case 'shrinking-sent':
           window.removeEventListener('shrinking-sent', this);
           // Notify lower layers that User has acknowledged to send NDEF msg
-          this.dispatchP2PUserResponse();
+          this._dispatchP2PUserResponse();
 
           // Stop the P2P UI
           window.dispatchEvent(new CustomEvent('shrinking-stop'));
@@ -313,6 +317,7 @@
       this._debug('_handleNFCOnOf is on:' + isOn);
 
       this._hwState = (isOn) ? this.NFC_HW_STATE.ON : this.NFC_HW_STATE.OFF;
+      this.icon && this.icon.update();
       this.writeSetting({'nfc.status': (isOn) ? 'enabled' : 'disabled'});
 
       // event dispatching to handle statusbar change
@@ -326,31 +331,14 @@
     },
 
     /**
-     * Step 1 of P2P sharing. Called as a result of discovering P2P peer.
-     * Triggers P2P sharing process handled with ShrinkingUI which listens for
-     * check-p2p-registration-for-active-app event.
+     * Step 1 of system app fallback P2P sharing.
+     * Queries Gecko (via NFC dom) if currently visible app has registered
+     * onpeerready handler. If the result is true, shrinking-start event is
+     * dispatched to ShrinkingUI, which will trigger UI change asking the
+     * user to confirm sharing.
      * @memberof NfcManager.prototype
      */
-    _triggerP2PUI: function nm_triggerP2PUI() {
-      var evt = new CustomEvent('check-p2p-registration-for-active-app', {
-        bubbles: true, cancelable: false,
-        detail: this
-      });
-      window.dispatchEvent(evt);
-    },
-
-    /**
-     * Step 2 of P2P sharing. Called by ShrinkingUI. Sends a DOM request to
-     * check if app with manifestURL has registered onpeerready handler.
-     * Due to security reasons DOM request will be always successful and result
-     * property of the request will be true if the event handler was registered.
-     * If the result is true, shrinking-start event is dispatched to
-     * ShrinkingUI, which will trigger UI change asking the user to confirm
-     * sharing.
-     * @memberof NfcManager.prototype
-     * @param {string} manifestURL - manifest url of app to check
-     */
-    checkP2PRegistration: function nm_checkP2PRegistration() {
+    _checkP2PRegistration: function nm_checkP2PRegistration() {
       var nfcdom = window.navigator.mozNfc;
       if (!nfcdom) {
         return;
@@ -359,8 +347,13 @@
       var manifestURL = activeApp.getTopMostWindow().manifestURL ||
         window.Service.manifestURL;
 
-      var promise = nfcdom.checkP2PRegistration(manifestURL);
-      promise.then(result => {
+      // Do not allow shrinking if we are on the private browser landing page.
+      if (activeApp.isPrivateBrowser() &&
+        activeApp.config.url.startsWith('app://')) {
+        return;
+      }
+
+      nfcdom.checkP2PRegistration(manifestURL).then(result => {
         if (result) {
           if (activeApp.isTransitioning() || activeApp.isSheetTransitioning()) {
             return;
@@ -381,13 +374,11 @@
     },
 
     /**
-     * Step 3 of P2P sharing. Called by ShrinkingUI when user confirms
-     * sharing. Sends DOM request to Gecko which will fire onpeerready handler
-     * of the web app willing to share something.
+     * Step 2 of system app fallback P2P sharing.
+     * Notifies Gecko to fire onpeerready handler of the currently visible app.
      * @memberof NfcManager.prototype
-     * @param {string} manifestURL - manifest url of the sharing app
      */
-    dispatchP2PUserResponse: function nm_dispatchP2PUserResponse() {
+    _dispatchP2PUserResponse: function nm_dispatchP2PUserResponse() {
       var nfcdom = window.navigator.mozNfc;
       if (!nfcdom) {
         return;

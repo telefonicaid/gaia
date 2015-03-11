@@ -7,7 +7,7 @@
 /* global ManifestHelper */
 /* global ModalDialog */
 /* global NotificationScreen */
-/* global StatusBar */
+/* global Service */
 /* global SystemBanner */
 /* global Template */
 /* global UtilityTray */
@@ -182,7 +182,7 @@ var AppInstallManager = {
 
     // Wrap manifest to get localized properties
     manifest = new ManifestHelper(manifest);
-    var msg = _('install-app', {'name': manifest.name});
+    var msg = _('install-app', {'name': manifest.displayName});
     this.msg.textContent = msg;
 
     if (manifest.developer) {
@@ -245,7 +245,7 @@ var AppInstallManager = {
         }
       };
     } else {
-      var nameObj = { name: manifest.name };
+      var nameObj = { name: manifest.displayName };
       dialogConfig = {
         type: 'remove',
         title: {id: 'delete-title', args: nameObj},
@@ -312,9 +312,9 @@ var AppInstallManager = {
     }
     var manifest = app.manifest || app.updateManifest;
     var appManifest = new ManifestHelper(manifest);
-    var name = appManifest.name;
+    var name = appManifest.displayName;
     var l10nId = appManifest.role === 'langpack' ?
-      'langpack-install-success' : 'app-install-success';
+      'langpack-install-success2' : 'app-install-success';
     this.systemBanner.show(
       navigator.mozL10n.get(l10nId, { appName: name }));
   },
@@ -343,7 +343,7 @@ var AppInstallManager = {
     var app = this.setupQueue[0];
     var manifest = app.manifest;
     var appManifest = new ManifestHelper(manifest);
-    var appName = appManifest.name;
+    var appName = appManifest.displayName;
     var appDescription = appManifest.description;
     this.setupAppDescription.textContent = appDescription;
     navigator.mozL10n.setAttributes(this.setupAppName,
@@ -389,7 +389,7 @@ var AppInstallManager = {
     var listHtml = '';
     var imeListWrap = Template(this.imeListTemplate);
     for (var name in inputs) {
-      var displayIMEName = new ManifestHelper(inputs[name]).name;
+      var displayIMEName = new ManifestHelper(inputs[name]).displayName;
       listHtml += imeListWrap.interpolate({
         imeName: name,
         displayName: displayIMEName
@@ -430,7 +430,7 @@ var AppInstallManager = {
     var app = evt.application;
     var _ = navigator.mozL10n.get;
     var manifest = app.manifest || app.updateManifest;
-    var name = new ManifestHelper(manifest).name;
+    var name = new ManifestHelper(manifest).displayName;
 
     var errorName = app.downloadError.name;
 
@@ -456,7 +456,7 @@ var AppInstallManager = {
 
   onDownloadStart: function ai_onDownloadStart(app) {
     if (! this.hasNotification(app)) {
-      StatusBar.incSystemDownloads();
+      Service.request('incDownloads');
       this.addNotification(app);
       this.requestWifiLock(app);
     }
@@ -464,7 +464,7 @@ var AppInstallManager = {
 
   onDownloadStop: function ai_onDownloadStop(app) {
     if (this.hasNotification(app)) {
-      StatusBar.decSystemDownloads();
+      Service.request('decDownloads');
       this.removeNotification(app);
       this.releaseWifiLock(app);
     }
@@ -518,7 +518,7 @@ var AppInstallManager = {
     navigator.mozL10n.setAttributes(
       newNode.querySelector('.title-container'),
       'downloadingAppMessage',
-      { appName: new ManifestHelper(manifest).name }
+      { appName: new ManifestHelper(manifest).displayName }
     );
 
     var progressNode = newNode.querySelector('progress');
@@ -671,7 +671,7 @@ var AppInstallManager = {
     var title = dialog.querySelector('h1');
 
     navigator.mozL10n.setAttributes(title, 'stopDownloading', {
-      app: new ManifestHelper(manifest).name
+      app: new ManifestHelper(manifest).displayName
     });
 
     dialog.classList.add('visible');

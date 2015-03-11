@@ -26,7 +26,7 @@
   ];
 
   NfcHandoverManager.EVENTS = [
-    'bluetooth-adapter-added',
+    'bluetooth-enabled',
     'bluetooth-disabled',
     'nfc-transfer-started',
     'nfc-transfer-completed'
@@ -161,6 +161,11 @@
       this.bluetoothStatusSaved = false;
       this.bluetoothAutoEnabled = false;
 
+      if (typeof(window.navigator.mozBluetooth.onattributechanged) !==
+        'undefined') {
+        this._debug('Bluetooth APIv2 does not support NFC yet');
+        return;
+      }
       if (this.bluetooth.enabled) {
         this._debug('Bluetooth already enabled on boot');
         var req = this.bluetooth.getDefaultAdapter();
@@ -195,9 +200,14 @@
       this._clearBluetoothStatus();
     },
 
-    '_handle_bluetooth-adapter-added': function() {
+    '_handle_bluetooth-enabled': function() {
+      if (typeof(window.navigator.mozBluetooth.onattributechanged) !==
+        'undefined') {
+        this._debug('Bluetooth APIv2 does not support NFC yet');
+        return;
+      }
       var self = this;
-      self._debug('bluetooth-adapter-added');
+      self._debug('bluetooth-enabled');
       var req = self.bluetooth.getDefaultAdapter();
       req.onsuccess = function bt_getAdapterSuccess() {
         self.settingsNotified = false;
@@ -334,16 +344,25 @@
 
     /**
      * Show an error notification when file transfer failed.
-     * @param {String} name Optional file name.
+     * @param {String} msg Optional message.
      * @memberof NfcHandoverManager.prototype
      */
-    _showFailedNotification: function _showFailedNotification(title, name) {
-      var fileName = (name !== undefined) ? name : '';
+    _showFailedNotification: function _showFailedNotification(title, msg) {
+      var body = (msg !== undefined) ? msg : '';
       var icon = 'style/bluetooth_transfer/images/icon_bluetooth.png';
       NotificationHelper.send(title, {
-        body: fileName,
+        body: body,
         icon: icon
       });
+    },
+
+    /**
+     * Show 'send failed, try again' notification.
+     */
+    _showTryAgainNotification: function _showTryAgainNotification() {
+      var _ = navigator.mozL10n.get;
+      this._showFailedNotification('transferFinished-sentFailed-title',
+                                  _('transferFinished-try-again-description'));
     },
 
     /**
@@ -609,6 +628,15 @@
       this._clearTimeout();
       var btssp = this._getBluetoothSSP(ndef);
       if (btssp == null) {
+        if (this.sendFileQueue.length !== 0) {
+          // We tried to send a file but the other device gave us an empty AC
+          // record. This will happen if the other device is currently
+          // transferring a file. Show a 'try later' notification.
+          this._debug('Other device is transferring file. Aborting');
+          var job = this.sendFileQueue.shift();
+          job.onerror();
+          this._showTryAgainNotification();
+        }
         return;
       }
 
@@ -629,6 +657,14 @@
      */
     _handleHandoverRequest: function _handleHandoverRequest(ndef, nfcPeer) {
       this._debug('_handleHandoverRequest');
+      if (Service.query('BluetoothTransfer.isFileTransferInProgress')) {
+        // We don't allow concurrent file transfers
+        this._debug('This device is currently transferring a file. ' +
+                    'Aborting via empty Hs');
+        var hs = NDEFUtils.encodeEmptyHandoverSelect();
+        nfcPeer.sendNDEF(hs);
+        return;
+      }
       this._saveBluetoothStatus();
       this._doAction({
         callback: this._doHandoverRequest,
@@ -680,6 +716,13 @@
      */
     handleFileTransfer: function handleFileTransfer(nfcPeer, blob, requestId) {
       this._debug('handleFileTransfer');
+      if (Service.query('BluetoothTransfer.isFileTransferInProgress')) {
+        // We don't allow concurrent file transfers
+        this._debug('This device is already transferring a file. Aborting');
+        this._dispatchSendFileStatus(1, requestId);
+        this._showTryAgainNotification();
+        return;
+      }
       this._saveBluetoothStatus();
       this._doAction({
         callback: this._initiateFileTransfer,

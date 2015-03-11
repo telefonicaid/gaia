@@ -107,13 +107,13 @@ suite('dialer/keypad', function() {
   });
 
   suite('Keypad Manager', function() {
-    test('initializates the TonePlayer to use the default audio channel',
+    test('initializates the TonePlayer to use the notification audio channel',
     function() {
       this.sinon.spy(MockTonePlayer, 'init');
       KeypadManager.init(/* oncall */ false);
 
       sinon.assert.calledOnce(MockTonePlayer.init);
-      sinon.assert.calledWithExactly(MockTonePlayer.init, null);
+      sinon.assert.calledWithExactly(MockTonePlayer.init, 'notification');
     });
 
     test('sanitizePhoneNumber', function(done) {
@@ -801,6 +801,8 @@ suite('dialer/keypad', function() {
         test('0# is ignored', function(done) {
           subject._getSpeedDialNumber('0').then(function(number) {
             assert.ok(false, 'the promise should be rejected');
+          }, function(error) {
+            assert.equal(error, 'noContactsWereFound');
           }).then(done, done);
         });
 

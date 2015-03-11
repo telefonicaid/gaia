@@ -72,6 +72,8 @@ CameraController.prototype.bindEvents = function() {
   app.on('storage:volumechanged', this.onStorageVolumeChanged);
   app.on('storage:changed', this.onStorageChanged);
   app.on('activity:pick', this.onPickActivity);
+  app.on('keydown:capture', this.onCaptureKey);
+  app.on('keydown:focus', this.onFocusKey);
   app.on('timer:ended', this.capture);
   app.on('visible', this.camera.load);
   app.on('capture', this.capture);
@@ -87,27 +89,43 @@ CameraController.prototype.bindEvents = function() {
   settings.hdr.on('change:selected', this.setHDR);
   settings.hdr.on('change:selected', this.onHDRChange);
 
-  // Key events
-  window.addEventListener('keydown', this.handleKeyDown);
-
   debug('events bound');
 };
 
-CameraController.prototype.handleKeyDown = function(ev) {
-  switch (ev.key.toLowerCase()) {
-    case 'camera':
-    case 'volumeup':
-    case 'volumedown':
-      this.capture();
-      break;
+/**
+ * Take picture or start/end recording
+ * when a capture hardware key is invoked.
+ *
+ * Calling `.preventDefault()` prevents
+ * the default system operation
+ * (eg. changing volume level). We
+ * only call it when capture request
+ * succeeds.
+ *
+ * We don't want to .preventDefault() when
+ * the preview-gallery is open as the
+ * user may want to change the volume
+ * of a video being played back.
+ *
+ * @param  {Event} e
+ * @private
+ */
+CameraController.prototype.onCaptureKey = function(e) {
+  debug('on capture key', e);
+  var output = this.capture();
+  if (output !== false) { e.preventDefault(); }
+};
 
-    case 'mozcamerafocusadjust':
-      this.camera.focus.focus();
-      break;
-
-    default:
-      debug('Unhandled keydown: ' + ev.key);
-  }
+/**
+ * Focus the camera when a focus
+ * hardware key is invoked.
+ *
+ * @param  {Event} e
+ * @private
+ */
+CameraController.prototype.onFocusKey = function(e) {
+  debug('on focus key', e);
+  this.camera.focus.focus();
 };
 
 /**
@@ -142,7 +160,7 @@ CameraController.prototype.onSettingsConfigured = function() {
 
   // Defer this work as it involves
   // expensive mozSettings calls
-  setTimeout(this.updateZoomForMako);
+  // setTimeout(this.updateZoomForMako);
 
   debug('camera configured with final settings');
 };
@@ -178,7 +196,7 @@ CameraController.prototype.capture = function() {
   }
 
   var position = this.app.geolocation.position;
-  this.camera.capture({ position: position });
+  return this.camera.capture({ position: position });
 };
 
 /**
@@ -487,29 +505,29 @@ CameraController.prototype.onGalleryClosed = function(reason) {
  * @private
  */
 CameraController.prototype.updateZoomForMako = function() {
-  debug('update zoom for mako');
+  // debug('update zoom for mako');
 
-  var self = this;
-  navigator.mozSettings
-    .createLock()
-    .get('deviceinfo.hardware')
-    .onsuccess = onSuccess;
+  // var self = this;
+  // navigator.mozSettings
+  //   .createLock()
+  //   .get('deviceinfo.hardware')
+  //   .onsuccess = onSuccess;
 
-  debug('settings request made');
-  function onSuccess(e) {
-    var device = e.target.result['deviceinfo.hardware'];
-    if (device !== 'mako') { return; }
+  // debug('settings request made');
+  // function onSuccess(e) {
+  //   var device = e.target.result['deviceinfo.hardware'];
+  //   if (device !== 'mako') { return; }
 
-    var frontCamera = self.camera.selectedCamera === 'front';
-    var maxHardwareZoom = frontCamera ? 1 : 1.25;
+  //   var frontCamera = self.camera.selectedCamera === 'front';
+  //   var maxHardwareZoom = frontCamera ? 1 : 1.25;
 
-    // Nexus 4 needs zoom preview adjustment since the viewfinder preview
-    // stream does not automatically reflect the current zoom value.
-    self.settings.zoom.set('useZoomPreviewAdjustment', true);
-    self.camera.set('maxHardwareZoom', maxHardwareZoom);
-    self.camera.emit('zoomconfigured', self.camera.getZoom());
-    debug('zoom reconfigured for mako');
-  }
+  //   // Nexus 4 needs zoom preview adjustment since the viewfinder preview
+  //   // stream does not automatically reflect the current zoom value.
+  //   self.settings.zoom.set('useZoomPreviewAdjustment', true);
+  //   self.camera.set('maxHardwareZoom', maxHardwareZoom);
+  //   self.camera.emit('zoomconfigured', self.camera.getZoom());
+  //   debug('zoom reconfigured for mako');
+  // }
 };
 
 });

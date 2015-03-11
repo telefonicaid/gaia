@@ -5,6 +5,7 @@
 /* global LogoLoader */
 /* global OrientationManager */
 /* global SettingsCache */
+/* global focusManager */
 
 (function(exports) {
 
@@ -65,8 +66,24 @@
      * @memberof SleepMenu.prototype
      * @return {Boolean}
      */
-    get visible() {
+    isVisible: function sm_isVisible() {
       return this.elements.overlay.classList.contains('visible');
+    },
+
+    /**
+     * returns the sleep menu dom element.
+     * @return {HTMLElement}
+     */
+    getElement: function sm_getElement() {
+      return this.elements.overlay;
+    },
+
+    /**
+     * focus back to its buttons.
+     */
+    focus: function sm_focus() {
+      document.activeElement.blur();
+      this.elements.cancel.focus();
     },
 
     /**
@@ -116,6 +133,7 @@
       SettingsCache.observe('audio.volume.notification', 7, function(value) {
         self.isSilentModeEnabled = (value === 0);
       });
+      focusManager.addUI(this);
     },
 
     /**
@@ -176,6 +194,8 @@
       this.elements.overlay.classList.add('visible');
       // Lock to default orientation
       screen.mozLockOrientation(OrientationManager.defaultOrientation);
+      // let focus manager to calculate the top most and focus for us.
+      focusManager.focus();
     },
 
     /**
@@ -203,6 +223,8 @@
       }
       this.elements.overlay.classList.remove('visible');
       window.dispatchEvent(new Event('sleepmenuhide'));
+      // focus back to the top most window/overlay.
+      focusManager.focus();
     },
 
     /**
@@ -228,7 +250,7 @@
           break;
 
         case 'click':
-          if (!this.visible) {
+          if (!this.isVisible()) {
             return;
           }
 
@@ -246,7 +268,7 @@
 
         case 'home':
         case 'attentionopened':
-          if (this.visible) {
+          if (this.isVisible()) {
             this.hide();
           }
           break;

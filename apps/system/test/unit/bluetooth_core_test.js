@@ -2,7 +2,9 @@
 'use strict';
 
 require('/shared/test/unit/mocks/mock_navigator_moz_bluetooth.js');
+requireApp('system/js/service.js');
 requireApp('system/js/base_module.js');
+requireApp('system/js/base_ui.js');
 
 function switchReadOnlyProperty(originObject, propName, targetObj) {
   Object.defineProperty(originObject, propName, {
@@ -15,15 +17,12 @@ suite('system/BluetoothCore', function() {
   var realMozBluetooth;
 
   setup(function(done) {
-    this.sinon.useFakeTimers();
-
     realMozBluetooth = navigator.mozBluetooth;
     switchReadOnlyProperty(navigator, 'mozBluetooth', MockMozBluetooth);
 
     window.Bluetooth = { init: function() {} };
     window.BluetoothTransfer = { init: function() {} };
 
-    requireApp('system/js/service.js');
     requireApp('system/js/bluetooth_core.js', done);
   });
 

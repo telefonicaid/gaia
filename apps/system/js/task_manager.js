@@ -1,4 +1,4 @@
-/* global Card, eventSafety, SettingsListener,
+/* global Card, eventSafety, SettingsListener, layoutManager,
           Service, homescreenLauncher, StackManager, OrientationManager */
 
 (function(exports) {
@@ -150,9 +150,6 @@
       app.enterTaskManager();
     });
 
-    this.publish('cardviewbeforeshow');
-
-    screen.mozLockOrientation(OrientationManager.defaultOrientation);
     this._placeCards();
     this.setActive(true);
 
@@ -181,15 +178,12 @@
    */
   TaskManager.prototype.hide = function cs_hideCardSwitcher() {
     if (!this.isActive()) {
-      // To avoid wrong behaviour when the app is closed
-      // by a second home button event
-      window.removeEventListener('appclosed', this._appClosedHandler);
-      this.screenElement.classList.remove('cards-view');
       return;
     }
     this._unregisterShowingEvents();
     this._removeCards();
     this.setActive(false);
+    window.removeEventListener('appclosed', this._appClosedHandler);
     this.screenElement.classList.remove('cards-view');
 
     var detail;
@@ -527,14 +521,44 @@
       filter = (evt.detail && evt.detail.filter) || null;
     }
 
-    var app = Service.currentApp;
-    if (app && !app.isHomescreen) {
-      app.getScreenshot(function onGettingRealtimeScreenshot() {
+
+    var shouldResize = (OrientationManager.defaultOrientation !=
+                        OrientationManager.fetchCurrentOrientation());
+    var shouldHideKeyboard = layoutManager.keyboardEnabled;
+
+    this.publish('cardviewbeforeshow'); // Will hide the keyboard if needed
+
+    var finish = () => {
+      if (shouldHideKeyboard) {
+        window.addEventListener('keyboardhidden', function kbHidden() {
+          window.removeEventListener('keyboardhidden', kbHidden);
+          shouldHideKeyboard = false;
+          setTimeout(finish);
+        });
+        return;
+      }
+
+      screen.mozLockOrientation(OrientationManager.defaultOrientation);
+      if (shouldResize) {
+        window.addEventListener('resize', function resized() {
+          window.removeEventListener('resize', resized);
+          shouldResize = false;
+          setTimeout(finish);
+        });
+        return;
+      }
+
+      var app = Service.currentApp;
+      if (app && !app.isHomescreen) {
+        app.getScreenshot(function onGettingRealtimeScreenshot() {
+          this.show(filter);
+        }.bind(this), 0, 0, 400);
+      } else {
         this.show(filter);
-      }.bind(this), 0, 0, 400);
-    } else {
-      this.show(filter);
-    }
+      }
+    };
+
+    finish();
   };
 
   /**

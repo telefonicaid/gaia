@@ -1,0 +1,1 @@
+{"manifest_version":2,"name":"music","minimun_chrome_version":"31","app":{"urls":["/"],"launch":{"web_url":"/app.html"}},"offline_enabled":true,"icons":{"128":"/icons/icon_128.png"}}

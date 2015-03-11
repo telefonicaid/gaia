@@ -131,6 +131,8 @@ var CallLog = {
    *                   contact cache.
    */
   _validateContactsCache: function cl_validateContactsCache() {
+    var self = this;
+
     return new Promise(function(resolve, reject) {
       /* Get the latest contact cache revision and the actual Contacts API
        * db revision. If both values differ, we need to update the contact cache
@@ -953,6 +955,10 @@ var CallLog = {
   updateListWithContactInfo: function cl_updateList(reason, contactId,
                                                     phoneNumbers, target) {
     var container = target || this.callLogContainer;
+
+    if (!container) {
+      return;
+    }
 
     // Get the list of logs to be updated.
     var logs = [];

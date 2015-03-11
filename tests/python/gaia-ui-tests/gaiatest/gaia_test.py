@@ -12,21 +12,12 @@ from marionette import (MarionetteTestCase,
                         EnduranceTestCaseMixin,
                         B2GTestCaseMixin,
                         MemoryEnduranceTestCaseMixin)
-try:
-    from marionette import expected
-    from marionette.by import By
-    from marionette.errors import (NoSuchElementException,
-                                   StaleElementException,
-                                   InvalidResponseException)
-    from marionette.wait import Wait
-except:
-    from marionette_driver import expected
-    from marionette_driver.by import By
-    from marionette_driver.errors import (NoSuchElementException,
-                                   StaleElementException,
-                                   InvalidResponseException)
-    from marionette_driver.wait import Wait
+from marionette_driver import expected, By, Wait
+from marionette_driver.errors import (NoSuchElementException,
+                                      StaleElementException,
+                                      InvalidResponseException)
 
+from environment import GaiaTestEnvironment
 from file_manager import GaiaDeviceFileManager, GaiaLocalFileManager
 
 
@@ -761,6 +752,7 @@ class GaiaTestCase(MarionetteTestCase, B2GTestCaseMixin):
             if self.restart:
                 pass
 
+        self.environment = GaiaTestEnvironment(self.testvars)
         self.device = GaiaDevice(self.marionette,
                                  manager=self.device_manager,
                                  testvars=self.testvars)

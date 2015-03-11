@@ -33,6 +33,9 @@ define(function(require) {
       onInit: function(panel) {
         Debug('onInit():');
 
+        // Init state for checking left app or not.
+        this._leftApp = false;
+
         elements = {
           panel: panel,
           enableCheckbox: panel.querySelector('.bluetooth-status input'),
@@ -137,6 +140,18 @@ define(function(require) {
         this._updateSearchingItem(BtContext.discovering);
       },
 
+      onShow: function() {
+        Debug('onShow():');
+
+        if (!this._leftApp) {
+          // If settings app is still in the forground, 
+          // we start discovering device automatically 
+          // while Bluetooth panel is onShow.
+          BtContext.startDiscovery();
+        }
+        this._leftApp = false;
+      },
+
       onBeforeHide: function() {
         Debug('onBeforeHide():');
 
@@ -149,6 +164,14 @@ define(function(require) {
 
       onHide: function() {
         Debug('onHide():');
+        this._leftApp = document.hidden;
+
+        if (!this._leftApp) {
+          // If settings app is still in the forground, 
+          // we stop discovering device automatically
+          // while Bluetooth panel is onHide.
+          BtContext.stopDiscovery();
+        }
 
         if (_pairedDevicesListView) {
           _pairedDevicesListView.enabled = false;
@@ -375,8 +398,22 @@ define(function(require) {
         }, (reason) => {
           Debug('_onFoundDeviceItemClick(): pair failed, ' + 
                 'reason = ' + reason);
-          // TODO: To check the pairing device is needed to update status back. 
+          // Reset the paired status back to false, 
+          // since the 'pairing' status is given in Gaia side.
+          deviceItem.paired = false;
+          // Show alert message while pair device failed.
+          this._alertPairFailedErrorMessage(reason);
         });
+      },
+
+      _alertPairFailedErrorMessage: function(errorReason) {
+        var errorMessage = 'error-pair-title'; // This is a default message.
+        if (errorReason === 'Repeated Attempts') {
+          errorMessage = 'error-pair-toofast';
+        } else if (errorReason === 'Authentication Failed') {
+          errorMessage = 'error-pair-pincode';
+        }
+        DialogService.alert(errorMessage, {title: 'error-pair-title'});
       }
     });
   };

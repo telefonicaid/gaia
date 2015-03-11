@@ -1,7 +1,7 @@
 {
   "name": "Camera",
   "description": "Gaia Camera",
-  "type": "certified",
+  "type": "trusted",
   "launch_path": "/index.html",
   "orientation": "default",
   "fullscreen": true,
@@ -10,16 +10,13 @@
     "url": "https://github.com/mozilla-b2g/gaia"
   },
   "permissions": {
-    "themeable":{},
     "storage":{},
     "device-storage:pictures":{ "access": "readwrite" },
     "device-storage:videos":{ "access": "readwrite" },
-    "settings":{ "access": "readonly" },
     "camera":{},
     "geolocation":{},
     "audio-channel-notification":{},
-    "audio-channel-content":{},
-    "feature-detection": {}
+    "audio-channel-content":{}
   },
   "activities": {
     "record": {
@@ -62,5 +59,6 @@
     "142": "/style/icons/camera_142.png",
     "189": "/style/icons/camera_189.png",
     "284": "/style/icons/camera_284.png"
-  }
+  },
+  "csp" : "default-src *; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'"
 }

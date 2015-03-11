@@ -3,6 +3,7 @@
 
 var assert = require('assert');
 
+var PROVIDERS_VERSION = 3;
 /**
  * Abstraction around search app.
  * @constructor
@@ -124,8 +125,29 @@ Search.prototype = {
     this.client.helper.waitForElement('body');
   },
 
+  searchDataVersion: function() {
+    return PROVIDERS_VERSION;
+  },
+
+  /**
+   * Gets a reference to the provider select using findElement.
+   * This waits for the element to be available, but not visible on the apge.
+   */
   get switchProvidersSelect() {
-    return this.client.helper.waitForElement(Search.Selectors.switchProviders);
+    // Fail finding elements quickly.
+    var quickly = this.client.scope({
+      searchTimeout: 20
+    });
+
+    var element;
+
+    try {
+      element = quickly.findElement(Search.Selectors.switchProviders);
+    } catch(e) {
+      return this.switchProvidersSelect;
+    }
+
+    return element;
   },
 
 };
