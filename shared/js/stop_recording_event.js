@@ -47,6 +47,9 @@
   }
 
   function listen() {
+    if (!navigator.mozSettings) {
+      return;
+    }
     navigator.mozSettings.addObserver(stopRecordingKey,
                                       stopRecordingObserver);
     navigator.mozSettings.addObserver(attentionScreenKey,
@@ -54,6 +57,9 @@
   }
 
   function unlisten() {
+    if (!navigator.mozSettings) {
+      return;
+    }
     navigator.mozSettings.removeObserver(stopRecordingKey,
                                          stopRecordingObserver);
     navigator.mozSettings.removeObserver(attentionScreenKey,
