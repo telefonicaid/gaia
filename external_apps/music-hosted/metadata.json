@@ -1,9 +1,9 @@
 {
   "origin": "https://music.hostedweb.tid.es",
-  "type": "trusted",
+  "type": "web",
   "removable": true,
   "manifestURL": "https://music.hostedweb.tid.es/manifest.webapp",
-  "installOrigin": "https://marketplace.firefox.com",
+  "installOrigin": "https://music.hostedweb.tid.es",
   "etag": "\"b4d-52b-510d90b794d80\"",
   "external": true
 }
