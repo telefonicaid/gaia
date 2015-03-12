@@ -1,6 +1,6 @@
 {
   "origin": "https://music.hostedweb.tid.es",
-  "type": "web",
+  "type": "trusted",
   "removable": true,
   "manifestURL": "https://music.hostedweb.tid.es/manifest.webapp",
   "installOrigin": "https://music.hostedweb.tid.es",
