@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en-US" dir="ltr" manifest="manifest.appcache">
+  <head>
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
+    <meta charset="utf-8">
+    <meta name="theme-color" content="#242d33">
+    <title>Gallery</title>
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="style/gallery.css" type="text/css">
+    <link rel="stylesheet" href="style/VideoPlayer.css" type="text/css">
+    <link rel="stylesheet" href="style/VideoPlayer_tablet.css" type="text/css" media="(min-height: 768px) and (min-width: 768px)">
+    <link rel="stylesheet" href="shared/style/progress_activity.css">
+    <!-- Reponsive design for tiny & large device -->
+    <link rel="stylesheet" href="style/gallery_tablet.css" type="text/css" media="(min-height: 768px) and (min-width: 768px)">
+    <link rel="stylesheet" type="text/css" href="shared/style/status.css">
+    <!-- this file is loaded lazily but is listed here so it gets packaged
+    <link rel="stylesheet" href="shared/style/confirm.css" type="text/css" />
+    -->
+    <!-- Localization -->
+    <meta name="defaultLanguage" content="en-US">
+    <meta name="availableLanguages" content="en-US:201502121210, qps-ploc:201502121210, qps-plocm:201502121210">
+    <link rel="localization" href="/locales-obj/{locale}.json">
+    
+    
+
+    <!-- This batch of scripts is the critical startup code that we
+      want to run as soon as possible. Thumbnails.js creates a MediaDB
+      instance and starts enumerating it and building the
+      thumbnails. The files that come before it are its
+      dependencies. The rest of the application startup is at the end
+      of the scripts in startup.js. I have tried converting these to
+      non-deferred, thinking that that will get them running faster,
+      but in practice (on a quad core nexus 5), the app starts more
+      quickly if everything is deferred.  -->
+    <script defer src="shared/js/l10n.js"></script>
+    <script defer src="shared/js/l10n_date.js"></script>
+    <script defer src="shared/js/mediadb.js"></script>
+    <script defer src="js/globals.js"></script>
+    <script defer src="js/thumbnail_item.js"></script>
+    <script defer src="js/thumbnail_date_group.js"></script>
+    <script defer src="js/thumbnail_list.js"></script>
+    <script defer src="js/thumbnails.js"></script>
+
+    <!-- Shared code -->
+    <script defer src="shared/js/performance_testing_helper.js"></script>
+    <script defer src="shared/js/device_storage/enumerate_all.js"></script>
+    <script defer src="shared/js/lazy_loader.js"></script>
+    <script defer src="shared/js/font_size_utils.js"></script>
+    <script defer src="shared/js/media/media_utils.js"></script>
+    <script defer src="shared/js/screen_layout.js"></script>
+    <script defer src="shared/js/scroll_detector.js"></script>
+    <script defer src="shared/js/media/downsample.js"></script>
+    <script defer src="shared/js/dialogs.js"></script>
+
+    <!-- This script is lazy loaded, but listed here so it gets packaged -->
+    <!-- <script defer src="shared/js/media/crop_resize_rotate.js"></script> -->
+
+    <!-- Web Components -->
+    <script defer src="shared/elements/config.js"></script>
+    <link rel="stylesheet" type="text/css" href="shared/elements/gaia-theme/gaia-theme.css">
+    <link rel="stylesheet" type="text/css" href="shared/elements/gaia-icons/gaia-icons.css">
+    <script defer src="shared/elements/gaia-header/dist/gaia-header.js"></script>
+
+    <!-- More application code. startup.js launches the app -->
+    <script defer src="js/config.js"></script>
+    <script defer src="js/utils.js"></script>
+    <script defer src="js/ensure_file_backed_blob.js"></script>
+    <script defer src="js/spinner.js"></script>
+    <script defer src="js/overlay.js"></script>
+    <script defer src="js/nfc.js"></script>
+    <script defer src="js/gallery.js"></script>
+    <script defer src="js/startup.js"></script>
+  <meta content="3.0" name="appVersion"><link rel="apple-touch-icon" href="icons/touch-icon-iphone.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icons/touch-icon-iphone-retina.png">
+<link rel="apple-touch-icon" sizes="76x76" href="icons/favicon.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/touch-icon-ipad-retina.png">
+<link rel="icon" href="icons/favicon.png">
+<meta name="msapplication-TileImage" content="icons/tileicon.png">
+<script type="text/javascript" src="add2home/js/add2home.js"></script>
+<link href="add2home/css/add2home.css" rel="stylesheet">
+</head>
+
+  <body role="application" class="theme-media">
+    <!-- This section holds the thumbnails list and the headers and footers -->
+    <!-- for all views that display the thumbnails -->
+    <section role="region" id="thumbnail-views" class="skin-dark">
+      <!-- This header only shown on tablet view  -->
+      <gaia-header id="thumbnails-list-top" class="thumbnails-list">
+        <h1 id="thumbnail-list-title" data-l10n-id="gallery">Gallery</h1>
+      </gaia-header>
+      <gaia-header id="selected-header" class="thumbnails-select" action="close">
+        <h1 id="thumbnails-number-selected"></h1>
+      </gaia-header>
+      <gaia-header id="pick-header" class="thumbnails-pick" action="close">
+        <h1 id="pick-header-title" data-l10n-id="pickoneimage2">Select</h1>
+      </gaia-header>
+
+      <!-- This is a placeholder element marking where the list of
+           thumbnails should be inserted into the document. When the
+           real list of thumbnails is inserted, it will have id
+           "thumbnails".  This list of thumbnails is displayed in
+           normal thumbnail list mode, in select mode, and in pick
+           mode, and its styling depends on what mode we're in.  -->
+      <ul id="thumbnails-placeholder"></ul>
+
+      <footer class="thumbnails-list" role="toolbar">
+        <a aria-label="Camera" id="thumbnails-camera-button" class="button" data-icon="camera" data-l10n-id="camera-button" role="button"></a>
+        <a aria-label="Select multiple" id="thumbnails-select-button" class="button" data-icon="select" data-l10n-id="select-multiple-button" role="button"></a>
+      </footer>
+      <footer class="thumbnails-select" role="toolbar">
+        <a aria-label="Delete" id="thumbnails-delete-button" class="button" data-icon="delete" data-l10n-id="delete-button" role="button"></a>
+        <a aria-label="Share" id="thumbnails-share-button" class="button" data-icon="share" data-l10n-id="share-button" role="button"></a>
+      </footer>
+    </section>
+
+    <section role="region" id="fullscreen-view" class="skin-dark">
+      <gaia-header id="fullscreen-toolbar-header" action="back" class="large-only">
+        <h1 data-l10n-id="gallery" id="fullscreen-title">Gallery</h1>
+        <a id="fullscreen-camera-button-large">
+          <span data-icon="camera"></span>
+        </a>
+        <a id="fullscreen-edit-button-large">
+          <span data-icon="edit-image"></span>
+        </a>
+        <a id="fullscreen-share-button-large">
+          <span data-icon="share"></span>
+        </a>
+        <a id="fullscreen-info-button-large">
+          <span data-icon="info"></span>
+        </a>
+        <a id="fullscreen-delete-button-large">
+          <span data-icon="delete"></span>
+        </a>
+      </gaia-header>
+      <button aria-label="Back" id="fullscreen-back-button-tiny" data-l10n-id="back-button" type="reset" class="tiny-only" data-icon="back"></button>
+      <div id="frames">
+        <!-- the current photo plus next and previous waiting in the wings -->
+        <section id="frame1" class="frame"></section>
+        <section id="frame2" class="frame"></section>
+        <section id="frame3" class="frame"></section>
+      </div>
+      <section role="status" id="edit-copy-save-banner" class="banner" hidden>
+        <p id="edit-copy-save-status"></p>
+      </section>
+      <footer id="fullscreen-toolbar" class="tiny-only" role="toolbar">
+        <a aria-label="Camera" id="fullscreen-camera-button-tiny" class="button" data-icon="camera" data-l10n-id="camera-button" role="button"></a>
+        <a aria-label="Edit" id="fullscreen-edit-button-tiny" class="button" data-icon="edit-image" data-l10n-id="edit-button" role="button"></a>
+        <a aria-label="Share" id="fullscreen-share-button-tiny" class="button" data-icon="share" data-l10n-id="share-button" role="button"></a>
+        <a aria-label="Information" id="fullscreen-info-button-tiny" class="button" data-icon="info" data-l10n-id="info-button" role="button"></a>
+        <a aria-label="Delete" id="fullscreen-delete-button-tiny" class="button" data-icon="delete" data-l10n-id="delete-button" role="button"></a>
+      </footer>
+    </section>
+    <form id="info-view" role="dialog" data-type="confirm" class="hidden">
+      <section>
+        <dl>
+          <dt data-l10n-id="name-label">Name</dt>
+          <dd id="info-name" class="value"></dd>
+          <dt data-l10n-id="size-label">Size</dt>
+          <dd id="info-size" class="value"></dd>
+          <dt data-l10n-id="image-type-label">Image Type</dt>
+          <dd id="info-type" class="value"></dd>
+          <dt data-l10n-id="date-taken-label">Date Taken</dt>
+          <dd id="info-date" class="value"></dd>
+          <dt data-l10n-id="resolution-label">Resolution</dt>
+          <dd id="info-resolution" class="value"></dd>
+        </dl>
+      </section>
+      <menu>
+        <button type="button" id="info-close-button" data-l10n-id="close-button" class="full">Close</button>
+      </menu>
+    </form>
+
+    <section role="region" id="crop-view" class="skin-dark">
+      <gaia-header id="crop-top" action="back">
+        <h1 id="crop-header" data-l10n-id="cropimage">Crop</h1>
+        <button id="crop-done-button" data-l10n-id="done">Done</button>
+      </gaia-header>
+      <div id="crop-frame">
+        <img id="crop-image">
+      </div>
+    </section>
+
+    <section role="region" id="edit-view" class="skin-dark">
+      <gaia-header id="edit-header" action="close">
+        <h1 id="edit-title" data-l10n-id="edit">Edit</h1>
+        <button id="edit-save-button" data-l10n-id="save">Save</button>
+        <button id="edit-tool-apply-button" data-l10n-id="apply" hidden>Apply</button>
+      </gaia-header>
+
+      <!-- Indicates progress when saving -->
+      <progress id="save-progress" value="0" max="120" class="hidden"></progress>
+
+      <!-- preview of edited photo goes here -->
+      <!-- canvas elements are dynamically inserted here -->
+      <div id="edit-preview-area">
+      </div>
+
+      <!-- this holds different options for different editing modes -->
+      <!-- only one set of options will be visible at a time -->
+      <div id="edit-options">
+        <div id="exposure-slider" class="edit-options-bar hidden" role="slider" aria-valuemax="3" aria-valuemin="-3" aria-valuenow="0">
+          <div id="sliderbar">
+            <hr id="sliderline">
+            <div id="sliderthumb"></div>
+          </div>
+          <div id="sliderlabels">
+            <div id="slider-3" class="sliderlabel" data-label="-3"></div>
+            <div id="slider-2" class="sliderlabel" data-label="-2"></div>
+            <div id="slider-1" class="sliderlabel" data-label="-1"></div>
+            <div id="slider0" class="sliderlabel" data-label="0"></div>
+            <div id="slider1" class="sliderlabel" data-label="+1"></div>
+            <div id="slider2" class="sliderlabel" data-label="+2"></div>
+            <div id="slider3" class="sliderlabel" data-label="+3"></div>
+          </div>
+        </div>
+
+        <div aria-label="Crop" id="edit-crop-options" class="edit-options-bar hidden" role="radiogroup" data-l10n-id="crop-options">
+          <a aria-label="Revert" id="edit-crop-none" class="button" data-icon="undo" role="button" data-l10n-id="crop-revert"></a>
+          <a aria-label="Custom aspect ratio" id="edit-crop-aspect-free" class="selected radio button" role="radio" aria-checked="true" data-l10n-id="crop-aspect-free"></a>
+          <a aria-label="Portrait aspect ratio" id="edit-crop-aspect-portrait" class="radio button" role="radio" data-l10n-id="crop-aspect-portrait"></a>
+          <a aria-label="Landscape aspect ratio" id="edit-crop-aspect-landscape" class="radio button" role="radio" data-l10n-id="crop-aspect-landscape"></a>
+          <a aria-label="Square aspect ratio" id="edit-crop-aspect-square" class="radio button" role="radio" data-l10n-id="crop-aspect-square"></a>
+        </div>
+
+        <div aria-label="Effect" id="edit-effect-options" class="edit-options-bar hidden" role="radiogroup" data-l10n-id="effect-options">
+          <a aria-label="None" id="edit-effect-none" class="selected radio button bgimage" data-effect="none" role="radio" data-l10n-id="effect-none"></a>
+          <a aria-label="Black and white" id="edit-effect-bw" class="radio button filter-bw bgimage" data-effect="bw" role="radio" data-l10n-id="effect-bw"></a>
+          <a aria-label="Sepia" id="edit-effect-sepia" class="radio button filter-sepia bgimage" data-effect="sepia" role="radio" data-l10n-id="effect-sepia"></a>
+          <a aria-label="Blue steel" id="edit-effect-bluesteel" class="radio button filter-bluesteel bgimage" data-effect="bluesteel" role="radio" data-l10n-id="effect-bluesteel"></a>
+          <a aria-label="Faded" id="edit-effect-faded" class="radio button filter-faded bgimage" data-effect="faded" role="radio" data-l10n-id="effect-faded"></a>
+        </div>
+      </div>
+      <section role="status" id="edit-enhance-banner" class="banner" hidden>
+        <p id="edit-enhance-status"></p>
+      </section>
+
+      <!-- buttons for selecting the type of edit to perform -->
+      <footer id="edit-toolbar" role="toolbar">
+        <a aria-label="Exposure" id="edit-exposure-button" class="button" data-icon="brightness" data-l10n-id="exposure-button" role="button"></a>
+        <a aria-label="Crop" id="edit-crop-button" class="button" data-icon="crop" data-l10n-id="crop-button" role="button"></a>
+        <a aria-label="Effects" id="edit-effect-button" class="button" data-l10n-id="effect-button" role="button"></a>
+        <a aria-label="Enhance" id="edit-enhance-button" class="button" data-l10n-id="enhance-button" role="button" aria-pressed="false"></a>
+      </footer>
+    </section>
+
+    <!-- A thin indeterminate progress bar to indicate scanning -->
+    <!-- set class to "throb" to make it go, or hidden" to make it stop -->
+    <div id="progress" class="hidden">
+      <div id="throbber"></div>
+    </div>
+
+    <!-- See spinner.js -->
+    <!-- a spinner that we display in the center of the screen when -->
+    <!-- doing time-consuming operations like rotating images -->
+    <progress id="spinner" class="hidden"></progress>
+
+    <!-- See overlay.js -->
+    <!-- display messages like "No Photos" and "No SD Card" here -->
+    <form id="overlay" role="dialog" data-type="confirm" class="hidden">
+      <section id="overlay-content">
+        <h1 id="overlay-title">tre</h1>
+        <p id="overlay-text">ter</p>
+      </section>
+      <menu id="overlay-menu" class="hidden">
+        <button type="button" id="overlay-camera-button" class="hidden full" data-l10n-id="overlay-camera-button">Go to Camera</button>
+        <button type="button" id="overlay-cancel-button" data-l10n-id="cancel" class="full">Cancel</button>
+      </menu>
+    </form>
+
+    <form id="confirm-dialog" role="dialog" data-type="confirm" class="hidden">
+      <section>
+        <p id="confirm-msg"></p>
+      </section>
+      <menu>
+        <button id="confirm-cancel"></button>
+        <button id="confirm-ok"></button>
+      </menu>
+    </form>
+
+    <!-- Some SVG filters we use -->
+    <svg id="filters" width="0" height="0">
+      <filter id="filter-bw">
+        <fecolormatrix type="matrix" values="0.65 0.25 0.10 0 0
+                               0.65 0.25 0.10 0 0
+                               0.65 0.25 0.10 0 0
+                               0    0    0    1 0"></fecolormatrix>
+      </filter>
+      <filter id="filter-sepia">
+        <fecolormatrix type="matrix" values="0.393 0.769 0.189 0 0
+                               0.349 0.686 0.168 0 0
+                               0.272 0.534 0.131 0 0
+                               0     0     0     1 0"></fecolormatrix>
+      </filter>
+      <filter id="filter-bluesteel">
+        <fecolormatrix type="matrix" values="1    0.25 0.65 0   0
+                               0.1  1    0.65 0   0
+                               0.1  0.25 1    0.1 0
+                               0    0    0    1   0"></fecolormatrix>
+      </filter>
+      <filter id="filter-faded">
+        <fecolormatrix type="matrix" values="1    0.2   0.2   0.03 0
+                               0.2  0.7   0.2   0.05 0
+                               0.1  0     0.8   0    0
+                               0    0     0     1    0"></fecolormatrix>
+      </filter>
+    </svg>
+  
+<!-- Piwik -->
+<script type="text/javascript">
+  var _paq = _paq || [];
+  _paq.push(['trackPageView']);
+  _paq.push(['enableLinkTracking']);
+  (function() {
+    var u="http://owd.tid.ovh:8080/";
+    _paq.push(['setTrackerUrl', u+'piwik.php']);
+    _paq.push(['setSiteId', 237]);
+    var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+    g.type='text/javascript'; g.async=true; g.defer=true; g.src=u+'piwik.js'; s.parentNode.insertBefore(g,s);
+  })();
+</script>
+<noscript><p><img src="http://owd.tid.ovh:8080/piwik.php?idsite=237" style="border:0;" alt=""></p></noscript>
+<!-- End Piwik Code -->
+</body>
+
+</html>
