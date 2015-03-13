@@ -15,6 +15,10 @@
     {
       "name": "Gallery",
       "manifestURL": "https://gallery.hostedweb.tid.es/manifest.webapp"
+    },
+    {
+      "name": "Clock",
+      "manifestURL": "https://clock.hostedweb.tid.es/manifest.webapp"
     }
   ]
 }
