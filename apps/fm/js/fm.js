@@ -834,7 +834,7 @@ function init() {
   };
 
   // Disable the power button and the fav list when the airplane mode is on.
-  updateAirplaneModeUI();
+  updateWarningModeUI();
 
   // Load the fav list and enable the FM radio if an antenna is available.
   historyList.init(function hl_ready() {
@@ -908,14 +908,19 @@ function init() {
   );*/
 }
 
-function onAirplaneModeChange(enabled) {
-  airplaneModeEnabled = enabled;
-  updateAirplaneModeUI();
+function onAirplaneModeChange(evt) {
+  airplaneModeEnabled = evt.settingValue;
+  updateWarningModeUI();
 }
 
 window.addEventListener('load', function(e) {
-  window.SettingService.observe('airplaneMode.enabled', false,
-    onAirplaneModeChange);
+  if (navigator.mozSettings) {
+    navigator.mozSettings.addObserver('airplaneMode.enabled',
+      onAirplaneModeChange);
+    var request = navigator.mozSettings.createLock().
+                    get('airplaneMode.enabled');
+    request.onsuccess = onAirplaneModeChange;
+  }
   init();
 }, false);
 
