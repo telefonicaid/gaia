@@ -1,7 +1,7 @@
 {
   "name": "Clock",
   "description": "Gaia Clock",
-  "type": "certified",
+  "type": "trusted",
   "url": "https://clock.hostedweb.tid.es",
   "launch_path": "/index.html",
   "developer": {
@@ -45,5 +45,6 @@
   "orientation": "default",
   "messages": [
      { "alarm": "/index.html" }
-  ]
+  ],
+  "csp" : "default-src *; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'"
 }
