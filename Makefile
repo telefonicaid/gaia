@@ -214,6 +214,7 @@ endif
 
 ifeq ($(HOSTED), 1)
 GAIA_APP_TARGET=hosted
+GAIA_CONCAT_LOCALES=0
 endif
 
 ifdef NODE_MODULES_GIT_URL
