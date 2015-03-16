@@ -2,6 +2,7 @@
   "name": "Camera",
   "description": "Gaia Camera",
   "type": "certified",
+  "appcache_path": "https://camera.hostedweb.tid.es/manifest.appcache",
   "url": "https://camera.hostedweb.tid.es",
   "launch_path": "/index.html",
   "orientation": "default",
