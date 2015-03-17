@@ -16,13 +16,13 @@ html, body {
   -moz-user-select: none; /* 1 */
 }
 
-a {
+button {
   outline: 0 none;
   text-decoration: none;
   color: #FFF;
 }
 
-a:active {
+button:active {
   color: #000;
   background-color: #00ABCD;
 }
@@ -64,7 +64,7 @@ a:active {
   text-align: center;
 }
 
-#frequency-bar a {
+#frequency-bar button {
   position: absolute;
   z-index: 1;
   line-height: 4rem;
@@ -350,7 +350,7 @@ div#fav-list-container div.fav-list-frequency::after {
   text-align: left;
 }
 
-#action-bar a {
+#action-bar button {
   display: inline-block;
   border: none;
   font-size: 2.5rem;
@@ -361,7 +361,7 @@ div#fav-list-container div.fav-list-frequency::after {
   box-shadow: 0 .1rem .1rem #A8A8A8 inset, 0 .2rem 0 #1e2226;
 }
 
-#action-bar a:active {
+#action-bar button:active {
   color: #FFF;
   background-color: #00ABCD;
   box-shadow: 0 .1rem .1rem #3F6978 inset, 0 .2rem 0 #1e2226;
@@ -415,7 +415,7 @@ div#fav-list-container div.fav-list-frequency::after {
   }
 }
 
-a#frequency-op-seekdown {
+button#frequency-op-seekdown {
   width: 5rem;
   height: 5rem;
   margin: 1rem 0;
@@ -426,11 +426,11 @@ a#frequency-op-seekdown {
   background-size: 5.6rem;
 }
 
-a#frequency-op-seekdown:active {
+button#frequency-op-seekdown:active {
   background-image: url(images/seekdown.png);
 }
 
-a#frequency-op-seekup {
+button#frequency-op-seekup {
   width: 5rem;
   height: 5rem;
   margin: 1rem 0;
@@ -441,7 +441,7 @@ a#frequency-op-seekup {
   background-size: 5.6rem;
 }
 
-a#frequency-op-seekup:active {
+button#frequency-op-seekup:active {
   background-image: url(images/seekup.png);
 }
 /**** end ****/
