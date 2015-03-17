@@ -1,7 +1,8 @@
 {
   "name": "Video",
   "description": "Gaia Video",
-  "type": "certified",
+  "type": "trusted",
+  "appcache_path": "https://video.hostedweb.tid.es/manifest.appcache",
   "url": "https://video.hostedweb.tid.es",
   "launch_path": "/index.html",
   "developer": {
