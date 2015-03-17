@@ -1,7 +1,7 @@
 {
   "name": "FM Radio",
   "description": "Gaia FM Radio",
-  "type": "certified",
+  "type": "trusted",
   "url": "https://fm.hostedweb.tid.es",
   "launch_path": "/index.html",
   "developer": {
