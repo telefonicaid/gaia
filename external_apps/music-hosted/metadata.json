@@ -3,7 +3,7 @@
   "type": "trusted",
   "removable": true,
   "manifestURL": "https://music.hostedweb.tid.es/manifest.webapp",
-  "installOrigin": "https://music.hostedweb.tid.es",
-  "etag": "3578398-1339-Thu Mar 12 2015 11:14:04 GMT+0000 (UTC)",
+  "installOrigin": "https://marketplace.firefox.com",
+  "etag": "\"3578443-1390-Tue Mar 17 2015 07:49:39 GMT+0000 (UTC)\"",
   "external": true
 }
