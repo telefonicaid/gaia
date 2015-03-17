@@ -1,15 +1,11 @@
 CACHE MANIFEST
-# version Thu Mar 12 2015 11:14:04 GMT+0000 (UTC)
+# version Tue Mar 17 2015 07:49:39 GMT+0000 (UTC)
 CACHE:
 app.html
 bower.json
 index.html
-manifest.webapp
 open.html
 locales/music.en-US.properties
-locales-obj/en-US.json
-locales-obj/qps-ploc.json
-locales-obj/qps-plocm.json
 bower_components/gaia-component/bower.json
 bower_components/gaia-component/gaia-component.js
 bower_components/gaia-header/bower.json
@@ -91,6 +87,7 @@ shared/js/device_storage/get_storage_if_available.js
 shared/js/device_storage/get_unused_filename.js
 shared/js/media/remote_controls.js
 shared/js/omadrm/fl.js
+shared/locales/media/media.en-US.properties
 shared/style/confirm.css
 shared/style/input_areas.css
 shared/style/progress_activity.css

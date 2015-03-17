@@ -7,6 +7,10 @@ if (window.applicationCache) {
                     'you restart the app.');
     (r === true) && location.reload();
   });
+
+  window.applicationCache.addEventListener('error', (e) => {
+    console.error('Application cache failed with status code', e.target.status);
+  });
 } else {
   window.console.error('no application cache');
 }
