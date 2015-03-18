@@ -1,0 +1,1087 @@
+
+label.pack-checkbox,
+label.pack-radio,
+label.pack-switch {
+  display: inline-block;
+  vertical-align: middle;
+  width: 5rem;
+  height: 5rem;
+  position: relative;
+  background: none;
+}
+label.pack-checkbox input,
+label.pack-radio input,
+label.pack-switch input {
+  margin: 0;
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  
+  left: 0;
+  right: 0;
+  width: 0;
+}
+label.pack-checkbox input ~ span:after,
+label.pack-radio input ~ span:after {
+  content: '';
+  position: absolute;
+  
+  left: 50%;
+  right: 50%;
+  top: 50%;
+  margin: 0;
+  margin-top: -1.1rem;
+  -moz-margin-start: -1.1rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  pointer-events: none;
+}
+label.pack-checkbox input ~ span:after {
+  background: url(../shared/style/switches/images/check/default.png) no-repeat center top / 2.2rem auto;
+}
+label.pack-radio input ~ span:after {
+  background: url(../shared/style/switches/images/radio/default.png) no-repeat center top / 2.2rem auto;
+}
+label.pack-checkbox input:disabled ~ span:after,
+label.pack-radio input:disabled ~ span:after {
+  opacity: 0.4;
+}
+label.pack-checkbox input:checked ~ span:after,
+label.pack-radio input:checked ~ span:after,
+label.pack-switch input:checked ~ span:after {
+  background-position: center bottom;
+}
+label.pack-checkbox.danger input ~ span:after {
+  background-image: url(../shared/style/switches/images/check/danger.png);
+}
+label.pack-radio.danger input ~ span:after {
+  background-image: url(../shared/style/switches/images/radio/danger.png);
+}
+label.pack-switch input ~ span:after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 6rem;
+  margin: -1.4rem 0 0;
+  height: 2.7rem;
+  pointer-events: none;
+  border-radius: 1.35rem;
+  overflow: hidden;
+  background: #e6e6e6 url(../shared/style/switches/images/switch/background_off.png) no-repeat -3.2rem 0 / 9.2rem 2.7rem;
+  transition: background 0.2s ease;
+}
+label.pack-switch input:checked ~ span:after {
+  background: #e6e6e6 url(../shared/style/switches/images/switch/background.png) no-repeat 0 0 / 9.2rem 2.7rem;
+}
+label.pack-switch input:disabled ~ span:after {
+  opacity: 0.4;
+}
+label.pack-switch input.uninit ~ span:after {
+  transition: none;
+}
+html[dir="rtl"] label.pack-switch input ~ span:after {
+  left: 0;
+  right: unset;
+}
+html[dir="rtl"] label.pack-switch input ~ span:after {
+  background-position: 0;
+}
+html[dir="rtl"] label.pack-switch input:checked ~ span:after {
+  background-image: url(../shared/style/switches/images/switch/background_rtl.png);
+  background-position: -3.2rem 0;
+}
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="tel"],
+input[type="search"],
+input[type="url"],
+input[type="number"],
+textarea {
+  font-family: sans-serif;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 4rem;
+  line-height: 4rem;
+  resize: none;
+  padding: 0 1.5rem;
+  font-size: 1.6rem;
+  border: 0.1rem solid #c7c7c7;
+  border-radius: 0;
+  box-shadow: none; 
+  color: #333;
+  background: #fff;
+  margin: 0 0 1rem 0;
+}
+label:active {
+  background-color: transparent;
+}
+textarea {
+  height: 10rem;
+  max-height: 10rem;
+  line-height: 2rem;
+}
+input::-moz-placeholder,
+textarea::-moz-placeholder {
+  color: #a9a9a9;
+  opacity: 1;
+  font-style: italic;
+  font-weight: 400;
+}
+input[disabled],
+textarea[disabled] {
+  opacity: 0.5;
+}
+.skin-dark input[type="text"],
+.skin-dark input[type="password"],
+.skin-dark input[type="email"],
+.skin-dark input[type="tel"],
+.skin-dark input[type="search"],
+.skin-dark input[type="url"],
+.skin-dark input[type="number"],
+.skin-dark textarea  {
+  color: #fff;
+  background-color: transparent;
+  border-color: #454545;
+}
+form p {
+  position: relative;
+  margin: 0;
+}
+form p input + button[type="reset"],
+form p textarea + button[type="reset"] {
+  position: absolute;
+  top: 0;
+  right: -0.3rem;
+  width: 4rem;
+  height: 4rem;
+  padding: 0;
+  border: none;
+  font-size: 0;
+  opacity: 0;
+  pointer-events: none;
+  background: url(../shared/style/input_areas/images/clear.png) no-repeat 50% 50% / 2.4rem auto;
+}
+.skin-dark p input + button[type="reset"],
+.skin-dark p textarea + button[type="reset"] {
+  background-image: url(../shared/style/input_areas/images/clear_dark.png);
+}
+li input + button[type="reset"]:after,
+li textarea + button[type="reset"]:after {
+  background: none;
+}
+textarea {
+  padding: 1.2rem;
+}
+form p input:focus {
+  padding-right: 3rem;
+}
+form p input:focus + button[type="reset"],
+form p textarea:focus + button[type="reset"] {
+  opacity: 1;
+  pointer-events: all;
+}
+fieldset {
+  position: relative;
+  overflow: hidden;
+  margin: 1.5rem 0 0 0;
+  padding: 0;
+  font-size: 2rem;
+  line-height: 1em;
+  background: none;
+  border: 0;
+}
+fieldset legend,
+input[type="date"],
+input[type="time"],
+input[type="datetime"],
+input[type="datetime-local"] {
+  border: 0.1rem solid #c7c7c7;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: sans-serif;
+  font-style: italic;
+  font-size: 1.6rem;
+  margin: 0 0 1.5rem;
+  padding: 0 1.5rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  height: 4rem;
+  color: #333;
+  border-radius: 0;
+  background: #fff url(../shared/style/input_areas/images/dialog.svg) no-repeat calc(100% - 1rem) calc(100% - 1rem);
+}
+fieldset legend {
+  margin: 0 0 1rem;
+  padding: 1rem 1.5rem 0;
+  background-color: rgba(0,0,0,0.05);
+}
+fieldset[disabled] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.skin-dark fieldset legend,
+.skin-dark input[type="date"],
+.skin-dark input[type="time"],
+.skin-dark input[type="datetime"],
+.skin-dark input[type="datetime-local"] {
+  color: #fff;
+  background-color: transparent;
+  border-color: #454545;
+}
+fieldset[disabled] legend,
+input[type="date"][disabled],
+input[type="time"][disabled],
+input[type="datetime"][disabled],
+input[type="datetime-local"][disabled] {
+  background-image: url(../shared/style/input_areas/images/dialog_disabled.svg);
+  background-color: transparent
+}
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="datetime"]:focus,
+input[type="datetime-local"]:focus {
+  box-shadow: none;
+  border-bottom-color: #c7c7c7;
+}
+.skin-dark input[type="date"]:focus,
+.skin-dark input[type="time"]:focus,
+.skin-dark input[type="datetime"]:focus,
+.skin-dark input[type="datetime-local"]:focus {
+  box-shadow: none;
+  border-bottom-color: #454545;
+}
+input[type="date"]:active,
+input[type="time"]:active,
+input[type="datetime"]:active,
+input[type="datetime-local"]:active {
+  background-color: #b2f2ff;
+  color: #fff;
+}
+.skin-dark input[type="date"]:active,
+.skin-dark input[type="time"]:active,
+.skin-dark input[type="datetime"]:active,
+.skin-dark input[type="datetime-local"]:active {
+  background-color: #00aacc;
+  background-image: url(../shared/style/input_areas/images/dialog_active.svg);
+}
+input:invalid,
+textarea:invalid,
+.skin-dark input:invalid,
+.skin-dark textarea:invalid {
+  color: #b90000;
+}
+input:focus,
+textarea:focus,
+.skin-dark input:focus,
+.skin-dark textarea:focus {
+  box-shadow: inset 0 -0.1rem 0 #00caf2;
+  border-bottom-color: #00caf2;
+}
+input:invalid:focus,
+textarea:invalid:focus,
+.skin-dark input:invalid:focus,
+.skin-dark textarea:invalid:focus {
+  box-shadow: inset 0 -0.1rem 0 #820000;
+  border-bottom-color: #820000;
+}
+input[type="range"]:focus,
+.skin-dark input[type="range"]:focus {
+  box-shadow: none;
+  border-bottom: 0;
+}
+form[role="search"] {
+  position: relative;
+  height: 3.7rem;
+  background: #f4f4f4;
+}
+form[role="search"].skin-dark {
+  background: #202020;
+}
+form[role="search"] p {
+  padding: 0 1.5rem 0 3rem;
+  overflow: hidden;
+  position: relative;
+}
+form[role="search"] p input,
+form[role="search"] p textarea {
+  height: 3.7rem;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  box-shadow: none;
+}
+form[role="search"] p textarea {
+  padding: 1rem 0 0 0;
+}
+form[role="search"] p input::-moz-placeholder {
+  background: url(../shared/style/input_areas/images/search.svg) right -0.5rem center no-repeat;
+  background-size: 3rem;
+}
+form[role="search"].skin-dark p input::-moz-placeholder {
+  background-image: url(../shared/style/input_areas/images/search_dark.svg);
+}
+form[role="search"] p input:focus::-moz-placeholder {
+  background: none;
+}
+form[role="search"] p input:invalid,
+form[role="search"] p textarea:invalid,
+form[role="search"] p input:focus,
+form[role="search"] p textarea:focus {
+  border: none;
+  box-shadow: none;
+}
+form[role="search"].skin-dark p input,
+form[role="search"].skin-dark p textarea {
+  color: #fff;
+  background: none;
+  box-shadow: none;
+}
+form[role="search"] button[type="submit"] {
+  float: right;
+  min-width: 6rem;
+  height: 3.7rem;
+  padding: 0 1.5rem;
+  border: none;
+  color: #00aac5;
+  font-weight: normal;
+  font-size: 1.6rem;
+  line-height: 3.7rem;
+  width: auto;
+  border-radius: 0;
+  margin: 0;
+  position: relative;
+  background-image: none;
+  background-color: unset;
+  font-style: italic;
+  overflow: visible;
+}
+form[role="search"] button[type="submit"]:after {
+  content: "";
+  position: absolute;
+  left: -0.1rem;
+  top: 0.7rem;
+  bottom: 0.7rem;
+  width: 0.1rem;
+  background: #c7c7c7;
+}
+form[role="search"] button[type="submit"].icon {
+  font-size: 0;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 3rem;
+}
+form[role="search"] p input + button[type="reset"]{
+  height: 3.7rem;
+  right: 0.5rem;
+}
+form[role="search"].skin-dark button[type="submit"]:after {
+  background-color: #575757;
+}
+form[role="search"] button[type="submit"] + p > textarea {
+  height: 3.7rem;
+  line-height: 2rem;
+}
+form[role="search"] button[type="submit"] + p button {
+  height: 3.7rem;
+}
+form[role="search"].full button[type="submit"] {
+  display: none;
+}
+form[role="search"] button.icon:active,
+form[role="search"] button[type="submit"]:active {
+  background-color: #b2f2ff;
+  color: #fff;
+}
+form[role="search"].skin-dark button.icon:active,
+form[role="search"].skin-dark button[type="submit"]:active {
+  background: #00aacc;
+}
+form[role="search"] button[type="submit"][disabled] {
+  color: #adadad;
+  pointer-events: none;
+}
+form button::-moz-focus-inner {
+  border: none;
+  outline: none;
+}
+.bb-editable [contenteditable] {
+  display: inline-block;
+  box-sizing: border-box;
+  position: relative;
+  max-width: calc(100% - 1.4rem);
+  overflow: hidden;
+  padding: 0 1.5rem;
+  margin: 0 0 0.6rem 0;
+  line-height: 2.8rem;
+  border-radius: 1.4rem;
+  text-overflow: ellipsis;
+  font-size: 1.6rem;
+  font-style: italic;
+  white-space: nowrap;
+  color: #333;
+  background: #fff;
+}
+.bb-editable [contenteditable].icon {
+  padding-right: 3.7rem;
+}
+.bb-editable [contenteditable="false"].invalid {
+  background-color: #fedcdc;
+   
+  padding-left: 3.3rem;
+}
+.bb-editable [contenteditable="false"].invalid:before {
+    content: "!";
+    position: absolute;
+    top: 0.6rem;
+    left: 0.8rem;
+    display: block;
+    width: 1.7rem;
+    height: 1.6rem;
+    padding: 0;
+    border-radius: 50%;
+    line-height: 1.6rem;
+    font-size: 1.2rem;
+    text-align: center;
+    text-indent: -0.1rem;
+    font-style: normal;
+    font-weight: 600;
+    color: #fff;
+    background-color: #b80404;
+}
+.bb-editable [contenteditable="false"].invalid:hover:before,
+.bb-editable [contenteditable="false"].invalid:active:before {
+  color: #b2f2ff;
+  background-color: #fff;
+}
+.bb-editable [contenteditable]:hover,
+.bb-editable [contenteditable]:active,
+.bb-editable [contenteditable].invalid:hover,
+.bb-editable [contenteditable].invalid:active {
+  color: #fff;
+  background-color: #b2f2ff;
+}
+.bb-editable [contenteditable].icon:after {
+  content: "";
+  position: absolute;
+  top: 0.7rem;
+  right: 0;
+  width: 3rem;
+  height: 3rem;
+  background-position: -0.7rem -3.8rem;
+  background-repeat: no-repeat;
+  background-size: 3rem;
+}
+.bb-editable [contenteditable].icon:hover:after,
+.bb-editable [contenteditable].icon:active:after {
+  background-position: -0.7rem -0.8rem;
+}
+.bb-editable [contenteditable].invalid.icon:after {
+  background-position: -0.7rem -6.8rem;
+}
+.bb-editable [contenteditable].invalid.icon:hover:after,
+.bb-editable [contenteditable].invalid.icon:active:after {
+  background-position: -0.7rem -0.8rem;
+}
+.bb-editable [contenteditable="true"],
+.bb-editable [contenteditable="true"]:hover,
+.skin-comms .bb-editable [contenteditable="true"]:hover {
+    padding: 0 0.2rem;
+    white-space: normal;
+    font-size: 1.8rem;
+    font-style: normal;
+    color: #000;
+    background: none repeat scroll 0 0 transparent;
+}
+.skin-comms .bb-editable [contenteditable]:hover,
+.skin-comms .bb-editable [contenteditable]:active {
+  color: #fff;
+  background-color: #29bbb5;
+}
+html[dir="rtl"] ::-moz-placeholder {
+  text-align: right;
+}
+html[dir="rtl"] input[type="text"],
+html[dir="rtl"] input[type="password"],
+html[dir="rtl"] input[type="email"],
+html[dir="rtl"] input[type="tel"],
+html[dir="rtl"] input[type="search"],
+html[dir="rtl"] input[type="url"],
+html[dir="rtl"] input[type="number"],
+html[dir="rtl"] textarea {
+  text-align: right;
+}
+html[dir="rtl"] fieldset legend {
+  background: rgba(0,0,0,0.05) url(../shared/style/input_areas/images/dialog_rtl.svg) no-repeat 1rem calc(100% - 1rem);
+}
+html[dir="rtl"] input[type="date"],
+html[dir="rtl"] input[type="time"],
+html[dir="rtl"] input[type="datetime"],
+html[dir="rtl"] input[type="datetime-local"] {
+  background: #fff url(../shared/style/input_areas/images/dialog_rtl.svg) no-repeat 1rem calc(100% - 1rem);
+}
+html[dir="rtl"] fieldset[disabled] legend,
+html[dir="rtl"] input[type="date"][disabled],
+html[dir="rtl"] input[type="time"][disabled],
+html[dir="rtl"] input[type="datetime"][disabled],
+html[dir="rtl"] input[type="datetime-local"][disabled] {
+  background-image: url(../shared/style/input_areas/images/dialog_disabled_rtl.svg);
+}
+html[dir="rtl"] form p input + button[type="reset"],
+html[dir="rtl"] form p textarea + button[type="reset"] {
+  right: auto;
+  left: 0.3rem;
+}
+html[dir="rtl"] form[role="search"] p {
+  padding: 0 3rem 0 1.5rem;
+}
+html[dir="rtl"] form[role="search"] p input + button[type="reset"]{
+  left: 0.5rem;
+}
+html[dir="rtl"] form[role="search"] p input::-moz-placeholder {
+  background-position: -0.5rem center;
+}
+html[dir="rtl"] form[role="search"] button[type="submit"] {
+  float: left;
+}
+html[dir="rtl"] form[role="search"] button[type="submit"]:after {
+  right: 0;
+  left: auto;
+}
+.bb-editable:-moz-dir(rtl) [contenteditable="false"].invalid {
+   
+  padding: 0 3.3rem 0 1.5rem;
+}
+.bb-editable:-moz-dir(rtl) [contenteditable="false"].invalid:before {
+  left: unset;
+  right: 0.8rem;
+}
+html[dir="rtl"] form p input:focus {
+  padding-right: 1.5rem;
+  padding-left: 3rem;
+}
+.button::-moz-focus-inner,
+.bb-button::-moz-focus-inner,
+button::-moz-focus-inner {
+  border: none;
+  outline: none;
+}
+button,
+.bb-button,
+.button {
+  font-family: sans-serif;
+  font-style: italic;
+  width: 100%;
+  height: 4rem;
+  margin: 0 0 1rem;
+  padding: 0 1.2rem;
+  -moz-box-sizing: border-box;
+  display: inline-block;
+  vertical-align: middle;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  background: #d8d8d8;
+  border: none;
+  border-radius: 2rem;
+  font-weight: normal;
+  font-size: 1.6rem;
+  line-height: 4rem;
+  color: #333;
+  text-align: center;
+  text-decoration: none;
+  outline: none;
+}
+button.recommend,
+.bb-button.recommend {
+  background-color: #00caf2;
+  color: #fff;
+}
+button.danger,
+.danger.bb-button {
+  background-color: #e51e1e;
+  color: #fff;
+}
+button:active,
+.bb-button:active,
+.button:active {
+  background-color: #b2f2ff;
+  color: #fff;
+}
+button[data-icon],
+.bb-button[data-icon],
+.button[data-icon] {
+  position: relative;
+}
+button[data-icon]:before,
+.bb-button[data-icon]:before,
+.button[data-icon]:before {
+  position: absolute;
+  top: 50%;
+  margin-top: -1.5rem;
+  right: 1.5rem;
+  line-height: 3rem;
+}
+button[data-icon]:active:before,
+.bb-button[data-icon]:active:before,
+.button[data-icon]:active:before {
+  color: #fff;
+}
+.skin-dark button:active,
+.skin-dark .bb-button:active,
+.skin-dark .button:active {
+  background-color: #00aacc;
+}
+button[disabled],
+.bb-button[aria-disabled="true"],
+.button[aria-disabled="true"] {
+  background-color: rgba(0,0,0,0.05);
+  color: #c7c7c7;
+  pointer-events: none;
+}
+button[disabled].recommend,
+.bb-button[aria-disabled="true"].recommend,
+.button[aria-disabled="true"].recommend {
+  background-color: #97cbd5;
+  color: rgba(255,255,255,0.5);
+}
+button[disabled].danger,
+.bb-button[aria-disabled="true"].danger,
+.button[aria-disabled="true"].danger {
+  background-color: #eb7474;
+  color: rgba(255,255,255,0.5);
+}
+.skin-dark button[disabled],
+.skin-dark .button[aria-disabled="true"],
+.skin-dark .bb-button[aria-disabled="true"] {
+  background-color: #565656;
+  color: rgba(255,255,255,0.4);
+}
+.skin-dark button[disabled].recommend,
+.skin-dark .button[aria-disabled="true"].recommend,
+.skin-dark .bb-button[aria-disabled="true"].recommend {
+  background-color: #006579;
+}
+.skin-dark button[disabled].danger,
+.skin-dark .button[aria-disabled="true"].danger,
+.skin-dark .bb-button[aria-disabled="true"].danger {
+  background-color: #730f0f;
+}
+button[disabled]::-moz-selection,
+.button[aria-disabled="true"]::-moz-selection,
+.bb-button[aria-disabled="true"]::-moz-selection {
+  -moz-user-select: none;
+}
+li button,
+li .bb-button,
+li .button {
+  position: relative;
+  text-align: start;
+  border: 0.1rem solid #c7c7c7;
+  background: rgba(0,0,0,0.05);
+  margin: 0 0 1rem;
+  overflow: hidden;
+  border-radius: 0;
+  display: flex;
+  height: auto;
+  min-height: 4rem;
+  text-overflow: initial;
+  white-space: normal;
+  line-height: 2rem;
+  padding: 1rem 1.2rem;
+}
+li .bb-button:active:after,
+li .button:active:after,
+li button:active:after {
+  opacity: 0;
+}
+li button:disabled,
+li .bb-button[aria-disabled="true"],
+li .button[aria-disabled="true"] {
+  opacity: 0.5;
+}
+li button.icon,
+li .bb-button.icon,
+li .button.icon {
+  -moz-padding-end: 4rem;
+}
+li button.icon:before,
+li .bb-button.icon:before,
+li .button.icon:before {
+  content: "";
+  width: 3rem;
+  height: 3rem;
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  margin-top: -1.5rem;
+  background: transparent no-repeat center center / 100% auto;
+  pointer-events: none;
+}
+li button.icon-view:active,
+li .bb-button.icon-view:active,
+li .button.icon-view:active {
+  background-color: #b2f2ff;
+}
+li button.icon-view:before,
+li .bb-button.icon-view:before,
+li .button.icon-view:before {
+  background-image: url(../shared/style/buttons/images/forward-light.svg);
+  background-size: 3rem;
+  right: 0;
+}
+li button[data-icon]:before,
+li .bb-button[data-icon]:before,
+li .button[data-icon]:before {
+  right: 1rem;
+}
+li button[data-icon="expand"]:before,
+li .bb-button[data-icon="expand"]:before,
+li .button[data-icon="expand"]:before {
+  color: #00aac5;
+  top: unset;
+  bottom: 0;
+}
+li button[data-icon="expand"][disabled]:before,
+li .bb-button[data-icon="expand"][aria-disabled="true"]:before,
+li .button[data-icon="expand"][aria-disabled="true"]:before {
+  color: #A9A9A9;
+}
+li button[data-icon="forward"]:before,
+li .bb-button[data-icon="forward"]:before,
+li .button[data-icon="forward"]:before {
+  color: #686f72;
+}
+li button.icon-dialog,
+li .bb-button.icon-dialog,
+li .button.icon-dialog {
+  -moz-padding-end: 3rem;
+}
+li button.icon-dialog:before,
+li .bb-button.icon-dialog:before,
+li .button.icon-dialog:before {
+  width: 0;
+  height: 0;
+  top: auto;
+  right: 0.8rem;
+  bottom: 0.5rem;
+  border-top: 0.7rem solid transparent;
+  border-bottom: 0.7rem solid transparent;
+  border-left: 0.7rem solid #00aac5;
+  transform: rotate(45deg);
+  z-index: 1;
+}
+li button.icon-dialog:disabled:before,
+li .bb-button[aria-disabled="true"].icon-dialog:before,
+li .button[aria-disabled="true"].icon-dialog:before {
+  border-left: 0.7rem solid #a9a9a9;
+}
+.skin-dark li button,
+.skin-dark li .bb-button,
+.skin-dark li .button {
+  background-color: #454545;
+  border: none;
+  color: #fff;
+  font-weight: normal;
+}
+.skin-dark li button:active,
+.skin-dark li .button:active,
+.skin-dark li .bb-button:active {
+  background-color: #00aacc;
+}
+.skin-dark li button.icon-view:active,
+.skin-dark li .button.icon-view:active,
+.skin-dark li .bb-button.icon-view:active {
+  background-color: #00aacc;
+}
+.skin-dark li button.icon-dialog:active:before,
+.skin-dark li .bb-button.icon-dialog:active:before,
+.skin-dark li .button.icon-dialog:active:before {
+  border-left: 0.7rem solid #b2f2ff;
+}
+.skin-dark li button:disabled,
+.skin-dark li .bb-button[aria-disabled="true"],
+.skin-dark li .button[aria-disabled="true"] {
+  background-color: #454545;
+  opacity: 0.5;
+}
+.button input,
+body[role="application"] .bb-button input,
+body[role="application"] .button input {
+  border: 0;
+  background: none;
+}
+select {
+  width: 100%;
+  -moz-box-sizing: border-box;
+  font-family: sans-serif;
+  font-style: italic;
+  font-size: 1.6rem;
+  color: #333;
+  margin: 0 0 1rem;
+  padding: 0;
+  -moz-padding-start: 1.1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  height: 4rem;
+  border: 0.1rem solid #c7c7c7;
+  background: rgba(0,0,0,0.05);
+}
+.skin-dark select {
+  background-color: rgba(87, 87, 87, 0.8);
+  border: none;
+  color: #fff;
+}
+select:-moz-focusring {
+  color: transparent;
+  text-shadow: 0 0 0 #333;
+}
+.skin-dark select:-moz-focusring {
+  text-shadow: 0 0 0 #fff;
+}
+.bb-button.icon select,
+.button.icon select,
+.bb-button[data-icon] select,
+.button[data-icon] select {
+  position: absolute;
+  top: -0.6rem;
+  left: 0;
+  width: calc(100% + 3rem);
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  -moz-padding-end: 5rem;
+  text-indent: 0;
+  font-weight: 400;
+  font-size: 1.7rem;
+  
+  color: rgba(0,0,0,0);
+  text-shadow: 1rem 0.5rem 0 #333;
+  border: none;
+  background: none;
+}
+.bb-button.icon select option,
+.button.icon select option,
+.bb-button[data-icon] select option,
+.button[data-icon] select option {
+  color: #000;
+  border: 0;
+  padding: 0.6rem 1.3rem;
+  text-shadow: 0 0 0 rgba(0,0,0,0);
+}
+.bb-button.icon-dialog,
+.button.icon-dialog {
+  overflow: hidden;
+}
+.skin-dark .bb-button.icon select,
+.skin-dark .button.icon select,
+.skin-dark .bb-button[data-icon] select,
+.skin-dark .button[data-icon] select {
+  text-shadow: 1rem 0.5rem 0 #fff;
+}
+html[dir="rtl"] button[data-icon]:before,
+html[dir="rtl"] .bb-button[data-icon]:before,
+html[dir="rtl"] .button[data-icon]:before {
+  left: 1.5rem;
+  right: unset;
+  transform: scale(-1, 1);
+}
+html[dir="rtl"] li button.icon-view:before,
+html[dir="rtl"] li .bb-button.icon-view:before,
+html[dir="rtl"] li .button.icon-view:before {
+  left: 0;
+  right: unset;
+  transform: rotate(180deg);
+}
+html[dir="rtl"] li button[data-icon]:before,
+html[dir="rtl"] li .bb-button[data-icon]:before,
+html[dir="rtl"] li .button[data-icon]:before {
+  left: 1rem;
+  right: unset;
+}
+html[dir="rtl"] li button.icon:before,
+html[dir="rtl"] li .bb-button.icon:before,
+html[dir="rtl"] li .button.icon:before {
+  left: 0.5rem;
+  right: unset;
+}
+html[dir="rtl"] li button.icon-dialog:before,
+html[dir="rtl"] li .bb-button.icon-dialog:before,
+html[dir="rtl"] li .button.icon-dialog:before {
+  left: 0.8rem;
+  right: unset;
+  transform: rotate(315deg);
+  border-left: unset;
+  border-right: 0.7rem solid #00aac5;
+}
+html[dir="rtl"] li button.icon-dialog:disabled:before,
+html[dir="rtl"] li .bb-button[aria-disabled="true"].icon-dialog:before,
+html[dir="rtl"] li .button[aria-disabled="true"].icon-dialog:before {
+  border-left: unset;
+  border-right: 0.7rem solid #a9a9a9;
+}
+html[dir="rtl"] .skin-dark li button.icon-dialog:active:before,
+html[dir="rtl"] .skin-dark li .bb-button.icon-dialog:active:before,
+html[dir="rtl"] .skin-dark li .button.icon-dialog:active:before {
+  border-left: unset;
+  border-right: 0.7rem solid #b2f2ff;
+}
+html[dir="rtl"] .bb-button.icon-dialog select,
+html[dir="rtl"] .button.icon-dialog select,
+html[dir="rtl"] .bb-button[data-icon] select,
+html[dir="rtl"] .button[data-icon] select {
+  left: unset;
+  right: 0.3rem; 
+  text-indent: 1rem;
+}
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+  color: white;
+  font-size: 10px;
+  background-color: #000;
+  -moz-user-select: none;
+}
+#clock-tabs {
+  -moz-user-select: none;
+}
+#clock-view {
+  width: 100%;
+  height: calc(100% - 0.13rem);
+  color: black;
+}
+.visible {
+  display: block;
+}
+#clock-time {
+  letter-spacing: -0.5rem;
+  font-weight: 300;
+  font-size: 11rem;
+  color: #CFE2E6;
+  pointer-events: none;
+}
+#clock-time small {
+  font-weight: 300;
+  font-size: 3.7rem;
+  color: #5C6466;
+  text-transform: uppercase;
+  pointer-events: none;
+  position: relative;
+}
+#clock-day-date {
+  font-weight: 300;
+  font-size: 2.1rem;
+  margin: 2.6rem 0 0 1.5rem;
+  line-height: 1.7rem;
+  position: absolute;
+  color: #737D80;
+  width: 100%;
+  top: 0;
+}
+#clock-day-date b {
+  font-weight: normal;
+  color: #A1B0B2;
+}
+#digital-clock {
+  display: none;
+  margin-top: 6.50rem;
+  height: 100%;
+}
+#digital-clock.visible {
+  display: block;
+}
+#digital-clock-face {
+  font-weight: 300;
+  text-align: center;
+  position: absolute;
+  width: 100%;
+  margin: auto;
+}
+#analog-clock {
+  display: none;
+  width: 100%;
+  height: 100%;
+}
+#analog-clock.visible {
+  display: block;
+}
+#analog-clock-container {
+  pointer-events: none;
+  overflow: hidden;
+}
+#analog-clock-container.large {
+  width: 27rem;
+  height: 27rem;
+  margin: 6.9rem auto 0;
+}
+#analog-clock-container.medium {
+  width: 21.8rem;
+  height: 21.8rem;
+  margin: 6.8rem auto 0;
+}
+#analog-clock-container.small {
+  width: 14.8rem;
+  height: 14.8rem;
+  margin: 5.8rem auto 0;
+}
+#analog-clock-face {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-image: url('images/analog_clock_face.svg');
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+#analog-clock-hands {
+  position: absolute;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  margin-top: 1.5%; 
+}
+.analog-clock-hand {
+  position: absolute;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+#secondhand {
+  background-image: url('images/analog_clock_second_hand.svg');
+}
+#minutehand {
+  background-image: url('images/analog_clock_minute_hand.svg');
+}
+#hourhand {
+  background-image: url('images/analog_clock_hour_hand.svg');
+}
+#banner-countdown {
+  z-index: -1;
+  opacity: 0;
+  -moz-transition: opacity 600ms ease;
+}
+#banner-countdown.visible {
+  z-index: 1;
+  opacity: 1;
+}
+#banner-countdown strong {
+  white-space: nowrap;
+}
+body.hidden *[data-l10n-id] {
+  visibility: hidden;
+}
+.hide {
+  display: none;
+}
+html[dir=rtl] #clock-day-date {
+  margin-left: 0;
+  margin-right: 1.5rem;
+}
