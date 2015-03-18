@@ -1,8 +1,8 @@
 {
   "name": "Gallery",
   "description": "Gaia Gallery",
-  "type":"trusted",
-  "url":"https://gallery.hostedweb.tid.es",
+  "type": "trusted",
+  "url": "https://gallery.hostedweb.tid.es",
   "appcache_path":"./manifest.appcache",
   "launch_path": "/index.html",
   "developer": {
@@ -11,7 +11,7 @@
   },
   "fullscreen": true,
   "permissions": {
-    "themeable":{},
+    "storage":{},
     "device-storage:pictures":{ "access": "readwrite" },
     "device-storage:videos":{ "access": "readwrite" },
     "audio-channel-content":{},
@@ -67,5 +67,6 @@
     "142": "/style/icons/gallery_142.png",
     "189": "/style/icons/gallery_189.png",
     "284": "/style/icons/gallery_284.png"
-  }
+  },
+  "csp" : "default-src *; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'"  
 }
