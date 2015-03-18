@@ -3,7 +3,8 @@
     "pdfjs": "*",
     "music-hosted": "*",
     "gallery-hosted": "*",
-    "video-hosted": "*"
+    "video-hosted": "*",
+    "clock-hosted": "*"
   },
   "JS_AGGREGATION_BLACKLIST": {
   },
