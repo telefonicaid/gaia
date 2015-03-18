@@ -129,6 +129,9 @@
       origin: this.app.origin,
       rearWindow: this.app
     };
+    if (!this.app.isVisible() || this.app._killed) {
+      this.app.open();
+    }
     var childWindow = new PopupWindow(configObject);
     childWindow.element.addEventListener('_closing', this);
     childWindow.open();
