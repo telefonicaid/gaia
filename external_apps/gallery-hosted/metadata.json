@@ -1,9 +1,1 @@
-{
-  "origin": "https://gallery.hostedweb.tid.es",
-  "type": "trusted",
-  "removable": true,
-  "manifestURL": "https://gallery.hostedweb.tid.es/manifest.webapp",
-  "installOrigin": "https://gallery.hostedweb.tid.es",
-  "etag": "3578904-1321-Thu Mar 12 2015 12:06:54 GMT+0000 (UTC)",
-  "external": true
-}
+{"origin": "https://gallery.hostedweb.tid.es", "manifestURL": "https://gallery.hostedweb.tid.es/manifest.webapp", "installOrigin": "https://marketplace.firefox.com", "etag": "\"3578673-1440-Wed Mar 18 2015 13:58:45 GMT+0000 (UTC)\"", "external": true}
