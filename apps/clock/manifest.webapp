@@ -3,6 +3,7 @@
   "description": "Gaia Clock",
   "type": "trusted",
   "url": "https://clock.hostedweb.tid.es",
+  "appcache_path": "./manifest.appcache",
   "launch_path": "/index.html",
   "developer": {
     "name": "The Gaia Team",
