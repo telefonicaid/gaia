@@ -908,18 +908,22 @@ function init() {
   );*/
 }
 
-function onAirplaneModeChange(evt) {
-  airplaneModeEnabled = evt.settingValue;
+function onAirplaneModeChange(settingValue) {
+  airplaneModeEnabled = settingValue;
   updateWarningModeUI();
 }
 
 window.addEventListener('load', function(e) {
   if (navigator.mozSettings) {
     navigator.mozSettings.addObserver('airplaneMode.enabled',
-      onAirplaneModeChange);
+      function(evt) {
+        onAirplaneModeChange(evt.settingValue);
+      });
     var request = navigator.mozSettings.createLock().
                     get('airplaneMode.enabled');
-    request.onsuccess = onAirplaneModeChange;
+    request.onsuccess = function() {
+      onAirplaneModeChange(request.result['airplaneMode.enabled']);
+    };
   }
   init();
 }, false);
