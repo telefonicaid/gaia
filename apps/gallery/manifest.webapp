@@ -1,7 +1,9 @@
 {
   "name": "Gallery",
   "description": "Gaia Gallery",
-  "type": "certified",
+  "type":"trusted",
+  "url":"https://gallery.hostedweb.tid.es",
+  "appcache_path":"./manifest.appcache",
   "launch_path": "/index.html",
   "developer": {
     "name": "The Gaia Team",
