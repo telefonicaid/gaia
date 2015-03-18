@@ -3,6 +3,7 @@
   "description": "Gaia FM Radio",
   "type": "trusted",
   "url": "https://fm.hostedweb.tid.es",
+  "appcache_path": "./manifest.appcache",
   "launch_path": "/index.html",
   "developer": {
     "name": "The Gaia Team",
