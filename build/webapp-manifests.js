@@ -114,6 +114,7 @@ ManifestBuilder.prototype.fillExternalAppManifest = function(webapp) {
     etag: etag,
     packageEtag: packageEtag,
     appStatus: webapp.appStatus,
+    kind: webapp.kind,
     webappTargetDirName: webappTargetDirName
   };
 };
