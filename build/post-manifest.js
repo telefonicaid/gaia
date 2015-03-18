@@ -17,7 +17,7 @@ function execute(options) {
 
   // Forces the presence of `origin` field in order to help WebIDE overriding
   // the app, with the same origin.
-  manifest.origin = webapp.url;
+  manifest.origin = webapp.manifest.url || webapp.url;
 
   // Get the Gaia version and set it as an app version in manifest.webapp.
   // It's used by Langpack API
