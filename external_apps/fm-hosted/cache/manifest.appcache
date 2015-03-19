@@ -1,11 +1,22 @@
 CACHE MANIFEST
-# version Wed Mar 18 2015 12:52:15 GMT+0000 (UTC)
+# version Thu Mar 19 2015 17:27:13 GMT+0000 (UTC)
 CACHE:
 ./app.html
+./app.json
 ./index.html
+./jsdoc.json
 ./manifest.webapp
+./icons/favicon.png
+./icons/icon_128.png
+./icons/icon_60.png
+./icons/tileicon.png
+./icons/touch-icon-ipad-retina.png
+./icons/touch-icon-iphone-retina.png
+./icons/touch-icon-iphone.png
 ./js/fm.js
 ./locales/fm.en-US.properties
+./add2home/css/add2home.css
+./add2home/js/add2home.js
 ./shared/js/async_storage.js
 ./shared/js/cache.js
 ./shared/js/l10n.js
