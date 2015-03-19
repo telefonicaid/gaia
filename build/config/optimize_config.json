@@ -4,6 +4,7 @@
     "music-hosted": "*",
     "gallery-hosted": "*",
     "video-hosted": "*",
+    "camera-hosted": "*",
     "clock-hosted": "*"
   },
   "JS_AGGREGATION_BLACKLIST": {
