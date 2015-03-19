@@ -6,6 +6,7 @@ var perfUtils = require('./perf-utils');
 global.config = perfUtils.configure( require('./config.json') );
 
 var appPath = config.appPath;
+var appPathDir = config.appPathDir;
 
 function handleExcludedApp() {
   var output = {
@@ -32,7 +33,7 @@ global.requireGaia = function(path)  {
 };
 
 var Manifests = requireGaia('tests/performance/manifests.js');
-var appManifest = Manifests.readForApp(appPath);
+var appManifest = Manifests.readForApp(appPath, appPathDir);
 if (appManifest == null) {
   console.error('Manifest for "%s" not found.', appPath);
 

@@ -5,6 +5,7 @@ var App = require('./app');
 var PerformanceHelper = requireGaia('/tests/performance/performance_helper.js');
 var perfUtils = require('./perf-utils');
 var appPath = config.appPath;
+var appPathDir = config.appPathDir;
 
 if (perfUtils.isWhitelisted(config.whitelists.mozLaunch, appPath) ||
     perfUtils.isBlacklisted(config.blacklists.legacyLaunch, appPath)) {
@@ -74,6 +75,9 @@ marionette('startup test > ' + appPath + ' >', function() {
     assert.ok(results, 'empty results');
 
     results = results.filter(function(element) {
+      if ((app.origin.indexOf('https://') === 0) && (element.src.indexOf(app.origin) === 0)) {
+        return true;
+      }
       if (element.src.indexOf('app://' + manifestPath) !== 0) {
         return false;
       }
