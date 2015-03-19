@@ -2,6 +2,10 @@
 
 if (window.applicationCache) {
   window.applicationCache.addEventListener('updateready', () => {
+    if (window.applicationCache.status !==
+        window.applicationCache.UPDATEREADY) {
+      return;
+    }
     var r = confirm('There is an update with new features. Do you want to ' +
                     'reload the app now? Otherwise you will enjoy them when ' +
                     'you restart the app.');
