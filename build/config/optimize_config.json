@@ -5,6 +5,7 @@
     "gallery-hosted": "*",
     "video-hosted": "*",
     "camera-hosted": "*",
+    "fm-hosted": "*",
     "clock-hosted": "*"
   },
   "JS_AGGREGATION_BLACKLIST": {
