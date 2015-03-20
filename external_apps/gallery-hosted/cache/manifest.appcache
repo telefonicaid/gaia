@@ -1,5 +1,5 @@
 CACHE MANIFEST
-# version Fri Mar 20 2015 07:48:08 GMT+0000 (UTC)
+# version Fri Mar 20 2015 09:39:52 GMT+0000 (UTC)
 CACHE:
 ./app.html
 ./app.json
@@ -96,6 +96,7 @@ CACHE:
 ./style/images/ui/tablet_header_pressed.png
 ./style/images/ui/tablet_section_divider.png
 ./shared/js/blobview.js
+./shared/js/cache.js
 ./shared/js/dialogs.js
 ./shared/js/font_size_utils.js
 ./shared/js/gesture_detector.js
