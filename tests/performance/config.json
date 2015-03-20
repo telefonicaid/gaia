@@ -3,6 +3,7 @@
     "gaiaDir": "GAIA_DIR",
     "verbose": "VERBOSE",
     "appPath": "CURRENT_APP",
+    "appPathDir": "CURRENT_APP_DIR",
     "runs": "RUNS",
     "runnerHost": "MARIONETTE_RUNNER_HOST"
   },

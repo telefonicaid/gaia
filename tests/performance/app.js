@@ -18,7 +18,12 @@ function PerfTestApp(client, origin) {
   var arr = config.appPath.split('/');
   var manifestPath = arr[0];
   var entryPoint = arr[1];
-  origin = util.format('app://%s',
+  var Manifests = requireGaia('tests/performance/manifests.js');
+  var appPathDir = config.appPathDir;
+  var appMetadata = Manifests.readMetadataForApp(manifestPath, appPathDir);
+
+  origin = appMetadata && appMetadata.origin ||
+    util.format('app://%s',
     manifestPath.indexOf('.') !== -1 ?
     manifestPath :
     manifestPath + '.gaiamobile.org');
