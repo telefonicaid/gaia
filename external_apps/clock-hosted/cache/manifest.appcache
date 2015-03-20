@@ -1,12 +1,23 @@
 CACHE MANIFEST
-# version Wed Mar 18 2015 12:24:32 GMT+0000 (UTC)
+# version Fri Mar 20 2015 07:41:29 GMT+0000 (UTC)
 CACHE:
 ./app.html
+./app.json
 ./index.html
+./jsdoc.json
 ./manifest.webapp
 ./onring.html
+./icons/favicon.png
+./icons/icon_128.png
+./icons/icon_60.png
+./icons/tileicon.png
+./icons/touch-icon-ipad-retina.png
+./icons/touch-icon-iphone-retina.png
+./icons/touch-icon-iphone.png
 ./locales/alarms.en-US.properties
 ./locales/clock.en-US.properties
+./add2home/css/add2home.css
+./add2home/js/add2home.js
 ./js/alameda.js
 ./js/css.js
 ./js/onring.js
