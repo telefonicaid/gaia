@@ -10,16 +10,13 @@
   function PermissionManager() {
   }
 
-
-
-
   PermissionManager.prototype = {
 
     currentOrigin: undefined,
     permissionType: undefined,
     currentPermissions: undefined,
     currentChoices: {}, //select choices
-    fullscreenRequest: undefined,
+    isFullscreenRequest: false,
     isVideo: false,
     isAudio: false,
     /**
@@ -104,19 +101,38 @@
       });
     },
 
+    /**
+     * Request all strings to show
+     * @memberof PermissionManager.prototype
+     */
     getStrings: function getStrings(detail) {
-      var permissionID = 'perm-' + this.permissionType.replace(':', '-');
-      var app = applications.getByManifestURL(detail.manifestURL);
       var _ = navigator.mozL10n.get;
 
+      // If we are in fullscreen, the strings are slightly different.
+      if (this.isFullscreenRequest) {
+        var fullscreenMessage = _(
+          'fullscreen-request',
+          {
+            'origin': detail.fullscreenorigin
+          }) || '';
+        return {
+          message: fullscreenMessage,
+          moreInfoText: null
+        };
+      }
+
+      // If it's a regular request (non-fullscreen), we review
+      // the permission and create the strings accordingly
+      var permissionID = 'perm-' + this.permissionType.replace(':', '-');
+      var app = applications.getByManifestURL(detail.manifestURL);
       var message = '';
       if (detail.isApp) {
-        var name = new ManifestHelper(app.manifest).name;
+        var appName = new ManifestHelper(app.manifest).name;
         message =
           _(
             permissionID + '-appRequest',
             {
-              'app': new ManifestHelper(app.manifest).name
+              'app': appName
             }
           );
       } else {
@@ -133,7 +149,7 @@
       return {
         message : message,
         moreInfoText: moreInfoText
-      }
+      };
     },
 
     /**
@@ -206,7 +222,6 @@
       }
       this.buttons.dataset.items = 2;
       this.no.style.display = 'inline';
-
     },
 
     /**
@@ -298,21 +313,16 @@
       function pm_handleFullscreenOriginChange(detail) {
       // If there's already a fullscreen request visible, cancel it,
       // we'll show the request for the new domain.
-      if (this.fullscreenRequest !== undefined) {
-        this.cancelRequest(this.fullscreenRequest);
-        this.fullscreenRequest = undefined;
+      if (this.isFullscreenRequest) {
+        this.cancelRequest(this.currentRequestId);
+        this.isFullscreenRequest = false;
       }
       if (detail.fullscreenorigin !== Service.currentApp.origin) {
-        var _ = navigator.mozL10n.get;
-        // The message to be displayed on the approval UI.
-        var message =
-          _('fullscreen-request', { 'origin': detail.fullscreenorigin });
-        this.fullscreenRequest = 'fullscreen';
-        // Overwrite the id
+        this.isFullscreenRequest = true;
         detail.id = 'fullscreen';
         this.showPermissionPrompt(
           detail,
-          null,
+          function foo() {},
           function() {
             document.mozCancelFullScreen();
           }
@@ -363,10 +373,10 @@
       if (this.isVideo && this.isAudio) {
         this.permissionType = 'media-capture';
       } else {
-        for (var permission in detail.permissions) {
-          if (detail.permissions.hasOwnProperty(permission)) {
-            this.permissionType = permission;
-          }
+        if (detail.permission) {
+          this.permissionType = detail.permission;
+        } else if (detail.permissions) {
+          this.permissionType = Object.keys(detail.permissions)[0];
         }
       }
       this.overlay.dataset.type = this.permissionType;
@@ -391,9 +401,6 @@
           }
         }
       }
-      // ****** HASTA AQUI LO QUE ESTABA EN EL handleEvent****
-
-
 
       if ((this.isAudio || this.isVideo) && !detail.isApp &&
         !this.isCamSelector) {
@@ -443,7 +450,7 @@
             self.remember.checked
           );
         }
-      )
+      );
     },
     /**
      * Send permission choice to gecko
@@ -483,6 +490,7 @@
       this.yes.callback = null;
       this.no.removeEventListener('click', this.noHandler);
       this.no.callback = null;
+      this.moreInfo.classList.add('hidden');
       this.moreInfoLink.removeEventListener('click',
         this.moreInfoHandler);
       this.hideInfoLink.removeEventListener('click',
@@ -514,9 +522,9 @@
       var request = this.pending.shift();
 
       if ((this.currentOrigin === request.origin) &&
-        (this.permissionType === request.permission)) {
+        (this.permissionType === Object.keys(request.permissions)[0])) {
         this.dispatchResponse(request.id, this.responseStatus,
-          this.remember.checked);
+            this.remember.checked);
         this.showNextPendingRequest();
         return;
       }
@@ -595,12 +603,15 @@
      * Put the message in the dialog.
      * @memberof PermissionManager.prototype
      */
-    showPermissionPrompt: function pm_showPermissionPrompt(detail, yescallback, nocallback) {
+    showPermissionPrompt:
+      function pm_showPermissionPrompt(detail, yescallback, nocallback) {
       // Note plain text since this may include text from
       // untrusted app manifests, for example.
       var text = this.getStrings(detail);
       this.message.textContent = text.message;
-      if (text.moreInfoText) {
+      if (text.moreInfoText &&
+          text.moreInfoText &&
+          text.moreInfoText.length > 0) {
         // Show the "More info… " link.
         this.moreInfo.classList.remove('hidden');
         this.moreInfoHandler = this.clickHandler.bind(this);
@@ -683,7 +694,7 @@
         if (this.no.callback) {
           this.no.callback();
         }
-        this.fullscreenRequest = undefined;
+        this.isFullscreenRequest = false;
       } else {
         this.dispatchResponse(this.currentRequestId, 'permission-deny', false);
       }
