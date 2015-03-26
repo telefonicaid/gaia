@@ -547,7 +547,8 @@ define BUILD_CONFIG
   "P" : "$(P)", \
   "VERBOSE" : "$(VERBOSE)", \
   "RAPTOR" : "$(RAPTOR)", \
-  "SHARE_PERF_USAGE": "$(SHARE_PERF_USAGE)" \
+  "SHARE_PERF_USAGE": "$(SHARE_PERF_USAGE)", \
+  "HOSTED": "$(HOSTED)" \
 }
 endef
 

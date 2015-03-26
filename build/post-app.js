@@ -12,6 +12,10 @@ exports.execute = function(options, webapp) {
 
   require('./multilocale').execute(options);
 
+  if (options.HOSTED == '1') {
+    require('./webapp-offliner').execute(webapp);
+  }
+
   // This task will do three things.
   // 1. Copy manifest to profile: generally we got manifest from
   //    webapp-manifest.js unless manifest is generated from Makefile of app.
