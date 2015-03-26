@@ -9,7 +9,7 @@ var isResource = function(resource) {
 }
 
 var WebappOffliner = function(webapp) {
-  this.url = webapp.url;
+  this.url = webapp.manifest.url;
   this.buildDirPath = webapp.buildDirectoryFilePath;
   this.buildDir = utils.getFile(this.buildDirPath);
   this.resources = [];
