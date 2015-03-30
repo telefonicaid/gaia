@@ -12,8 +12,8 @@ exports.execute = function(options, webapp) {
 
   require('./multilocale').execute(options);
 
-  if (options.HOSTED == '1') {
-    require('./webapp-offliner').execute(webapp);
+  if (options.HOSTED == '2') {
+    require('./webapp-offliner').execute(options);
   }
 
   // This task will do three things.
