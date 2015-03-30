@@ -212,7 +212,7 @@ ifeq ($(DOGFOOD), 1)
 GAIA_APP_TARGET=dogfood
 endif
 
-ifeq ($(HOSTED), 1)
+ifneq ($(HOSTED), 0)
 GAIA_APP_TARGET=hosted
 GAIA_CONCAT_LOCALES=0
 endif
