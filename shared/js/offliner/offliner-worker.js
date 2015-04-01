@@ -13,7 +13,7 @@ importScripts('offliner-resources.js');
 
 offliner = new off.Offliner();
 
-console.log('Offliner instantiated!');
+console.log('Offliner >', 'Offliner instantiated!');
 
 offliner.prefetch
 

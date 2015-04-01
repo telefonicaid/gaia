@@ -24,6 +24,8 @@ self.off.fetchers.urls = {
       // `fetch()` so it's neccessary to bust the URL to recover a fresh copy.
       var bustedUrl = resource.url + '?__b=' + Date.now();
 
+      console.log('Offliner >', 'Prefetching', resource.url);
+
       // The request is for the busted url in no-cors mode to allow resources
       // from other origins.
       var request = new Request(bustedUrl, { mode: 'no-cors' });
