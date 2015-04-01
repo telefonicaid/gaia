@@ -43,8 +43,7 @@ WebappOffliner.prototype.createResourcesFile = function() {
   this.visitResources(this.buildDir);
   var file = this.buildDir.clone();
   file.append('offliner-resources.js');
-  utils.writeContent(file, 'var off = window.off || {};\n' +
-                           'off.resources = ' +
+  utils.writeContent(file, 'off.resources = ' +
                             JSON.stringify(this.resources) +
                            ';');
 }
