@@ -5,6 +5,8 @@ importScripts('offliner-resources.js');
 
 offliner = new off.Offliner();
 
+console.log('Offliner instantiated!');
+
 offliner.prefetch
 
   .use(off.fetchers.urls)

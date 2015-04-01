@@ -4,6 +4,8 @@ const { Ci } = require('chrome');
 
 const OFFLINER_CLIENT_NAME = 'offliner-client';
 
+const OFFLINER_INIT_NAME = 'offliner-init';
+
 var utils = require('./utils');
 
 var isResource = function(resource) {
@@ -60,19 +62,23 @@ WebappOffliner.prototype.decorateLaunchPath = function() {
 
   var doc = utils.getDocument(utils.getFileContent(htmlFile));
 
-  this.appendElement(doc, {
-    fileType: 'script',
-    attrs: {
-      src: OFFLINER_CLIENT_NAME + '.js',
-      type: 'text/javascript'
-    }
+  var fileNames = [OFFLINER_INIT_NAME, OFFLINER_CLIENT_NAME];
+
+  fileNames.forEach(fileName => {
+    this.prependElement(doc, {
+      fileType: 'script',
+      attrs: {
+        src: fileName + '.js',
+        type: 'text/javascript'
+      }
+    });
   });
 
   var str = utils.serializeDocument(doc);
   utils.writeContent(htmlFile, str);
 };
 
-WebappOffliner.prototype.appendElement = function(doc, data) {
+WebappOffliner.prototype.prependElement = function(doc, data) {
   var file = doc.createElement(data.fileType);
 
   for (var attr in data.attrs) {
