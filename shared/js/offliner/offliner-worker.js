@@ -1,6 +1,14 @@
 
 importScripts('offliner.min.js');
 
+importScripts('offliner-fetcher-urls.js');
+
+importScripts('offliner-source-cache.js');
+
+importScripts('offliner-source-network.js');
+
+importScripts('offliner-updater-reinstall.js');
+
 importScripts('offliner-resources.js');
 
 offliner = new off.Offliner();
@@ -20,11 +28,5 @@ offliner.fetch
   .use(off.sources.network)
 
   .orFail();
-
-offliner.update
-
-  .option('period', '5m')
-
-  .use(off.updaters.reinstall.onInstallOnly(true));
 
 offliner.standalone();
