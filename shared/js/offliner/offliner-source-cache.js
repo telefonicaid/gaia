@@ -11,8 +11,8 @@ self.off.sources.cache = function (request, activeCache) {
 
     // Notice how we resolve with the response if there is a match in the
     // cache of reject otherwise.
-    console.log('Offliner >', 'Cache receives', JSON.stringify(request));
-    console.log('Offliner >', 'Cache returns', JSON.stringify(response));
+    console.log('Offliner >', 'Cache receives', request.url);
+    console.log('Offliner >', 'Cache returns', response && response.status);
     return response ? Promise.resolve(response) : Promise.reject();
   });
 };
