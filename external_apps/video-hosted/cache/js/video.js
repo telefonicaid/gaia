@@ -681,6 +681,8 @@ function updateDialog() {
     showOverlay('nocard');
   } else if (storageState === MediaDB.UNMOUNTED) {
     showOverlay('pluggedin');
+  } else if (storageState === MediaDB.SECURITYERROR) {
+    showOverlay('nopermission');
   } else if (firstScanEnded &&
              thumbnailList.count === 0 &&
              metadataQueue.length === 0) {
