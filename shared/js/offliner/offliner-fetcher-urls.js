@@ -30,7 +30,11 @@ self.off.fetchers.urls = {
 
       console.log('Offliner prefetching >', resource.url);
       // But when caching, the cache is for the original URL.
-      return fetch(request).then(cache.put.bind(cache, resource.url));
+      return fetch(request).then(response => {
+        console.log('Offliner cached >', resource.url,
+                     response && response.status);
+        cache.put(resource.url, response);
+      });
     }));
   }
 };

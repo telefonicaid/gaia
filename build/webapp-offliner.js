@@ -13,7 +13,7 @@ var isResource = function(resource) {
 }
 
 var isResourceDir = function(resource) {
-  return ['test-data', 'test'].indexOf(resource) === -1;
+  return ['test-data', 'test', 'locales-obj'].indexOf(resource) === -1;
 }
 
 var WebappOffliner = function(options) {
@@ -27,24 +27,25 @@ var WebappOffliner = function(options) {
   this.resources = [];
 };
 
-WebappOffliner.prototype.visitResources = function(source) {
+WebappOffliner.prototype.visitResources = function(source, pathToRemove) {
   var files = source.directoryEntries;
 
   while (files.hasMoreElements()) {
     var file = files.getNext().QueryInterface(Ci.nsILocalFile);
     if (file.isDirectory()) {
-      isResourceDir(file.leafName) && this.visitResources(file);
+      isResourceDir(file.leafName) && this.visitResources(file, pathToRemove);
     } else {
       if (isResource(file.leafName)) {
-        this.resources.push(this.url +
-                            file.path.replace(this.buildDirPath, ''));
+        this.resources.push(this.url + file.path.replace(pathToRemove, ''));
       }
     }
   }
 }
 
 WebappOffliner.prototype.createResourcesFile = function() {
-  this.visitResources(this.buildDir);
+  this.visitResources(utils.getFile(this.webapp.appDirPath, 'locales'),
+                      this.webapp.appDirPath);
+  this.visitResources(this.buildDir, this.buildDirPath);
   this.resources.push(this.url + '/app.html');
   var file = this.buildDir.clone();
   file.append('offliner-resources.js');
