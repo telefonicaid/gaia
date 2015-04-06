@@ -57,6 +57,11 @@ function initDB() {
   videodb.ondeleted = function(event) {
     event.detail.forEach(videoDeleted);
   };
+
+  videodb.onSecurityError = function(event) {
+    storageState = MediaDB.SECURITYERROR;
+    updateDialog();
+  };
 }
 
 // Remember whether we've already run the enumeration step
