@@ -914,17 +914,8 @@ function onAirplaneModeChange(settingValue) {
 }
 
 window.addEventListener('load', function(e) {
-  if (navigator.mozSettings) {
-    navigator.mozSettings.addObserver('airplaneMode.enabled',
-      function(evt) {
-        onAirplaneModeChange(evt.settingValue);
-      });
-    var request = navigator.mozSettings.createLock().
-                    get('airplaneMode.enabled');
-    request.onsuccess = function() {
-      onAirplaneModeChange(request.result['airplaneMode.enabled']);
-    };
-  }
+  window.SettingService.observe('airplaneMode.enabled',
+    false, onAirplaneModeChange);
   init();
 }, false);
 
