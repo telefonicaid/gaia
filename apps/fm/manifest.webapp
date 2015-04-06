@@ -15,6 +15,12 @@
     "audio-channel-content":{},
     "settings:airplaneMode.enabled": { "access": "readonly" }
   },
+  "connections": {
+    "appsettingrequired": {
+      "description": "Communicate between Settings app and other installed apps.",
+      "rules": {}
+    }
+  },
   "locales": {
     "ar": {
       "name": "FM Radio",
