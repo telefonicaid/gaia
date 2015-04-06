@@ -1,5 +1,5 @@
 CACHE MANIFEST
-# version Fri Mar 20 2015 07:24:27 GMT+0000 (UTC)
+# version Mon Apr 06 2015 09:58:42 GMT+0000 (UTC)
 CACHE:
 ./app.html
 ./app.json
@@ -19,8 +19,10 @@ CACHE:
 ./add2home/js/add2home.js
 ./shared/js/async_storage.js
 ./shared/js/cache.js
+./shared/js/iac_handler.js
 ./shared/js/l10n.js
 ./shared/js/performance_testing_helper.js
+./shared/js/setting_service.js
 ./style/fm.css
 ./style/icons/fm_126.png
 ./style/icons/fm_142.png
