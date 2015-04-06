@@ -9,7 +9,11 @@ const OFFLINER_INIT_NAME = 'offliner-init';
 var utils = require('./utils');
 
 var isResource = function(resource) {
-  return ['.DS_Store', 'test-data'].indexOf(resource) === -1;
+  return ['.DS_Store'].indexOf(resource) === -1;
+}
+
+var isResourceDir = function(resource) {
+  return ['test-data', 'test'].indexOf(resource) === -1;
 }
 
 var WebappOffliner = function(options) {
@@ -29,7 +33,7 @@ WebappOffliner.prototype.visitResources = function(source) {
   while (files.hasMoreElements()) {
     var file = files.getNext().QueryInterface(Ci.nsILocalFile);
     if (file.isDirectory()) {
-      isResource(file.leafName) && this.visitResources(file);
+      isResourceDir(file.leafName) && this.visitResources(file);
     } else {
       if (isResource(file.leafName)) {
         this.resources.push(this.url +
