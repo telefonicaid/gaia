@@ -9,7 +9,7 @@ const OFFLINER_INIT_NAME = 'offliner-init';
 var utils = require('./utils');
 
 var isResource = function(resource) {
-  return ['.DS_Store'].indexOf(resource) === -1;
+  return ['.DS_Store', 'test-data'].indexOf(resource) === -1;
 }
 
 var WebappOffliner = function(options) {
@@ -29,7 +29,7 @@ WebappOffliner.prototype.visitResources = function(source) {
   while (files.hasMoreElements()) {
     var file = files.getNext().QueryInterface(Ci.nsILocalFile);
     if (file.isDirectory()) {
-      this.visitResources(file);
+      isResource(file.leafName) && this.visitResources(file);
     } else {
       if (isResource(file.leafName)) {
         this.resources.push(this.url +
@@ -47,6 +47,17 @@ WebappOffliner.prototype.createResourcesFile = function() {
                             JSON.stringify(this.resources) +
                            ';');
 }
+
+WebappOffliner.prototype.addDateToWorker = function() {
+  var file = utils.getFile(this.buildDirPath, 'offliner-worker.js');
+
+  if (!file.exists()) {
+    utils.log(file.path + 'does not exist!\n');
+  }
+
+  var content = utils.getFileContent(file);
+  utils.writeContent(file, '// ' + Date.now() + content);
+};
 
 WebappOffliner.prototype.decorateLaunchPath = function() {
   var launchPath = this.webapp.manifest.launch_path || 'index.html';
@@ -98,7 +109,9 @@ WebappOffliner.prototype.execute = function() {
   this.createResourcesFile();
   // 2) Copy all files in '/shared/js/offliner' to root folder
   this.copyServiceWorkerFiles();
-  // 3) Add offliner-setup's link in the launch HTML page
+  // 3) Write current date to worker
+  this.addDateToWorker();
+  // 4) Add offliner-setup's link in the launch HTML page
   this.decorateLaunchPath();
 };
 

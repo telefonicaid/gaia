@@ -20,18 +20,25 @@ self.off.fetchers.urls = {
   // prefetching is done.
   prefetch: function (resources, cache) {
     return Promise.all(resources.map(function (resource) {
-      // The HTTP cache is still working when leavin the service worker via
-      // `fetch()` so it's neccessary to bust the URL to recover a fresh copy.
-      var bustedUrl = resource.url + '?__b=' + Date.now();
+      return cache.match(new Request(resource.url)).then(response => {
+        console.log(response && response.status);
+        if (response && response.status === '200') {
+          console.log('Offliner fetcher >', resource.url,  'already in cache');
+          return Promise.resolve();
+        } else {
+          // The HTTP cache is still working when leaving the service worker via
+          // `fetch()` so it's neccessary to bust the URL to recover a fresh copy.
+          var bustedUrl = resource.url + '?__b=' + Date.now();
 
-      console.log('Offliner >', 'Prefetching', resource.url);
+          // The request is for the busted url in no-cors mode to allow resources
+          // from other origins.
+          var request = new Request(bustedUrl, { mode: 'no-cors' });
 
-      // The request is for the busted url in no-cors mode to allow resources
-      // from other origins.
-      var request = new Request(bustedUrl, { mode: 'no-cors' });
-
-      // But when caching, the cache is for the original URL.
-      return fetch(request).then(cache.put.bind(cache, resource.url));
+          console.log('Offliner fetcher >', resource.url);
+          // But when caching, the cache is for the original URL.
+          return fetch(request).then(cache.put.bind(cache, resource.url));
+        }
+      });
     }));
   }
 };
