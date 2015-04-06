@@ -33,6 +33,7 @@ self.off.fetchers.urls = {
       return fetch(request).then(response => {
         console.log('Offliner cached >', resource.url,
                      response && response.status);
+        response && response.status === 200 &&
         cache.put(resource.url, response);
       });
     }));

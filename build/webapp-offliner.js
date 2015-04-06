@@ -9,7 +9,7 @@ const OFFLINER_INIT_NAME = 'offliner-init';
 var utils = require('./utils');
 
 var isResource = function(resource) {
-  return ['.DS_Store'].indexOf(resource) === -1;
+  return ['.DS_Store', '.jshintrc'].indexOf(resource) === -1;
 }
 
 var isResourceDir = function(resource) {
