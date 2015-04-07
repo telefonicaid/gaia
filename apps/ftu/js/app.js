@@ -4,7 +4,7 @@
 /* exported AppManager */
 'use strict';
 
-function notifyCollection() {
+function notifySetup() {
   navigator.mozApps.getSelf().onsuccess = function(evt) {
     var app = evt.target.result;
     if (app.connect) {
@@ -36,9 +36,12 @@ var AppManager = {
     UIManager.init();
     Navigation.init();
 
-    // Send message to populate preinstalled collections.
+    // Send message to populate preinstalled apps.
     // This needs to be done for both upgrade and non-upgrade flows.
-    notifyCollection();
+    window.addEventListener('online', function online() {
+      window.removeEventListener('online', online);
+      notifySetup();
+    });
 
     UIManager.splashScreen.addEventListener('transitionend', function onEnd() {
       UIManager.splashScreen.removeEventListener('transitionend', onEnd);
