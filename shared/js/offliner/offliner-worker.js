@@ -2,13 +2,14 @@
 
 var CACHE_NAME = 'cache-v1';
 
-importScripts('offliner-resources.js');
+console.log('Offliner running!', typeof self);
 
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(function(cache) {
         console.log('Offliner > Opened cache');
+        importScripts('offliner-resources.js');
         return Promise.all(resources.map(url => {
           var bustedUrl = url + '?__b=' + Date.now();
 
@@ -27,6 +28,7 @@ self.addEventListener('install', function(event) {
 });
 
 self.addEventListener('fetch', function(event) {
+  console.log('Offliner > Fetch method', !!caches, typeof event.respondWith);
   event.respondWith(
     caches.match(event.request)
       .then(function(response) {
@@ -59,6 +61,8 @@ self.addEventListener('fetch', function(event) {
             return response;
           }
         );
+      }).catch(function(error) {
+        console.error(error);
       })
     );
 });

@@ -47,7 +47,6 @@ WebappOffliner.prototype.createResourcesFile = function() {
                       this.webapp.appDirPath);
   this.visitResources(this.buildDir, this.buildDirPath);
   this.resources.push(this.url + '/app.html');
-  this.resources.push(this.url + '/offliner-resources.js');
   var file = this.buildDir.clone();
   file.append('offliner-resources.js');
   utils.writeContent(file, 'var resources = ' +

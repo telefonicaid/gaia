@@ -15,6 +15,7 @@
 
   exports.off = {
     install: function () {
+      console.log('Offliner is being registered');
       return navigator.serviceWorker.register(workerURL, {
         scope: root
       });
