@@ -59,6 +59,14 @@ var Overlay = {
             $('overlay-menu').classList.remove('hidden');
           }
           break;
+        case 'securityerror':
+          title = 'nopermission-title';
+          text = 'nopermission-text';
+          if (picking) {
+            $('overlay-cancel-button').classList.remove('hidden');
+            $('overlay-menu').classList.remove('hidden');
+          }
+          break;
         case 'pluggedin':
           title = 'pluggedin2-title';
           text = 'pluggedin2-text';

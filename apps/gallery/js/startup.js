@@ -104,7 +104,10 @@ navigator.mozL10n.once(function startup() {
       // If storage becomes unavailble (e.g. the user starts a USB Mass Storage
       // Lock the user out of the app, and tell them why
       var why = photodb.state;
-      if (why === MediaDB.NOCARD) {
+      if (why === MediaDB.SECURITYERROR) {
+        Overlay.show('securityerror');
+      }
+      else if (why === MediaDB.NOCARD) {
         Overlay.show('nocard');
       }
       else if (why === MediaDB.UNMOUNTED) {
