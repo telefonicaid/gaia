@@ -1,32 +1,68 @@
+'use strict';
 
-importScripts('offliner.min.js');
-
-importScripts('offliner-fetcher-urls.js');
-
-importScripts('offliner-source-cache.js');
-
-importScripts('offliner-source-network.js');
-
-importScripts('offliner-updater-reinstall.js');
+var CACHE_NAME = 'cache-v1';
 
 importScripts('offliner-resources.js');
 
-offliner = new off.Offliner();
+self.addEventListener('install', function(event) {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(function(cache) {
+        console.log('Offliner > Opened cache');
+        return Promise.all(resources.map(url => {
+          var bustedUrl = url + '?__b=' + Date.now();
 
-console.log('Offliner >', 'Offliner instantiated!');
+          var request = new Request(bustedUrl, { mode: 'no-cors' });
 
-offliner.prefetch
+          // But when caching, the cache is for the original URL.
+          return fetch(request).then(response => {
+            if (response && response.status === 200) {
+              console.log('Offliner cached >', url);
+              cache.put(url, response);
+            }
+          });
+        }));
+      })
+  );
+});
 
-  .use(off.fetchers.urls)
+self.addEventListener('fetch', function(event) {
+  event.respondWith(
+    caches.match(event.request)
+      .then(function(response) {
+        console.log('Offliner > Fetching', event.request.url);
+        // Cache hit - return response
+        if (response) {
+          console.log('Offliner > Returning from cache', response.status);
+          return response;
+        }
 
-  .resources(off.resources);
+        console.log('Offliner > No cached');
 
-offliner.fetch
+        var fetchRequest = event.request.clone();
 
-  .use(off.sources.cache)
+        return fetch(fetchRequest).then(
+          function(response) {
+            // Check if we received a valid response
+            if(!response || response.status !== 200 ||
+                response.type !== 'basic') {
+              return response;
+            }
 
-  .use(off.sources.network)
+            var responseToCache = response.clone();
 
-  .orFail();
+            caches.open(CACHE_NAME)
+              .then(function(cache) {
+                cache.put(event.request, responseToCache);
+              });
 
-offliner.standalone();
+            return response;
+          }
+        );
+      })
+    );
+});
+
+self.addEventListener('activate', function(event) {
+  console.log('Offliner has been activated!');
+});

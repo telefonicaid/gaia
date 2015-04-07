@@ -30,8 +30,8 @@
 
       this.installing = true;
 
-      off.on('installationDone', this.onInstall.bind(this));
-      off.on('installationFailed', this.onError.bind(this));
+      //off.on('installationDone', this.onInstall.bind(this));
+      //off.on('installationFailed', this.onError.bind(this));
 
       off.install();
     },
