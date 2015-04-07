@@ -695,7 +695,11 @@ var MediaDB = (function() {
             getNextAvailability();
           };
           req.onerror = function(e) {
-            details.availability[name] = 'unavailable';
+            if(e.target.error.name === "SecurityError"){
+              details.availability[name] = 'securityError';
+            } else {
+              details.availability[name] = 'unavailable';
+            }
             getNextAvailability();
           };
         }
@@ -735,6 +739,7 @@ var MediaDB = (function() {
         var a = 0;   // # that are available
         var u = 0;   // # that are unavailable
         var s = 0;   // # that are shared
+        var sErr = 0;   // # that have permissions error
 
         for (var name in availability) {
           n++;
@@ -747,6 +752,9 @@ var MediaDB = (function() {
             break;
           case 'shared':
             s++;
+            break;
+          case 'securityError':
+            sErr++;
             break;
           }
         }
@@ -761,6 +769,11 @@ var MediaDB = (function() {
         // it is better to just act as if all volumes are shared together
         if (s > 0) {
           return MediaDB.UNMOUNTED;
+        }
+
+        // If all volumes have security error, then MediaDB is unavailable
+        if (sErr === n) {
+            return MediaDB.SECURITYERROR;
         }
 
         // If all volumes are unavailable, then MediaDB is unavailable
