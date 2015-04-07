@@ -65,6 +65,22 @@ WebappOffliner.prototype.addDateToWorker = function() {
   utils.writeContent(file, '// ' + Date.now() + content);
 };
 
+WebappOffliner.prototype.addSWRegisterToManifest = function() {
+  var file = utils.getFile(this.buildDirPath, 'manifest.webapp');
+
+  if (!file.exists()) {
+    utils.log(file.path + 'does not exist!\n');
+  }
+
+  var manifest = JSON.parse(utils.getFileContent(file));
+  manifest.connections = manifest.connections || {};
+  manifest.connections.setup = {
+    rules: {},
+    handler_path: '/offliner-register.html'
+  };
+  utils.writeContent(file, JSON.stringify(manifest));
+};
+
 WebappOffliner.prototype.decorateLaunchPath = function() {
   var launchPath = this.webapp.manifest.launch_path || 'index.html';
   launchPath = launchPath.startsWith('/') ? launchPath.substring(1) :
@@ -119,6 +135,8 @@ WebappOffliner.prototype.execute = function() {
   this.addDateToWorker();
   // 4) Add offliner-setup's link in the launch HTML page
   this.decorateLaunchPath();
+  // 5) Add IAC connection to register the SW from FTU
+  this.addSWRegisterToManifest();
 };
 
 function execute(options) {
