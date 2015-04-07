@@ -1,8 +1,0 @@
-{
-  "fm": {
-    "src": ["apps/fm/js/**/*.js"],
-    "options": {
-      "destination": "docs/fm"
-    }
-  }
-}
