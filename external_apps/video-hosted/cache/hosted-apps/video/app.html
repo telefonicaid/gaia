@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-US" dir="ltr" manifest="manifest.appcache">
+<html lang="en-US" dir="ltr">
   <head>
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
     <meta charset="utf-8">
     <link rel="manifest" href="manifest.webapp">
     <title>Videos</title>
     <meta name="defaultLanguage" content="en-US">
-    <meta name="availableLanguages" content="en-US:201503061231, qps-ploc:201503061231, qps-plocm:201503061231">
+    <meta name="availableLanguages" content="en-US:201503091037, qps-ploc:201503091037, qps-plocm:201503091037">
     <link rel="localization" href="locales/video.{locale}.properties">
     <link rel="localization" href="/shared/locales/date/date.{locale}.properties">
     <!-- this file is loaded lazily but is listed here so it gets packaged
@@ -50,15 +50,7 @@
     <script defer src="js/forward_rewind_controller.js"></script>
     <script defer src="js/video_loading_checker.js"></script>
     <script defer src="js/video.js"></script>
-  <meta content="3.0" name="appVersion"><link rel="apple-touch-icon" href="icons/touch-icon-iphone.png">
-<link rel="apple-touch-icon" sizes="120x120" href="icons/touch-icon-iphone-retina.png">
-<link rel="apple-touch-icon" sizes="76x76" href="icons/favicon.png">
-<link rel="apple-touch-icon" sizes="152x152" href="icons/touch-icon-ipad-retina.png">
-<link rel="icon" href="icons/favicon.png">
-<meta name="msapplication-TileImage" content="icons/tileicon.png">
-<script type="text/javascript" src="add2home/js/add2home.js"></script>
-<link href="add2home/css/add2home.css" rel="stylesheet">
-</head>
+  <meta content="3.0" name="appVersion"></head>
   <body role="application" class="skin-dark theme-media">
     <div id="app-container">
       <div id="two-column-spearator"></div>
@@ -231,22 +223,6 @@
         <p id="in-use-overlay-text"></p>
       </section>
     </form>
-  
-<!-- Piwik -->
-<script type="text/javascript">
-  var _paq = _paq || [];
-  _paq.push(['trackPageView']);
-  _paq.push(['enableLinkTracking']);
-  (function() {
-    var u="http://owd.tid.ovh:8080/";
-    _paq.push(['setTrackerUrl', u+'piwik.php']);
-    _paq.push(['setSiteId', 553]);
-    var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
-    g.type='text/javascript'; g.async=true; g.defer=true; g.src=u+'piwik.js'; s.parentNode.insertBefore(g,s);
-  })();
-</script>
-<noscript><p><img src="http://owd.tid.ovh:8080/piwik.php?idsite=553" style="border:0;" alt=""></p></noscript>
-<!-- End Piwik Code -->
-</body>
+  </body>
 
 </html>

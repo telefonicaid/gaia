@@ -1,20 +1,8 @@
 {
   "apps": [
     {
-      "name": "Music",
-      "manifestURL": "https://music.hostedweb.tid.es/manifest.webapp"
-    },
-    {
-      "name": "FM",
-      "manifestURL": "https://fm.hostedweb.tid.es/manifest.webapp"
-    },
-    {
       "name": "Video",
-      "manifestURL": "https://video.hostedweb.tid.es/manifest.webapp"
-    },
-    {
-      "name": "Gallery",
-      "manifestURL": "https://gallery.hostedweb.tid.es/manifest.webapp"
+      "manifestURL": "https://telefonicaid.github.io/hosted-apps/video/manifest.webapp"
     }
   ]
 }

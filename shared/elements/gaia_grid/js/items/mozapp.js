@@ -194,7 +194,10 @@
     },
 
     asyncName: function() {
-      var pre = this.app.manifestURL.contains('hostedweb.tid') ? 'H - ' : '';
+      var isHostedDemo = this.app.manifestURL.contains('hostedweb.tid') ||
+                         this.app.manifestURL.contains('/hosted-apps/');
+      var pre = isHostedDemo ? 'H - ' : '';
+
       var userLang = document.documentElement.lang;
 
       var ep = this.entryPoint || undefined;
