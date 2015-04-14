@@ -11,6 +11,10 @@
     {
       "name": "Radio FM",
       "manifestURL": "https://telefonicaid.github.io/hosted-apps/fm/manifest.webapp"
+    },
+    {
+      "name": "Gallery",
+      "manifestURL": "https://telefonicaid.github.io/hosted-apps/gallery/manifest.webapp"
     }
   ]
 }
