@@ -3,6 +3,10 @@
     {
       "name": "Video",
       "manifestURL": "https://telefonicaid.github.io/hosted-apps/video/manifest.webapp"
+    },
+    {
+      "name": "Clock",
+      "manifestURL": "https://telefonicaid.github.io/hosted-apps/clock/manifest.webapp"
     }
   ]
 }

@@ -5304,7 +5304,8 @@ define('panels/alarm/active_alarm',['require','app','alarm_database','timer','ut
    */
   function ActiveAlarm() {
     this.alertWindow = new ChildWindowManager(
-      window.location.origin + '/onring.html');
+      window.location.href.slice(0, window.location.href.lastIndexOf('/')) +
+      '/onring.html');
 
     // Handle the system's alarm event.
     navigator.mozSetMessageHandler('alarm', this.onMozAlarm.bind(this));
