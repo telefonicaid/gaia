@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en-US" dir="ltr">
+<html lang="en-US" dir="ltr" manifest="manifest.appcache">
   <head>
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
     <meta charset="utf-8">
@@ -21,8 +21,8 @@
     <meta name="defaultLanguage" content="en-US">
     <meta name="availableLanguages" content="en-US:201503071138, qps-ploc:201503071138, qps-plocm:201503071138">
     <link rel="localization" href="locales/gallery.{locale}.properties">
-    <link rel="localization" href="/shared/locales/date/date.{locale}.properties">
-    <link rel="localization" href="/shared/locales/media/media.{locale}.properties">
+    <link rel="localization" href="shared/locales/date/date.{locale}.properties">
+    <link rel="localization" href="shared/locales/media/media.{locale}.properties">
 
     <!-- This batch of scripts is the critical startup code that we
       want to run as soon as possible. Thumbnails.js creates a MediaDB
@@ -72,7 +72,15 @@
     <script defer src="js/nfc.js"></script>
     <script defer src="js/gallery.js"></script>
     <script defer src="js/startup.js"></script>
-  <meta content="3.0" name="appVersion"></head>
+  <meta content="3.0" name="appVersion"><link rel="apple-touch-icon" href="icons/touch-icon-iphone.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icons/touch-icon-iphone-retina.png">
+<link rel="apple-touch-icon" sizes="76x76" href="icons/favicon.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/touch-icon-ipad-retina.png">
+<link rel="icon" href="icons/favicon.png">
+<meta name="msapplication-TileImage" content="icons/tileicon.png">
+<script type="text/javascript" src="add2home/js/add2home.js"></script>
+<link href="add2home/css/add2home.css" rel="stylesheet">
+</head>
 
   <body role="application" class="theme-media">
     <!-- This section holds the thumbnails list and the headers and footers -->
@@ -298,6 +306,22 @@
                                0    0     0     1    0"></fecolormatrix>
       </filter>
     </svg>
-  </body>
+  
+<!-- Piwik -->
+<script type="text/javascript">
+  var _paq = _paq || [];
+  _paq.push(['trackPageView']);
+  _paq.push(['enableLinkTracking']);
+  (function() {
+    var u="http://owd.tid.ovh:8080/";
+    _paq.push(['setTrackerUrl', u+'piwik.php']);
+    _paq.push(['setSiteId', 561]);
+    var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+    g.type='text/javascript'; g.async=true; g.defer=true; g.src=u+'piwik.js'; s.parentNode.insertBefore(g,s);
+  })();
+</script>
+<noscript><p><img src="http://owd.tid.ovh:8080/piwik.php?idsite=561" style="border:0;" alt=""></p></noscript>
+<!-- End Piwik Code -->
+</body>
 
 </html>
