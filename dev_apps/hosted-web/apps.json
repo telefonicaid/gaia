@@ -2,19 +2,19 @@
   "apps": [
     {
       "name": "Video",
-      "manifestURL": "https://telefonicaid.github.io/hosted-apps/video/manifest.webapp"
+      "manifestURL": "http://telefonicaid.github.io/hosted-apps/video/manifest.webapp"
     },
     {
       "name": "Clock",
-      "manifestURL": "https://telefonicaid.github.io/hosted-apps/clock/manifest.webapp"
+      "manifestURL": "http://telefonicaid.github.io/hosted-apps/clock/manifest.webapp"
     },
     {
       "name": "Radio FM",
-      "manifestURL": "https://telefonicaid.github.io/hosted-apps/fm/manifest.webapp"
+      "manifestURL": "http://telefonicaid.github.io/hosted-apps/fm/manifest.webapp"
     },
     {
       "name": "Gallery",
-      "manifestURL": "https://telefonicaid.github.io/hosted-apps/gallery/manifest.webapp"
+      "manifestURL": "http://telefonicaid.github.io/hosted-apps/gallery/manifest.webapp"
     }
   ]
 }
