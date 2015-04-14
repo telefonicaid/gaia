@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en-US" dir="ltr">
+<html lang="en-US" dir="ltr" manifest="manifest.appcache">
   <head>
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
     <meta charset="utf-8">
@@ -14,15 +14,23 @@
     <script defer src="shared/js/async_storage.js"></script>
     <script defer src="shared/js/cache.js"></script>
     <!-- Setting Service IAC -->
-    <script defer src="/shared/js/iac_handler.js"></script>
-    <script defer src="/shared/js/setting_service.js"></script>
+    <script defer src="shared/js/iac_handler.js"></script>
+    <script defer src="shared/js/setting_service.js"></script>
 
     <!-- For perf-measurement related utilities -->
     <script defer src="shared/js/performance_testing_helper.js"></script>
 
     <script defer src="js/fm.js"></script>
 
-  <meta content="3.0" name="appVersion"></head>
+  <meta content="3.0" name="appVersion"><link rel="apple-touch-icon" href="icons/touch-icon-iphone.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icons/touch-icon-iphone-retina.png">
+<link rel="apple-touch-icon" sizes="76x76" href="icons/favicon.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/touch-icon-ipad-retina.png">
+<link rel="icon" href="icons/favicon.png">
+<meta name="msapplication-TileImage" content="icons/tileicon.png">
+<script type="text/javascript" src="add2home/js/add2home.js"></script>
+<link href="add2home/css/add2home.css" rel="stylesheet">
+</head>
 
   <body>
     <div id="container" dir="ltr">
@@ -63,6 +71,22 @@
       <div class="warning-header" data-l10n-id="airplaneModeHeader">Airplane mode is on</div>
       <div class="warning-body" data-l10n-id="airplaneModeMsg">Turn off Airplane mode to use FM Radio.</div>
     </div>
-  </body>
+  
+<!-- Piwik -->
+<script type="text/javascript">
+  var _paq = _paq || [];
+  _paq.push(['trackPageView']);
+  _paq.push(['enableLinkTracking']);
+  (function() {
+    var u="http://owd.tid.ovh:8080/";
+    _paq.push(['setTrackerUrl', u+'piwik.php']);
+    _paq.push(['setSiteId', 552]);
+    var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+    g.type='text/javascript'; g.async=true; g.defer=true; g.src=u+'piwik.js'; s.parentNode.insertBefore(g,s);
+  })();
+</script>
+<noscript><p><img src="http://owd.tid.ovh:8080/piwik.php?idsite=552" style="border:0;" alt=""></p></noscript>
+<!-- End Piwik Code -->
+</body>
 
 </html>
