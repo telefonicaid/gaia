@@ -695,7 +695,11 @@ var MediaDB = (function() {
             getNextAvailability();
           };
           req.onerror = function(e) {
-            details.availability[name] = 'unavailable';
+            if(e.target.error.name === "SecurityError"){
+              details.availability[name] = 'securityError';
+            } else {
+              details.availability[name] = 'unavailable';
+            }
             getNextAvailability();
           };
         }
@@ -735,6 +739,7 @@ var MediaDB = (function() {
         var a = 0;   // # that are available
         var u = 0;   // # that are unavailable
         var s = 0;   // # that are shared
+        var sErr = 0;   // # that have permissions error
 
         for (var name in availability) {
           n++;
@@ -747,6 +752,9 @@ var MediaDB = (function() {
             break;
           case 'shared':
             s++;
+            break;
+          case 'securityError':
+            sErr++;
             break;
           }
         }
@@ -761,6 +769,11 @@ var MediaDB = (function() {
         // it is better to just act as if all volumes are shared together
         if (s > 0) {
           return MediaDB.UNMOUNTED;
+        }
+
+        // If all volumes have security error, then MediaDB is unavailable
+        if (sErr === n) {
+            return MediaDB.SECURITYERROR;
         }
 
         // If all volumes are unavailable, then MediaDB is unavailable
@@ -1392,6 +1405,7 @@ var MediaDB = (function() {
   MediaDB.NOCARD = 'nocard';         // Unavailable because there is no sd card
   MediaDB.UNMOUNTED = 'unmounted';   // Unavailable because card unmounted
   MediaDB.CLOSED = 'closed';         // Unavailable because MediaDB has closed
+  MediaDB.SECURITYERROR = 'securityerror'; // User canceled permissions
 
   /* Details of helper functions follow */
 
@@ -1515,8 +1529,8 @@ var MediaDB = (function() {
       cursor.onerror = function() {
         // We can't scan if we can't read device storage.
         // Perhaps the card was unmounted or pulled out
-        console.warning('Error while scanning', cursor.error);
-        endscan(media);
+        console.warn('Error while scanning', cursor.error);
+        endscan(media, cursor.error);
       };
     }
 
@@ -1559,7 +1573,7 @@ var MediaDB = (function() {
         // We can't scan if we can't read device storage.
         // Perhaps the card was unmounted or pulled out
         console.warning('Error while scanning', cursor.error);
-        endscan(media);
+        endscan(media, cursor.error);
       };
 
       function getDBFiles() {
@@ -1691,11 +1705,11 @@ var MediaDB = (function() {
   // This event is sent on normal scan termination and also
   // when something goes wrong, such as the device storage being
   // unmounted during a scan.
-  function endscan(media) {
+  function endscan(media, cursorError) {
     if (media.scanning) {
       media.scanning = false;
       media.parsingBigFiles = false;
-      dispatchEvent(media, 'scanend');
+      dispatchEvent(media, cursorError ? cursorError.name : 'scanend');
     }
   }
 
