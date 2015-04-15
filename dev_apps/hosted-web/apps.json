@@ -15,6 +15,10 @@
     {
       "name": "Gallery",
       "manifestURL": "http://telefonicaid.github.io/hosted-apps/gallery/manifest.webapp"
+    },
+    {
+      "name": "Camera",
+      "manifestURL": "https://test-demo.hostedweb.tid.es/manifest.webapp"
     }
   ]
 }
