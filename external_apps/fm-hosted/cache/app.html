@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en-US" dir="ltr">
+  <head>
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
+    <meta charset="utf-8">
+    <meta name="theme-color" content="#242d33">
+    <link rel="manifest" href="manifest.webapp">
+    <title>FM Radio</title>
+    <link rel="stylesheet" href="style/fm.css" type="text/css">
+    <meta name="defaultLanguage" content="en-US">
+    <meta name="availableLanguages" content="en-US:201503061159, qps-ploc:201503061159, qps-plocm:201503061159">
+    <link rel="localization" href="locales/fm.{locale}.properties">
+    <script defer src="shared/js/l10n.js"></script>
+    <script defer src="shared/js/async_storage.js"></script>
+    <script defer src="shared/js/cache.js"></script>
+    <!-- Setting Service IAC -->
+    <script defer src="/shared/js/iac_handler.js"></script>
+    <script defer src="/shared/js/setting_service.js"></script>
+
+    <!-- For perf-measurement related utilities -->
+    <script defer src="shared/js/performance_testing_helper.js"></script>
+
+    <script defer src="js/fm.js"></script>
+
+  <meta content="3.0" name="appVersion"></head>
+
+  <body>
+    <div id="container" dir="ltr">
+      <div id="frequency-bar">
+        <div id="frequency-display">
+          <button aria-label="Speaker" id="speaker-switch" href="#speaker" data-speaker-on="false" data-l10n-id="speaker-switch" aria-pressed="false"></button>
+          <div id="frequency" role="status">0</div>
+          <button aria-label="Favorite" id="bookmark-button" href="#bookmark" data-bookmarked="false" data-l10n-id="bookmark-button"></button>
+        </div>
+      </div>
+      <div id="dialer-bar">
+        <div aria-label="Frequency" id="dialer-container" data-l10n-id="dialer-container" role="slider" aria-valuemin="87.5" aria-valuemax="108" aria-controls="frequency">
+          <div id="frequency-indicator"></div>
+          <div id="frequency-dialer" class="animation-on"></div>
+        </div>
+      </div>
+      <div id="fav-list">
+        <div aria-label="Favorited stations" id="fav-list-container" role="listbox" data-l10n-id="fav-list-container"></div>
+      </div>
+      <div id="action-bar" role="toolbar">
+        <div>
+          <button aria-label="Seek Down" id="frequency-op-seekdown" href="#seekdown" data-l10n-id="frequency-op-seekdown"></button>
+        </div>
+        <div>
+          <button aria-label="Off" id="power-switch" href="#power-switch" data-enabled="false" data-enabling="false" data-l10n-id="power-switch-off"><span></span></button>
+        </div>
+        <div>
+          <button aria-label="Seek Up" id="frequency-op-seekup" href="#seekup" data-l10n-id="frequency-op-seekup"></button>
+        </div>
+      </div>
+    </div>
+    <div id="antenna-warning" class="warning" hidden>
+      <div></div>
+      <div id="antenna-warning-header" class="warning-header" data-l10n-id="noAntenna">Plug in a headset</div>
+      <div id="antenna-warning-body" class="warning-body" data-l10n-id="noAntennaMsg">FM Radio requires a plugged in headset to receive radio signals.</div>
+    </div>
+    <div id="airplane-mode-warning" class="warning" hidden>
+      <div class="warning-header" data-l10n-id="airplaneModeHeader">Airplane mode is on</div>
+      <div class="warning-body" data-l10n-id="airplaneModeMsg">Turn off Airplane mode to use FM Radio.</div>
+    </div>
+  </body>
+
+</html>

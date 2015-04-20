@@ -2,23 +2,27 @@
   "apps": [
     {
       "name": "Video",
-      "manifestURL": "http://telefonicaid.github.io/hosted-apps/video/manifest.webapp"
+      "manifestURL": "https://video-demo.hostedweb.tid.es/manifest.webapp"
     },
     {
       "name": "Clock",
-      "manifestURL": "http://telefonicaid.github.io/hosted-apps/clock/manifest.webapp"
+      "manifestURL": "https://clock-demo.hostedweb.tid.es/manifest.webapp"
     },
     {
       "name": "Radio FM",
-      "manifestURL": "http://telefonicaid.github.io/hosted-apps/fm/manifest.webapp"
+      "manifestURL": "https://fm-demo.hostedweb.tid.es/manifest.webapp"
     },
     {
       "name": "Gallery",
-      "manifestURL": "http://telefonicaid.github.io/hosted-apps/gallery/manifest.webapp"
+      "manifestURL": "https://gallery-demo.hostedweb.tid.es/manifest.webapp"
     },
     {
       "name": "Camera",
-      "manifestURL": "https://test-demo.hostedweb.tid.es/manifest.webapp"
+      "manifestURL": "https://camera-demo.hostedweb.tid.es/manifest.webapp"
+    },
+    {
+      "name": "Music",
+      "manifestURL": "https://music-demo.hostedweb.tid.es/manifest.webapp"
     }
   ]
 }
