@@ -1,72 +1,82 @@
 'use strict';
 
-var CACHE_NAME = 'cache-v1';
+// First import the offliner library. This import exports the namespaces `off`
+// to the global. `off` has three submodules, empty by default.
+importScripts('offliner.js');
 
-console.log('Offliner running!', typeof self);
+// By convention, fetchers are put inside the `off.fetchers` submodule.
+importScripts('offliner-fetcher-urls.js');
 
-self.addEventListener('install', function(event) {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(function(cache) {
-        console.log('Offliner > Opened cache');
-        importScripts('offliner-resources.js');
-        return Promise.all(resources.map(url => {
-          var bustedUrl = url + '?__b=' + Date.now();
+// Sources are in the `off.sources` submodule.
+importScripts('offliner-source-cache.js');
+importScripts('offliner-source-network.js');
 
-          var request = new Request(bustedUrl, { mode: 'no-cors' });
+// And updaters in the `off.updaters` one.
+importScripts('offliner-updater-reinstall.js');
 
-          // But when caching, the cache is for the original URL.
-          return fetch(request).then(response => {
-            if (response && response.status === 200) {
-              console.log('Offliner cached >', url);
-              cache.put(url, response);
-            }
-          });
-        }));
-      })
-  );
-});
+importScripts('offliner-resources.js');
 
-self.addEventListener('fetch', function(event) {
-  console.log('Offliner > Fetch method', !!caches, typeof event.respondWith);
-  event.respondWith(
-    caches.match(event.request)
-      .then(function(response) {
-        console.log('Offliner > Fetching', event.request.url);
-        // Cache hit - return response
-        if (response) {
-          console.log('Offliner > Returning from cache', response.status);
-          return response;
-        }
+// You can create an offliner instance using `off.Offliner` as a constructor.
+// If you want several instances of offliner, pass a unique name for each one
+// in the constructor or the persistent state for each one could conflict.
+offliner = new off.Offliner();
 
-        console.log('Offliner > No cached');
+// Offliner provides with a configurable strategy to prefetch resources. Each
+// resource is an object with a type and other data. Each fetcher has a type.
+// Offliner gathers all the resources with the same type and feeds the fetcher
+// with the matching type of those resources.
+offliner.prefetch
 
-        var fetchRequest = event.request.clone();
+  // You register a fetcher by calling `use()` with the fetcher.
+  .use(off.fetchers.urls)
 
-        return fetch(fetchRequest).then(
-          function(response) {
-            // Check if we received a valid response
-            if(!response || response.status !== 200 ||
-                response.type !== 'basic') {
-              return response;
-            }
+  // Then provide an array (you can pass a solely item as well) of resources
+  // by using `resources()`. As you can see the resources **are not objects**,
+  // if resources are not objects they are passed to the `normalize()` functions
+  // of last fetcher `use()`d.
+  .resources(resources);
 
-            var responseToCache = response.clone();
+// Offliner has a plugable fetch strategy based on fallbacks. When a resource
+// is fetched, it traverse all the source pipeline until one is able to provide
+// a response. If the source returns a rejected promise or throws an exception,
+// the request pass to the next source until reaching the end of the pipeline.
+offliner.fetch
 
-            caches.open(CACHE_NAME)
-              .then(function(cache) {
-                cache.put(event.request, responseToCache);
-              });
+  // You call `use()` to add a source to the pipeline.
+  .use(off.sources.cache)
 
-            return response;
-          }
-        );
-      }).catch(function(error) {
-        console.error(error);
-      })
-    );
-});
+  // Order is important and so, `network` source will act if `cache` is not
+  // able to answer the request.
+  .use(off.sources.network)
 
-self.addEventListener('activate', function(event) {
-  console.log('Offliner has been activated!');
-});
+  // You can use `orFail()` to quickly add an always failing strategy imitating
+  // a network error but you are not restricted to this. You could return your
+  // own custom 404 error o generate awesome error pages on the fly!
+  .orFail();
+
+// Last but not least, Offliner offers a generic update strategy. It is based
+// on the following steps:
+//
+// 1. Get the latest version. [hook]
+// 2. Determine if it is a new version. [hook]
+// 3. Prepare a new offline cache.
+// 4. Populate the new cache updating the old one. [hook]
+// 5. After the service worker is stopped and before the next _first fetch_,
+//    activate the new cache.
+//
+// As you can see, there are three [hook] marks indicating which steps can be
+// customized. These steps must be provided by the update implementation.
+offliner.update
+
+  // You call `use()` to register the update implementation providing the
+  // convinient hooks. Calling use implies calling `option('enabled', true)`.
+  .use(off.updaters.reinstall.onInstallOnly(true));
+
+  // With `onInstallOnly(true)` you need to alter the worker to trigger
+  // the update. Adding a comment will suffice. If you set it to `false`
+  // the update process will be launched each 5 minutes with the current
+  // configuration.
+
+// Lastly, use `standalone()` to install offliner as a service worker. Other
+// options will be soon available...
+offliner.standalone();

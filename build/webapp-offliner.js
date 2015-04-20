@@ -140,8 +140,7 @@ WebappOffliner.prototype.execute = function() {
 };
 
 function execute(options) {
-  var webapp = options.webapp;
-  webapp.manifest.type === 'trusted' && (new WebappOffliner(options)).execute();
+  (new WebappOffliner(options)).execute();
 }
 
 exports.execute = execute;
