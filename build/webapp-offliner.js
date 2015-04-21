@@ -64,7 +64,7 @@ WebappOffliner.prototype.addDateToWorker = function() {
   }
 
   var content = utils.getFileContent(file);
-  utils.writeContent(file, '// ' + Date.now() + content);
+  utils.writeContent(file, '// ' + Date.now() + '\n' + content);
 };
 
 WebappOffliner.prototype.addSWRegisterToManifest = function() {
@@ -78,7 +78,7 @@ WebappOffliner.prototype.addSWRegisterToManifest = function() {
   manifest.connections = manifest.connections || {};
   manifest.connections.setup = {
     rules: {},
-    handler_path: '/offliner-register.html'
+    handler_path: '/app.html'
   };
   utils.writeContent(file, JSON.stringify(manifest));
 };
