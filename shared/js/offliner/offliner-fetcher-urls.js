@@ -29,7 +29,10 @@ self.off.fetchers.urls = {
       var request = new Request(bustedUrl, { mode: 'no-cors' });
 
       // But when caching, the cache is for the original URL.
-      return fetch(request).then(cache.put.bind(cache, resource.url));
+      return fetch(request).
+             then(cache.put.bind(cache, resource.url), e => {
+               console.error(resource.url, e);
+             });
     }));
   }
 };
