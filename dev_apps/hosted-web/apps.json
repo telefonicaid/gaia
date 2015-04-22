@@ -2,27 +2,27 @@
   "apps": [
     {
       "name": "Video",
-      "manifestURL": "https://video-demo.hostedweb.tid.es/manifest.webapp"
+      "manifestURL": "http://video-demo.hostedweb.tid.es/manifest.webapp"
     },
     {
       "name": "Clock",
-      "manifestURL": "https://clock-demo.hostedweb.tid.es/manifest.webapp"
+      "manifestURL": "http://clock-demo.hostedweb.tid.es/manifest.webapp"
     },
     {
       "name": "Radio FM",
-      "manifestURL": "https://fm-demo.hostedweb.tid.es/manifest.webapp"
+      "manifestURL": "http://fm-demo.hostedweb.tid.es/manifest.webapp"
     },
     {
       "name": "Gallery",
-      "manifestURL": "https://gallery-demo.hostedweb.tid.es/manifest.webapp"
+      "manifestURL": "http://gallery-demo.hostedweb.tid.es/manifest.webapp"
     },
     {
       "name": "Camera",
-      "manifestURL": "https://camera-demo.hostedweb.tid.es/manifest.webapp"
+      "manifestURL": "http://camera-demo.hostedweb.tid.es/manifest.webapp"
     },
     {
       "name": "Music",
-      "manifestURL": "https://music-demo.hostedweb.tid.es/manifest.webapp"
+      "manifestURL": "http://music-demo.hostedweb.tid.es/manifest.webapp"
     }
   ]
 }
