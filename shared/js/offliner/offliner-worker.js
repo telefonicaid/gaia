@@ -19,7 +19,7 @@ importScripts('offliner-resources.js');
 // You can create an offliner instance using `off.Offliner` as a constructor.
 // If you want several instances of offliner, pass a unique name for each one
 // in the constructor or the persistent state for each one could conflict.
-offliner = new off.Offliner();
+var offliner = new off.Offliner();
 
 // Offliner provides with a configurable strategy to prefetch resources. Each
 // resource is an object with a type and other data. Each fetcher has a type.
