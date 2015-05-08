@@ -127,7 +127,9 @@
   // Note that the lock might be created and yet everything fail on it...
   var createLock = function() {
     var lock = new FakeSettingsLock();
-    navConnPromise.then(navConnHelper => navConnHelper.sendObject(lock));
+    navConnPromise.then(navConnHelper => {
+      console.info(lock);
+      navConnHelper.sendObject(lock);});
     return lock;
   };
 

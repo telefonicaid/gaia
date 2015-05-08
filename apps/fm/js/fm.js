@@ -920,10 +920,10 @@ window.addEventListener('load', function(e) {
   var lock = window.navigator.mozSettings.createLock();
   var request = lock.get('airplaneMode.enabled');
 
-  request.onsuccess = () => {
+  request.onsuccess = function() {
     airplaneModeEnabled = request.result['airplaneMode.enabled'];
     updateWarningModeUI();
-  };
+  }
 
   init();
 }, false);
