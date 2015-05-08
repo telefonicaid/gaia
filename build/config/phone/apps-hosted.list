@@ -35,3 +35,4 @@ apps/wallpaper
 apps/wappush
 dev_apps/hosted-web
 outoftree_apps/*
+dev_apps/shiminstaller
