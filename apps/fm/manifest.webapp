@@ -13,12 +13,6 @@
     "speaker-control":{},
     "audio-channel-content":{}
   },
-  "connections": {
-    "appsettingrequired": {
-      "description": "Communicate between Settings app and other installed apps.",
-      "rules": {}
-    }
-  },
   "locales": {
     "ar": {
       "name": "FM Radio",

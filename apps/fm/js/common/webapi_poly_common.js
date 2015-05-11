@@ -19,7 +19,7 @@
   function NavConnectHelper(serviceURL) {
 
     function debug(text) {
-      console.log('*-*-* NavConnectHelper: ' + text);
+      console.log('MANU *-*-* NavConnectHelper: ' + text);
     }
 
     return new Promise((resolve, reject) => {

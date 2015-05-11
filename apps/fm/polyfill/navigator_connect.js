@@ -76,7 +76,6 @@
     });
   };
 
-  debug('SHIM CLIENT  navigatorConnect se ejecuta!!!');
   exports.navigator.connect = !exports.navigator.connect && connectShim ||
                               undefined;
 
