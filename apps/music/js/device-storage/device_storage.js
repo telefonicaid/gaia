@@ -50,7 +50,7 @@
 (function(window) {
 
   function debug(text) {
-    console.log('MANU *-*-*- DeviceStorage PF: ' + text);
+    console.log('*-*-*- DeviceStorage PF: ' + text);
   }
 
   var realGetDeviceStorage = navigator.getDeviceStorage.bind(navigator);
@@ -155,7 +155,6 @@
 
     this.enumerate = function(path, options) {
       var params = [path, options];
-console.info(path);
       return _createAndQueueRequest({
         operation: 'enumerate',
         params: params
