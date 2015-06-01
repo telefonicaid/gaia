@@ -1,7 +1,7 @@
 {
   "name": "Gallery",
   "description": "Gaia Gallery",
-  "type": "trusted",
+  "type": "certified",
   "url": "https://gallery.hostedweb.tid.es",
   "appcache_path":"./manifest.appcache",
   "launch_path": "/index.html",
