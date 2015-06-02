@@ -1,7 +1,7 @@
 {
   "name": "Clock",
   "description": "Gaia Clock",
-  "type": "trusted",
+  "type": "certified",
   "url": "https://clock.hostedweb.tid.es",
   "appcache_path": "./manifest.appcache",
   "launch_path": "/index.html",
